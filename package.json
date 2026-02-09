@@ -1,0 +1,13 @@
+{
+  "name": "tfm-marketplace",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "lint:all": "npm run lint --prefix backend && npm run lint --prefix frontend",
+    "type-check:all": "npm run type-check --prefix backend && npm run type-check --prefix frontend"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3"
+  }
+}
