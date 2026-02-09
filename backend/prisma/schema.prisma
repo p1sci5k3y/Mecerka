@@ -1,0 +1,112 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  PROVIDER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(CLIENT)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders    Order[]  // As Client
+  products  Product[] // As Provider (if role is PROVIDER)
+}
+
+model City {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  // Relations
+  products  Product[]
+  orders    Order[]
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  slug      String   @unique
+  image_url String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  products  Product[]
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Foreign Keys
+  providerId  Int
+  cityId      Int
+  categoryId  Int
+
+  // Relations
+  provider    User     @relation(fields: [providerId], references: [id])
+  city        City     @relation(fields: [cityId], references: [id])
+  category    Category @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Order {
+  id          Int         @id @default(autoincrement())
+  totalPrice  Decimal     @db.Decimal(10, 2)
+  status      OrderStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Foreign Keys
+  clientId    Int
+  cityId      Int
+
+  // Relations
+  client      User        @relation(fields: [clientId], references: [id])
+  city        City        @relation(fields: [cityId], references: [id])
+  items       OrderItem[]
+}
+
+model OrderItem {
+  id              Int      @id @default(autoincrement())
+  quantity        Int
+  priceAtPurchase Decimal  @db.Decimal(10, 2)
+
+  // Foreign Keys
+  orderId         Int
+  productId       Int
+
+  // Relations
+  order           Order    @relation(fields: [orderId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id])
+}
