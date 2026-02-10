@@ -29,8 +29,8 @@ export class OrdersController {
   }
 
   @Get()
-  @Roles(Role.CLIENT)
+  @Roles(Role.CLIENT, Role.PROVIDER)
   findAll(@Request() req: { user: UserFromJwt }) {
-    return this.ordersService.findAll(req.user.userId);
+    return this.ordersService.findAll(req.user.userId, req.user.role);
   }
 }
