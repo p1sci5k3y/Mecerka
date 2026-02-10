@@ -40,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Servicio `ordersService.createOrder` implementado.
   - Botón "Proceed to Checkout" conectado.
   - Manejo de flujo: Auth Check -> Create Order -> Clear Cart -> Redirect Dashboard.
+- **Slice F6 (Client Dashboard):** Historial de Pedidos.
+  - Tabla de pedidos en `/dashboard` (ID, Fecha, Ciudad, Estado, Total).
+  - Integración con `GET /orders`.
+  - Estados de carga y error manejados.
 
 ### Fixed
 - **API Security:** `PrismaClientExceptionFilter` endurecido para no exponer metadatos internos (P2002/P2025 mapeados a 409/404 genericos).
