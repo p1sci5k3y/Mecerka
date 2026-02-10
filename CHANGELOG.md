@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Tabla de pedidos en `/dashboard` (ID, Fecha, Ciudad, Estado, Total).
   - Integración con `GET /orders`.
   - Estados de carga y error manejados.
+- **Slice F7 (Provider Sales):** Tablero de Ventas.
+  - Backend: `OrdersService.findAll` soporta filtrado por Rol.
+    - Clientes ven sus pedidos.
+    - Proveedores ven pedidos que contienen sus productos (aislamiento de datos).
+  - Frontend: Nueva ruta `/provider/sales` protegida.
+  - Tabla de ventas con desglose de items (Producto, Cantidad, Precio Unitario, Total).
+  - Navbar condicional para enlace "Sales".
 
 ### Fixed
 - **API Security:** `PrismaClientExceptionFilter` endurecido para no exponer metadatos internos (P2002/P2025 mapeados a 409/404 genericos).

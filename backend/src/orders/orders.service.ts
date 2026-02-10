@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 
 @Injectable()
 export class OrdersService {
@@ -93,18 +93,47 @@ export class OrdersService {
     });
   }
 
-  findAll(clientId: number) {
-    return this.prisma.order.findMany({
-      where: { clientId },
-      include: {
-        items: {
-          include: {
-            product: true,
+  findAll(userId: number, role: string) {
+    if (role === Role.CLIENT) {
+      return this.prisma.order.findMany({
+        where: { clientId: userId },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+          city: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } else if (role === Role.PROVIDER) {
+      return this.prisma.order.findMany({
+        where: {
+          items: {
+            some: {
+              product: {
+                providerId: userId,
+              },
+            },
           },
         },
-        city: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        include: {
+          items: {
+            where: {
+              product: {
+                providerId: userId,
+              },
+            },
+            include: {
+              product: true,
+            },
+          },
+          city: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+    return [];
   }
 }
