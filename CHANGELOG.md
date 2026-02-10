@@ -19,6 +19,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Validación de stock y agrupación por ciudad.
   - Snapshot de precios (`priceAtPurchase`).
   - Lógica atómica con `prisma.$transaction`.
+- **Slice F1 (Frontend):** Arquitectura base Next.js App Router.
+  - AuthProvider (Context, Memory Storage).
+  - Wrapper `apiFetch` para peticiones autenticadas.
+  - Rutas protegidas y públicas separadas por Layouts.
+- **Slice F2 (Auth Integration):** UI de Autenticación conectada.
+  - Formularios Login/Register con manejo de errores y tipos estrictos.
+  - Redirección y protección de rutas en `layout.tsx`.
+  - Dashboard reactivo al Rol del usuario.
+- **Slice F3 (Product Catalog):** Visualización pública de productos.
+  - Servicios tipados (`getProducts`, `getProductById`).
+  - Componentes `ProductCard` y Grid Layout.
+  - Estado Load/Error/Empty manejado.
+  - Botón "Edit" visible solo para el proveedor dueño.
+- **Slice F4 (Shopping Cart):** Gestión de carrito en cliente.
+  - `CartContext` con persistencia en memoria.
+  - Validación estricta: todos los productos deben ser de la misma ciudad.
+  - UI: Contador en Navbar, página `/cart` con gestión de cantidades y eliminación.
+- **Slice F5 (Checkout):** Integración con Backend.
+  - Servicio `ordersService.createOrder` implementado.
+  - Botón "Proceed to Checkout" conectado.
+  - Manejo de flujo: Auth Check -> Create Order -> Clear Cart -> Redirect Dashboard.
 
 ### Fixed
 - **API Security:** `PrismaClientExceptionFilter` endurecido para no exponer metadatos internos (P2002/P2025 mapeados a 409/404 genericos).
