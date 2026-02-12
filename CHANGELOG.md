@@ -51,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Frontend: Nueva ruta `/provider/sales` protegida.
   - Tabla de ventas con desglose de items (Producto, Cantidad, Precio Unitario, Total).
   - Navbar condicional para enlace "Sales".
+- **Slice F7 (Frontend V2 Integration):** Integración de nueva UI (v0/Lovable).
+  - Implementación de Adapter Pattern en servicios (`products-service`, `orders-service`) para transformar Data Contracts del backend a UI.
+  - Auditoría de Seguridad: JWT restringido a memoria (AuthContext), protección de rutas por roles.
+  - Features Mockeadas: UX de MFA (Profile setup) y Panel de Admin (preview data).
+  - Verificación de Build e Integración de API Real.
 
 ### Fixed
 - **API Security:** `PrismaClientExceptionFilter` endurecido para no exponer metadatos internos (P2002/P2025 mapeados a 409/404 genericos).
