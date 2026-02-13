@@ -8,6 +8,8 @@ import { CategoriesModule } from './categories/categories.module';
 import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
+import { AdminModule } from './admin/admin.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { OrdersModule } from './orders/orders.module';
     AuthModule,
     ProductsModule,
     OrdersModule,
+    AdminModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

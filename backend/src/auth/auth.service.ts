@@ -2,7 +2,9 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
+import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
@@ -15,7 +17,8 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-  ) { }
+    private emailService: EmailService,
+  ) {}
 
   async register(registerDto: RegisterDto) {
     const { email, password, name, role } = registerDto;
@@ -39,6 +42,12 @@ export class AuthService {
         role: userRole,
       },
     });
+
+    this.emailService.sendEmail(
+      email,
+      'Welcome to Mecerka',
+      `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
+    );
 
     return {
       id: user.id,
@@ -75,5 +84,20 @@ export class AuthService {
 
   async findById(id: number) {
     return this.prisma.user.findUnique({ where: { id } });
+  }
+
+  async resetPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    this.emailService.sendEmail(
+      email,
+      'Password Reset Request',
+      '<p>This is a mock password reset email.</p>',
+    );
+
+    return { message: 'Password reset email sent' };
   }
 }

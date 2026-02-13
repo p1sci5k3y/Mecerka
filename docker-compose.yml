@@ -36,5 +36,12 @@ services:
     depends_on:
       - backend
 
+  mailpit:
+    image: axllent/mailpit
+    container_name: tfm_mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
 volumes:
   postgres_data:
