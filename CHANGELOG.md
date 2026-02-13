@@ -57,6 +57,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Features Mockeadas: UX de MFA (Profile setup) y Panel de Admin (preview data).
   - Verificación de Build e Integración de API Real.
 
+### Phase 3: Governance, Administration & Communication (Nivel 3)
+#### Added
+- **Backend (Admin Module):**
+  - **Role & Security:** Added `ADMIN` role, secure seeding (`admin@meceka.local`), and global `RolesGuard`.
+  - **User Management:** Endpoints for listing, blocking, and promoting users (`PATCH`). Prevented self-modification.
+  - **Master Data:** Full CRUD for Cities and Categories with strict DTO validation.
+  - **Metrics:** Database-aggregated stats (`count`, `sum`) for Users, Orders, Clients, and Revenue.
+- **Email System (Local SMTP):**
+  - **Mailpit Integration:** Docker service running on ports 1025/8025.
+  - **Async Triggers:** Welcome email (Registration), MFA Code (Activation), and Mock Password Reset.
+  - **Availability:** Non-blocking email sending using `nodemailer`.
+- **Frontend (Admin Panel):**
+  - **Protected Routes:** `/admin/*` restricted to admins with auto-redirect.
+  - **Modern UI/UX:** Professional sidebar layout, metric cards dashboard, and responsive tables.
+  - **Management Tools:** 
+    - **Users:** Status badges (Active/Blocked) and role switching actions.
+    - **Masters:** Tabbed interface for managing Cities and Categories.
+- **Technical Governance:** 
+  - Optimized Docker setup with `mailpit`.
+  - Passed strict build/lint checks (Frontend/Backend).
+
 ### Fixed
-- **API Security:** `PrismaClientExceptionFilter` endurecido para no exponer metadatos internos (P2002/P2025 mapeados a 409/404 genericos).
-- **Validation:** Regex estricto para slugs en DTOs.
+- **Phantom Files:** Resolved IDE errors caused by stale `frontend/services/orders.ts` (removed).
+- **Linting:** Downgraded ESLint to v8 for stability and resolved all warnings (`useEffect` deps, `next/image`).
+- **Dependencies:** Fixed `otplib` import issues and `date-fns` peer conflicts.
+- **API Security:** `PrismaClientExceptionFilter` hardened (generic errors for P2002/P2025).
+- **Validation:** Strict Regex for slugs in DTOs.

@@ -20,7 +20,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) { }
+  ) {}
 
   @Post('register')
   register(@Body() registerDto: RegisterDto) {
@@ -30,6 +30,11 @@ export class AuthController {
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('reset-password')
+  resetPassword(@Body('email') email: string) {
+    return this.authService.resetPassword(email);
   }
 
   @Get('me')
@@ -45,9 +50,9 @@ export class AuthController {
     // We should fetch user email or update JWT strategy/interface.
     // For now, let's fetch user from service or Prisma.
     // Check if authService has a method to get user by ID.
-    // Or just let mfaService fetch it. 
+    // Or just let mfaService fetch it.
     // Wait, MfaService.generateMfaSecret takes (userId, email).
-    // Let's modify MfaService to look up email if only userId is passed? 
+    // Let's modify MfaService to look up email if only userId is passed?
     // Or just fetch it here.
     const user = await this.authService.findById(req.user.userId);
     if (!user) {
@@ -58,8 +63,14 @@ export class AuthController {
 
   @Post('mfa/verify')
   @UseGuards(JwtAuthGuard)
-  async verifyMfa(@Request() req: { user: UserFromJwt }, @Body('token') token: string) {
-    const isValid = await this.mfaService.verifyMfaToken(req.user.userId, token);
+  async verifyMfa(
+    @Request() req: { user: UserFromJwt },
+    @Body('token') token: string,
+  ) {
+    const isValid = await this.mfaService.verifyMfaToken(
+      req.user.userId,
+      token,
+    );
     if (!isValid) {
       throw new BadRequestException('MFA Code Invalid');
     }

@@ -1,32 +1,35 @@
-# PROJECT_STATUS.md
+# Estado del Proyecto (Project Status)
 
-## 📅 Estado Actual
-**Fase:** FASE 2 — DECISIONES FUNDAMENTALES (Validación Final)
-**Última Actualización:** 2026-02-09
+## Progreso General
+- **Fase 1 (MVP)**: Finalizada ✅
+- **Fase 2 (Autenticación y Productos)**: Finalizada ✅
+- **Fase 3 (Gobernanza y Administración)**: Finalizada ✅
+- **Fase 4 (Reglas de Negocio)**: Pendiente ⏳
 
-## 📌 1. Definición del Producto (Discovery Validado)
-**Concepto:** Marketplace local multi-proveedor focalizado en el comercio de cercanía.
-**Alcance MVP:**
-- **Web App Responsive** (Móvil/Escritorio).
-- **Regla de Oro Logística:** Un pedido = Una ciudad.
-- **Roles:** Cliente, Proveedor.
+## Hitos Completados (Milestones)
 
-## 🛡️ 2. Seguridad y Datos
-- **Auth:** JWT (Stateless). Email + Password (Argon2/Bcrypt).
-- **Datos Sensibles:** Mínimos (Email, Nombre).
-- **Riesgos Críticos:** IDOR, XSS/SQLi.
+### Fase 1: Base de Datos y API
+- [x] Modelado de base de datos (Prisma Schema).
+- [x] API CRUD para Cities y Categories.
+- [x] Seed inicial de datos.
 
-## 🏗️ 3. Arquitectura (Modular Monolith)
-- **Backend:** NestJS (Node.js) con arquitectura modular.
-- **Frontend:** Next.js (comunicación directa a API).
-- **Integración:** Docker Compose (sin API Gateway complejo para MVP).
+### Fase 2: Autenticación y Frontend Base
+- [x] Sistema de Registro y Login (JWT).
+- [x] Protección de rutas (Guards/Middleware).
+- [x] Frontend base con Next.js y Tailwind.
+- [x] Catálogo de productos público.
+- [x] Carrito de compras funcional (Local Storage).
+- [x] Checkout básico (Creación de pedidos).
 
-## 🛠️ 4. Stack Tecnológico
-- **Frontend:** Next.js + Tailwind CSS.
-- **Backend:** NestJS + Prisma ORM.
-- **Base de Datos:** PostgreSQL.
-- **Infra/DevOps:** Docker, GitHub Actions (Lint/Test/Build).
+### Fase 3: Gobernanza, Administración y Comunicación
+- [x] **Rol ADMIN**: Implementado en DB y Auth Guards.
+- [x] **Panel de Admin**: Dashboard, Gestión de Usuarios, ABM de Ciudades/Categorías.
+- [x] **Email System**: Integración con Mailpit (SMTP Local) y envíos asíncronos.
+- [x] **MFA**: Activación de doble factor (TOTP) con QR.
+- [x] **Docker**: Optimización de contenedores y orquestación con Mailpit.
+- [x] **Calidad**: Linter (ESLint v8) y Build checks pasados sin errores.
 
-## 🗂️ 5. Modelo de Datos Core
-- Tablas Maestras: `City`, `Category`.
-- Tablas Negocio: `User`, `Product`, `Order`, `OrderItem`.
+## Próximos Pasos (Fase 4)
+- Implementar lógica compleja de marketplace (comisiones, pagos divididos).
+- Refinar roles de Proveedor (panel de ventas detallado).
+- Integración con pasarela de pagos (Stripe/PayPal mock).

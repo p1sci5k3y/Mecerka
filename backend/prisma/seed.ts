@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Role } from '@prisma/client';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +19,23 @@ async function main() {
             await prisma.city.create({ data: city });
             console.log(`Created city: ${city.name}`);
         }
+    }
+
+    // Admin User
+    const adminEmail = 'admin@meceka.local';
+    const adminExists = await prisma.user.findUnique({ where: { email: adminEmail } });
+    if (!adminExists) {
+        const hashedPassword = await argon2.hash('Admin123!');
+        await prisma.user.create({
+            data: {
+                email: adminEmail,
+                password: hashedPassword,
+                name: 'Admin',
+                role: Role.ADMIN,
+                mfaEnabled: false
+            }
+        });
+        console.log('Created admin user: admin@meceka.local');
     }
 
     // Categories
