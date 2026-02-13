@@ -2,8 +2,8 @@
 
 ## Progreso General
 - **Fase 1 (MVP)**: Finalizada ✅
-- **Fase 2 (Autenticación y Productos)**: Finalizada ✅
-- **Fase 3 (Gobernanza y Administración)**: Finalizada ✅
+- **Fase 2 (Autenticación y Frontend Base)**: Finalizada ✅
+- **Fase 3 (Gobernanza, Administración y Comunicación)**: Finalizada ✅
 - **Fase 4 (Reglas de Negocio)**: Pendiente ⏳
 
 ## Hitos Completados (Milestones)

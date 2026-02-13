@@ -12,6 +12,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserFromJwt } from './interfaces/auth.interfaces';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 import { MfaService } from './mfa.service';
 
@@ -32,9 +33,13 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
+  // ...
+
+  // ...
+
   @Post('reset-password')
-  resetPassword(@Body('email') email: string) {
-    return this.authService.resetPassword(email);
+  resetPassword(@Body() resetDto: ResetPasswordDto) {
+    return this.authService.resetPassword(resetDto.email);
   }
 
   @Get('me')

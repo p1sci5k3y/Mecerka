@@ -16,6 +16,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
+import { UpdateRoleDto } from './dto/update-role.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -29,13 +30,17 @@ export class AdminController {
     return this.adminService.getAllUsers();
   }
 
+  // ... (methods)
+
+  // ...
+
   @Patch('users/:id/role')
   updateUserRole(
     @Param('id', ParseIntPipe) id: number,
-    @Body('role') role: Role,
+    @Body() dto: UpdateRoleDto,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.adminService.updateUserRole(id, role, req.user.userId);
+    return this.adminService.updateUserRole(id, dto.role, req.user.userId);
   }
 
   @Patch('users/:id/activate')

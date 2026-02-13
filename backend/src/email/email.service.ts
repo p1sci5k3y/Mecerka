@@ -13,16 +13,19 @@ export class EmailService {
     });
   }
 
-  sendEmail(to: string, subject: string, html: string) {
+  async sendEmail(to: string, subject: string, html: string) {
     // Send asynchronously without blocking the main flow
-    this.sendMailAsync(to, subject, html).catch((error) => {
+    try {
+      await this.sendMailAsync(to, subject, html);
+    } catch (error) {
       console.error(`[EmailService] Failed to send email to ${to}:`, error);
-    });
+    }
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {
+    const from = process.env.EMAIL_FROM || '"Mecerka" <no-reply@meceka.local>';
     const info = (await this.transporter.sendMail({
-      from: '"Mecerka" <no-reply@meceka.local>',
+      from,
       to,
       subject,
       html,

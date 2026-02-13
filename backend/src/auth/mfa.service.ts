@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { toDataURL } from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { authenticator } from '@otplib/preset-default';
+import { generateSecret, generateURI, verify } from 'otplib';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
@@ -9,11 +9,15 @@ export class MfaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   async generateMfaSecret(userId: number, email: string) {
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(email, 'Mecerka (Startup)', secret);
+    const secret = generateSecret();
+    const otpauthUrl = generateURI({
+      label: email,
+      issuer: 'Mecerka (Startup)',
+      secret,
+    });
 
     // Save secret to user but keep MFA disabled until verified
     await this.prisma.user.update({
@@ -23,10 +27,11 @@ export class MfaService {
 
     const qrCode = await toDataURL(otpauthUrl);
 
-    this.emailService.sendEmail(
+    // Send notification email without sensitive data
+    await this.emailService.sendEmail(
       email,
-      'MFA Activation Code',
-      `<p>Your MFA setup secret is: <b>${secret}</b></p>`,
+      'MFA Setup Initiated',
+      `<p>MFA setup has been initiated for your account. Please scan the QR code in the application to complete the process.</p>`,
     );
 
     return {
@@ -42,18 +47,18 @@ export class MfaService {
       return false;
     }
 
-    const isValid = authenticator.verify({
+    const { valid } = await verify({
       token,
       secret: user.mfaSecret,
     });
 
-    if (isValid) {
+    if (valid) {
       await this.prisma.user.update({
         where: { id: userId },
         data: { mfaEnabled: true },
       });
     }
 
-    return isValid;
+    return valid;
   }
 }

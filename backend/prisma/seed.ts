@@ -25,7 +25,11 @@ async function main() {
     const adminEmail = 'admin@meceka.local';
     const adminExists = await prisma.user.findUnique({ where: { email: adminEmail } });
     if (!adminExists) {
-        const hashedPassword = await argon2.hash('Admin123!');
+        const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
+        if (!process.env.SEED_ADMIN_PASSWORD) {
+            console.warn('WARNING: Using insecure default password for admin user. Set SEED_ADMIN_PASSWORD env var.');
+        }
+        const hashedPassword = await argon2.hash(adminPassword);
         await prisma.user.create({
             data: {
                 email: adminEmail,
