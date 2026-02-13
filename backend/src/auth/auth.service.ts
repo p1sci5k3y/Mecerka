@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   UnauthorizedException,
-  NotFoundException,
 } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
@@ -43,7 +42,7 @@ export class AuthService {
       },
     });
 
-    this.emailService.sendEmail(
+    await this.emailService.sendEmail(
       email,
       'Welcome to Mecerka',
       `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
@@ -88,16 +87,19 @@ export class AuthService {
 
   async resetPassword(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new NotFoundException('User not found');
+
+    if (user) {
+      await this.emailService.sendEmail(
+        email,
+        'Password Reset Request',
+        '<p>This is a mock password reset email.</p>',
+      );
     }
 
-    this.emailService.sendEmail(
-      email,
-      'Password Reset Request',
-      '<p>This is a mock password reset email.</p>',
-    );
-
-    return { message: 'Password reset email sent' };
+    // Always return success to prevent enumeration
+    return {
+      message:
+        'If an account with that email exists, a reset email has been sent',
+    };
   }
 }

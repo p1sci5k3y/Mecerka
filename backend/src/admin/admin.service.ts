@@ -77,6 +77,14 @@ export class AdminService {
     id: number,
     data: Partial<{ name: string; slug: string; active: boolean }>,
   ) {
+    if (data.slug) {
+      const exists = await this.prisma.city.findFirst({
+        where: { slug: data.slug, NOT: { id } },
+      });
+      if (exists) {
+        throw new ConflictException('City slug already in use');
+      }
+    }
     return this.prisma.city.update({ where: { id }, data });
   }
 
@@ -118,6 +126,14 @@ export class AdminService {
     id: number,
     data: Partial<{ name: string; slug: string; image_url: string }>,
   ) {
+    if (data.slug) {
+      const exists = await this.prisma.category.findFirst({
+        where: { slug: data.slug, NOT: { id } },
+      });
+      if (exists) {
+        throw new ConflictException('Category slug already in use');
+      }
+    }
     return this.prisma.category.update({ where: { id }, data });
   }
 
