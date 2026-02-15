@@ -14,10 +14,12 @@ import { Role, User } from '@prisma/client';
 @Injectable()
 export class AuthService {
   constructor(
-    private prisma: PrismaService,
-    private jwtService: JwtService,
-    private emailService: EmailService,
-  ) { }
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
+  ) {
+    // empty
+  }
 
   async register(registerDto: RegisterDto) {
     const { email, password, name, role } = registerDto;
@@ -42,7 +44,7 @@ export class AuthService {
       },
     });
 
-    await this.emailService.sendEmail(
+    this.emailService.sendEmail(
       email,
       'Welcome to Mecerka',
       `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
@@ -90,18 +92,11 @@ export class AuthService {
 
     if (user) {
       // Fire and forget - do not await
-      this.emailService
-        .sendEmail(
-          email,
-          'Password Reset Request',
-          '<p>This is a mock password reset email.</p>',
-        )
-        .catch((err) =>
-          console.error(
-            `[AuthService] Error sending reset email to user ${user.id}:`,
-            err,
-          ),
-        );
+      this.emailService.sendEmail(
+        email,
+        'Password Reset Request',
+        '<p>This is a mock password reset email.</p>',
+      );
     }
 
     // Always return success to prevent enumeration
