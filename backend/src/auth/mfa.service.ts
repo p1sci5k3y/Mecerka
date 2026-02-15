@@ -5,7 +5,7 @@ import { TOTP } from 'otplib';
 import { EmailService } from '../email/email.service';
 
 // authenticator in otplib v13+ is essentially a TOTP instance
-const authenticator = new TOTP({
+const totp = new TOTP({
   digits: 6,
   period: 30,
 });
@@ -22,8 +22,8 @@ export class MfaService {
   }
 
   async generateMfaSecret(userId: number, email: string) {
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.toURI({
+    const secret = totp.generateSecret();
+    const otpauthUrl = totp.toURI({
       label: email,
       issuer: 'Mecerka (Startup)',
       secret,
@@ -71,10 +71,11 @@ export class MfaService {
     let isValid = false;
     try {
       // Use class method signature: verify(token, options)
-      const result = await authenticator.verify(token, {
+      // Note: TOTP verify returns Promise<VerifyResult>, not boolean directly.
+      const { valid } = await totp.verify(token, {
         secret: userWithMfa.mfaSecret,
       });
-      isValid = result?.valid || false;
+      isValid = valid;
     } catch {
       // Handle potential errors from verify
       isValid = false;
