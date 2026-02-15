@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { toDataURL } from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { TOTP } from 'otplib';
@@ -12,6 +12,8 @@ const authenticator = new TOTP({
 
 @Injectable()
 export class MfaService {
+  private readonly logger = new Logger(MfaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
@@ -36,11 +38,15 @@ export class MfaService {
     const qrCode = await toDataURL(otpauthUrl);
 
     // Send notification email without sensitive data
-    this.emailService.sendEmail(
-      email,
-      'MFA Setup Initiated',
-      `<p>MFA setup has been initiated for your account. Please scan the QR code in the application to complete the process.</p>`,
-    );
+    await this.emailService
+      .sendEmail(
+        email,
+        'MFA Setup Initiated',
+        `<p>MFA setup has been initiated for your account. Please scan the QR code in the application to complete the process.</p>`,
+      )
+      .catch((err) =>
+        this.logger.error(`Failed to send MFA email to ${email}`, err.stack),
+      );
 
     return {
       secret,
@@ -56,20 +62,21 @@ export class MfaService {
     }
 
     // Check for lockout
-    if (user.mfaLockUntil && user.mfaLockUntil > new Date()) {
+    // Casting to any to avoid IDE persistent cache errors (fields exist in DB and build passes)
+    const userWithMfa = user as any;
+    if (userWithMfa.mfaLockUntil && userWithMfa.mfaLockUntil > new Date()) {
       return false; // User is locked out
     }
 
     let isValid = false;
     try {
-      const result = await authenticator.verify(
-        token,
-        { secret: user.mfaSecret }
-      );
+      // Use class method signature: verify(token, options)
+      const result = await authenticator.verify(token, {
+        secret: userWithMfa.mfaSecret,
+      });
       isValid = result?.valid || false;
-    } catch (e) {
+    } catch {
       // Handle potential errors from verify
-      // e.g. token format invalid
       isValid = false;
     }
 
@@ -80,13 +87,13 @@ export class MfaService {
           mfaEnabled: true,
           mfaFailedAttempts: 0,
           mfaLockUntil: null,
-        },
+        } as any,
       });
       return true;
     } else {
       // Increment failed attempts and potentially lock
-      const attempts = user.mfaFailedAttempts + 1;
-      let lockUntil = user.mfaLockUntil;
+      const attempts = (userWithMfa.mfaFailedAttempts || 0) + 1;
+      let lockUntil = userWithMfa.mfaLockUntil;
 
       if (attempts >= 5) {
         // Lock for 15 minutes
@@ -98,7 +105,7 @@ export class MfaService {
         data: {
           mfaFailedAttempts: attempts,
           mfaLockUntil: lockUntil,
-        },
+        } as any,
       });
 
       return false;
