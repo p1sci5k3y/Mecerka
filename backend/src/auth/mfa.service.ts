@@ -47,18 +47,19 @@ export class MfaService {
       return false;
     }
 
-    const result = verifySync({
+    // otplib verifySync returns an object { valid: boolean }
+    const { valid: isValid } = verifySync({
       token,
       secret: user.mfaSecret,
     });
 
-    if (result.valid) {
+    if (isValid) {
       await this.prisma.user.update({
         where: { id: userId },
         data: { mfaEnabled: true },
       });
     }
 
-    return result.valid;
+    return isValid;
   }
 }

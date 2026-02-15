@@ -28,22 +28,14 @@ export class EmailService {
       process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);
 
-    try {
-      const info = (await this.transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-      })) as { messageId: string };
-      console.log(`[EmailService] Email sent: ${info.messageId} to ${maskedTo}`);
-      return info;
-    } catch (error) {
-      console.error(
-        `[EmailService] Failed to send email to ${maskedTo}:`,
-        error,
-      );
-      throw error;
-    }
+    const info = (await this.transporter.sendMail({
+      from,
+      to,
+      subject,
+      html,
+    })) as { messageId: string };
+    console.log(`[EmailService] Email sent: ${info.messageId} to ${maskedTo}`);
+    return info;
   }
 
   private maskEmail(email: string): string {
