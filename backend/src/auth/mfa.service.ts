@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { toDataURL } from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { generateSecret, generateURI, verify } from 'otplib';
+import { generateSecret, generateURI, verifySync } from 'otplib';
 import { EmailService } from '../email/email.service';
 
 @Injectable()
@@ -47,7 +47,7 @@ export class MfaService {
       return false;
     }
 
-    const { valid } = await verify({
+    const { valid } = verifySync({
       token,
       secret: user.mfaSecret,
     });

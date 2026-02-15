@@ -17,7 +17,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private emailService: EmailService,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const { email, password, name, role } = registerDto;
@@ -89,11 +89,19 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      await this.emailService.sendEmail(
-        email,
-        'Password Reset Request',
-        '<p>This is a mock password reset email.</p>',
-      );
+      // Fire and forget - do not await
+      this.emailService
+        .sendEmail(
+          email,
+          'Password Reset Request',
+          '<p>This is a mock password reset email.</p>',
+        )
+        .catch((err) =>
+          console.error(
+            `[AuthService] Error sending reset email to user ${user.id}:`,
+            err,
+          ),
+        );
     }
 
     // Always return success to prevent enumeration
