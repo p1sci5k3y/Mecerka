@@ -47,18 +47,18 @@ export class MfaService {
       return false;
     }
 
-    const { valid } = verifySync({
+    const result = verifySync({
       token,
       secret: user.mfaSecret,
     });
 
-    if (valid) {
+    if (result.valid) {
       await this.prisma.user.update({
         where: { id: userId },
         data: { mfaEnabled: true },
       });
     }
 
-    return valid;
+    return result.valid;
   }
 }
