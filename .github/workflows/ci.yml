@@ -59,8 +59,8 @@ jobs:
           fetch-depth: 0
 
       - name: Gitleaks Secret Scan
-        uses: zricethezav/gitleaks-action@master
-        continue-on-error: true
+        uses: gitleaks/gitleaks-action@v2.3.9
+        continue-on-error: false
 
       - name: Trivy FS Scan
         uses: aquasecurity/trivy-action@master
@@ -70,7 +70,7 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-        continue-on-error: true
+        continue-on-error: false
 
       - name: SBOM Generation (Backend)
         uses: anchore/sbom-action@v0
@@ -127,7 +127,7 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Build Frontend Image
         uses: docker/build-push-action@v5
@@ -145,4 +145,4 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
-        continue-on-error: true
+        continue-on-error: false
