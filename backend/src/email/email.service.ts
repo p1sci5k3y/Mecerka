@@ -13,14 +13,9 @@ export class EmailService {
     });
   }
 
-  sendEmail(to: string, subject: string, html: string) {
+  async sendEmail(to: string, subject: string, html: string) {
     // Send asynchronously without blocking the main flow
-    this.sendMailAsync(to, subject, html).catch((error) => {
-      console.error(
-        `[EmailService] Failed to send email to ${this.maskEmail(to)}:`,
-        error,
-      );
-    });
+    return this.sendMailAsync(to, subject, html);
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {

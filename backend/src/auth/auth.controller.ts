@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserFromJwt } from './interfaces/auth.interfaces';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyMfaDto } from './dto/verify-mfa.dto';
 
 import { MfaService } from './mfa.service';
 
@@ -21,7 +22,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) {}
+  ) { }
 
   @Post('register')
   register(@Body() registerDto: RegisterDto) {
@@ -70,11 +71,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async verifyMfa(
     @Request() req: { user: UserFromJwt },
-    @Body('token') token: string,
+    @Body() verifyMfaDto: VerifyMfaDto,
   ) {
     const isValid = await this.mfaService.verifyMfaToken(
       req.user.userId,
-      token,
+      verifyMfaDto.token,
     );
     if (!isValid) {
       throw new BadRequestException('MFA Code Invalid');

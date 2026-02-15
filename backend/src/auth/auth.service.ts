@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
@@ -13,6 +14,8 @@ import { Role, User } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -44,11 +47,18 @@ export class AuthService {
       },
     });
 
-    this.emailService.sendEmail(
-      email,
-      'Welcome to Mecerka',
-      `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
-    );
+    this.emailService
+      .sendEmail(
+        email,
+        'Welcome to Mecerka',
+        `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
+      )
+      .catch((err) =>
+        this.logger.error(
+          `Failed to send welcome email to ${email}`,
+          err.stack,
+        ),
+      );
 
     return {
       id: user.id,
@@ -92,11 +102,18 @@ export class AuthService {
 
     if (user) {
       // Fire and forget - do not await
-      this.emailService.sendEmail(
-        email,
-        'Password Reset Request',
-        '<p>This is a mock password reset email.</p>',
-      );
+      this.emailService
+        .sendEmail(
+          email,
+          'Password Reset Request',
+          '<p>This is a mock password reset email.</p>',
+        )
+        .catch((err) =>
+          this.logger.error(
+            `Failed to send password reset email to ${email}`,
+            err.stack,
+          ),
+        );
     }
 
     // Always return success to prevent enumeration

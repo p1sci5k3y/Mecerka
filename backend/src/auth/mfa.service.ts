@@ -1,8 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { toDataURL } from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { generateSecret, generateURI, verifySync } from 'otplib';
+import { TOTP } from 'otplib';
 import { EmailService } from '../email/email.service';
+
+// authenticator in otplib v13+ is essentially a TOTP instance
+const authenticator = new TOTP({
+  digits: 6,
+  period: 30,
+});
 
 @Injectable()
 export class MfaService {
@@ -14,8 +20,8 @@ export class MfaService {
   }
 
   async generateMfaSecret(userId: number, email: string) {
-    const secret = generateSecret();
-    const otpauthUrl = generateURI({
+    const secret = authenticator.generateSecret();
+    const otpauthUrl = authenticator.toURI({
       label: email,
       issuer: 'Mecerka (Startup)',
       secret,
@@ -49,19 +55,53 @@ export class MfaService {
       return false;
     }
 
-    // otplib verifySync returns an object { valid: boolean }
-    const { valid: isValid } = verifySync({
-      token,
-      secret: user.mfaSecret,
-    });
+    // Check for lockout
+    if (user.mfaLockUntil && user.mfaLockUntil > new Date()) {
+      return false; // User is locked out
+    }
+
+    let isValid = false;
+    try {
+      const result = await authenticator.verify(
+        token,
+        { secret: user.mfaSecret }
+      );
+      isValid = result?.valid || false;
+    } catch (e) {
+      // Handle potential errors from verify
+      // e.g. token format invalid
+      isValid = false;
+    }
 
     if (isValid) {
       await this.prisma.user.update({
         where: { id: userId },
-        data: { mfaEnabled: true },
+        data: {
+          mfaEnabled: true,
+          mfaFailedAttempts: 0,
+          mfaLockUntil: null,
+        },
       });
-    }
+      return true;
+    } else {
+      // Increment failed attempts and potentially lock
+      const attempts = user.mfaFailedAttempts + 1;
+      let lockUntil = user.mfaLockUntil;
 
-    return isValid;
+      if (attempts >= 5) {
+        // Lock for 15 minutes
+        lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+      }
+
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          mfaFailedAttempts: attempts,
+          mfaLockUntil: lockUntil,
+        },
+      });
+
+      return false;
+    }
   }
 }

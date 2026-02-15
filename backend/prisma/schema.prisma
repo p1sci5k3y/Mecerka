@@ -33,6 +33,8 @@ model User {
   updatedAt DateTime @updatedAt
   mfaSecret String?  // Stores the TOTP secret
   mfaEnabled Boolean @default(false)
+  mfaFailedAttempts Int @default(0)
+  mfaLockUntil DateTime?
   active    Boolean  @default(true)
 
   // Relations
