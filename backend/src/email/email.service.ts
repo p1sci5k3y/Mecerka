@@ -3,7 +3,7 @@ import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -13,7 +13,7 @@ export class EmailService {
     });
   }
 
-  async sendEmail(to: string, subject: string, html: string) {
+  sendEmail(to: string, subject: string, html: string) {
     // Send asynchronously without blocking the main flow
     this.sendMailAsync(to, subject, html).catch((error) => {
       console.error(
@@ -24,8 +24,7 @@ export class EmailService {
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {
-    const from =
-      process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
+    const from = process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);
 
     const info = (await this.transporter.sendMail({

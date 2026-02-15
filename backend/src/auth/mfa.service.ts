@@ -9,7 +9,9 @@ export class MfaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
-  ) { }
+  ) {
+    // empty
+  }
 
   async generateMfaSecret(userId: number, email: string) {
     const secret = generateSecret();
@@ -28,7 +30,7 @@ export class MfaService {
     const qrCode = await toDataURL(otpauthUrl);
 
     // Send notification email without sensitive data
-    await this.emailService.sendEmail(
+    this.emailService.sendEmail(
       email,
       'MFA Setup Initiated',
       `<p>MFA setup has been initiated for your account. Please scan the QR code in the application to complete the process.</p>`,
