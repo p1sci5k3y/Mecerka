@@ -75,13 +75,13 @@ jobs:
         continue-on-error: false
 
       - name: SBOM Generation (Backend)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           path: ./backend
           artifact-name: sbom-backend.spdx.json
 
       - name: SBOM Generation (Frontend)
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@v0.22.2
         with:
           path: ./frontend
           artifact-name: sbom-frontend.spdx.json
