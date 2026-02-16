@@ -22,7 +22,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) { }
+  ) {}
 
   @Post('register')
   register(@Body() registerDto: RegisterDto) {

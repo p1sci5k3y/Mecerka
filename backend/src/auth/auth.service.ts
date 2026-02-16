@@ -56,6 +56,7 @@ export class AuthService {
       .catch((err) =>
         this.logger.error(
           `Failed to send welcome email to ${email}`,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           err.stack,
         ),
       );
@@ -111,6 +112,7 @@ export class AuthService {
         .catch((err) =>
           this.logger.error(
             `Failed to send password reset email to ${email}`,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             err.stack,
           ),
         );
