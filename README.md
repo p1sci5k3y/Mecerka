@@ -29,3 +29,8 @@ Para garantizar la calidad académica y técnica, este repositorio utiliza **Hus
 - **CI (GitHub Actions):** Bloquea merge si fallan Lint, Build o Tests en un entorno limpio.
 
 # Mecerka
+
+Copyright (c) 2026 p1sci5k3y
+Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados, para utilizar el Software sin restricción, incluyendo sin limitación los derechos para usar, copiar, modificar, fusionar, publicar y distribuir el Software, siempre que sea para fines no comerciales.
+Queda prohibida la venta, licencia o uso del Software para obtener beneficios económicos directos o indirectos.
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO.
