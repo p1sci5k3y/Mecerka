@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -166,7 +167,7 @@ export class OrdersService {
     return [];
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId: number, roles: Role[]) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -180,6 +181,17 @@ export class OrdersService {
     if (!order) {
       throw new NotFoundException(`Order ${id} not found`);
     }
+
+    if (roles.includes(Role.ADMIN)) return order;
+
+    const isClient = order.clientId === userId;
+    const isRunner = order.runnerId === userId;
+    const isProvider = order.items.some((item) => item.product.providerId === userId);
+
+    if (!isClient && !isRunner && !isProvider) {
+      throw new ForbiddenException('You do not have permission to view this order');
+    }
+
     return order;
   }
 
@@ -205,67 +217,43 @@ export class OrdersService {
   }
 
   async acceptOrder(id: number, runnerId: number) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
-
-    if (!order) {
-      throw new NotFoundException(`Order ${id} not found`);
-    }
-
-    if (order.status !== 'PENDING' || order.runnerId) {
-      throw new BadRequestException('Order is already accepted or not pending');
-    }
-
-    if (order.clientId === runnerId) {
-      throw new BadRequestException('A runner cannot accept their own order');
-    }
-
-    return this.prisma.order.update({
-      where: { id },
+    const result = await this.prisma.order.updateMany({
+      where: {
+        id,
+        status: 'PENDING',
+        runnerId: null,
+        clientId: { not: runnerId },
+      },
       data: {
         runnerId,
         status: 'CONFIRMED',
       },
     });
+
+    if (result.count === 0) {
+      throw new BadRequestException('Order is already accepted, not pending, or you cannot accept your own order');
+    }
+
+    return this.prisma.order.findUnique({ where: { id } });
   }
 
   async completeOrder(id: number, runnerId: number) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
-
-    if (!order) {
-      throw new NotFoundException(`Order ${id} not found`);
-    }
-
-    if (order.runnerId !== runnerId) {
-      throw new BadRequestException('You didn\'t accept this order');
-    }
-
-    if (order.status !== 'CONFIRMED') {
-      throw new BadRequestException('Order cannot be completed in its current state');
-    }
-
-    // In a real system, you might set this to DELIVERED or COMPLETED. 
-    // We update to COMPLETED here. We need to add COMPLETED to the enum if missing, 
-    // but the schema has CANCELLED, PENDING, CONFIRMED. We'll use CANCELLED as a placeholder 
-    // if COMPLETED is not in enum, or we can just keep it CONFIRMED.
-    // Looking at schema: enum OrderStatus { PENDING, CONFIRMED, CANCELLED }. 
-    // We should ideally add COMPLETED to schema, but for now we'll mark as CONFIRMED.
-    // Actually let's assume CONFIRMED means picked up, and we'll just return it. 
-    // If we want a final state, we should update Prisma schema. Let's do that next if needed.
-    // For now, let's keep it as CONFIRMED since the DB doesn't have COMPLETED.
-    // Wait, the task says "Update order status to completed". 
-    // Let's modify schema to include COMPLETED, then update this. 
-    // I will add COMPLETED in schema later. For now, let's try to update to 'COMPLETED' and assume Prisma DB push update will be needed.
-    // Actually, I should update schema first. Let's use string 'COMPLETED' and handle type errors. No, Prisma will throw.
-
-    // I will update the Prisma schema again. For now, 'COMPLETED' as any to pass compiler if possible, or just 'CONFIRMED' for testing.
-    // Let's stay with 'CONFIRMED' for now and fix schema in the next step.
-
-    return this.prisma.order.update({
-      where: { id },
+    const result = await this.prisma.order.updateMany({
+      where: {
+        id,
+        runnerId,
+        status: 'CONFIRMED',
+      },
       data: {
-        status: 'COMPLETED', // Enum updated
+        status: 'COMPLETED',
       },
     });
+
+    if (result.count === 0) {
+      throw new BadRequestException('Order cannot be completed in its current state, or you are not the assigned runner');
+    }
+
+    return this.prisma.order.findUnique({ where: { id } });
   }
 
   async getProviderStats(providerId: number) {

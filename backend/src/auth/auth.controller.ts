@@ -8,6 +8,7 @@ import {
   BadRequestException,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -33,6 +34,7 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Get('verify')
   async verifyEmail(@Query('token') token: string) {
     if (!token) {
@@ -41,7 +43,6 @@ export class AuthController {
     return this.authService.verifyEmail(token);
   }
 
-  // Removed register, login, reset-password as we are moving to passwordless
 
   @Get('me')
   @UseGuards(JwtAuthGuard)

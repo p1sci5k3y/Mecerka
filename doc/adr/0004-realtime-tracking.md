@@ -32,3 +32,12 @@ We implemented **WebSocket (Socket.io) Gateways**.
 
 - **Pros**: Low latency updates. Event-driven architecture fits well with NestJS.
 - **Cons**: Stateful connections require sticky sessions if scaling to multiple backend instances (requires Redis Adapter later).
+
+## Security
+The WebSocket gateway is protected by the `WsJwtAuthGuard` which decodes the JWT provided during the handshake query or `Authorization` header.
+- **Authorization**: The service enforces strict assignment validations. Only the assigned Runner, the Client, Admin, or the Provider of a product in the order can join the room.
+- **Validation**: Payload integrity ensures no unauthorized coordinate broadcasting occurs by type-checking and enforcing runner-only updates.
+
+## Error Handling
+Socket.IO exceptions are carefully caught and propagated as `WsException`. Clients connected over WebSocket receive structured Error responses, preventing unhandled promise rejections or server crashes during anomalous real-time events.
+
