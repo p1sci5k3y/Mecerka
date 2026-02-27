@@ -5,5 +5,10 @@
 
 */
 -- AlterTable
-ALTER TABLE "User" DROP COLUMN "role",
-ADD COLUMN     "roles" "Role"[] DEFAULT ARRAY['CLIENT']::"Role"[];
+ALTER TABLE "User" ADD COLUMN "roles" "Role"[] DEFAULT ARRAY['CLIENT']::"Role"[];
+
+-- Migrate Data
+UPDATE "User" SET "roles" = ARRAY["role"] WHERE "role" IS NOT NULL;
+
+-- Drop original column
+ALTER TABLE "User" DROP COLUMN "role";

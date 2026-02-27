@@ -3,6 +3,7 @@ import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
+// eslint-disable-next-line sonarjs/cognitive-complexity
 async function main() {
     console.log('Seeding database...');
 
@@ -66,7 +67,8 @@ async function main() {
             name: 'Runner Pro (Sol)',
             baseLat: 40.4168, // Puerta del Sol
             baseLng: -3.7038,
-            priceBase: 2.50,
+            priceBase: 2.5,
+            pricePerKm: 0.5,
             maxDistanceKm: 10,
             ratingAvg: 4.9,
             isActive: true
@@ -76,18 +78,20 @@ async function main() {
             name: 'Runner Eco (Atocha)',
             baseLat: 40.4065, // Atocha
             baseLng: -3.6896,
-            price: 15.5,
-            pricePerKm: 0.40,
+            priceBase: 15.5,
+            pricePerKm: 0.4,
+            maxDistanceKm: 10,
             ratingAvg: 4.2,
             isActive: true
         },
         {
             email: 'runner3@meceka.local',
             name: 'Runner Far (Chamartín)',
-            baseLat: 40.4720, // Chamartín
-            baseLng: -3.6820,
-            priceBase: 2.00,
-            pricePerKm: 0.50,
+            baseLat: 40.472, // Chamartín
+            baseLng: -3.682,
+            priceBase: 2,
+            pricePerKm: 0.5,
+            maxDistanceKm: 10,
             ratingAvg: 4.5,
             isActive: true
         }
@@ -156,9 +160,9 @@ async function main() {
 
         // 2. Create Products for Provider
         const products = [
-            { name: 'Manzanas Golden (1kg)', price: 2.50, stock: 100, categoryId: alimentacion.id },
-            { name: 'Pan Artesano', price: 1.20, stock: 50, categoryId: alimentacion.id },
-            { name: 'Camiseta Básica', price: 15.00, stock: 200, categoryId: moda.id } // Different category
+            { name: 'Manzanas Golden (1kg)', price: 2.5, stock: 100, categoryId: alimentacion.id },
+            { name: 'Pan Artesano', price: 1.2, stock: 50, categoryId: alimentacion.id },
+            { name: 'Camiseta Básica', price: 15, stock: 200, categoryId: moda.id } // Different category
         ];
 
         for (const p of products) {
@@ -202,8 +206,8 @@ async function main() {
                 emailVerified: true,
                 // Juan Cliente -> Parque del Retiro, Madrid
                 address: 'Parque del Retiro',
-                latitude: 40.4180,
-                longitude: -3.6830
+                latitude: 40.418,
+                longitude: -3.683
             }
         });
         console.log(`Created client: ${client.name}`);
@@ -212,6 +216,7 @@ async function main() {
     console.log('Seeding completed.');
 }
 
+// eslint-disable-next-line unicorn/prefer-top-level-await
 main()
     .catch((e) => {
         console.error(e);

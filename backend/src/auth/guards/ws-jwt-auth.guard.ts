@@ -5,10 +5,10 @@ import { Socket } from 'socket.io';
 
 @Injectable()
 export class WsJwtAuthGuard implements CanActivate {
-    private logger = new Logger('WsJwtAuthGuard');
+    private readonly logger = new Logger('WsJwtAuthGuard');
 
     constructor(
-        private jwtService: JwtService,
+        private readonly jwtService: JwtService,
     ) { }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -25,8 +25,13 @@ export class WsJwtAuthGuard implements CanActivate {
                 throw new WsException('Unauthorized');
             }
 
+            const jwtSecret = process.env.JWT_SECRET;
+            if (!jwtSecret) {
+                throw new Error('JWT_SECRET configuration is missing');
+            }
+
             const payload = await this.jwtService.verifyAsync(token, {
-                secret: process.env.JWT_SECRET || 'secretKey',
+                secret: jwtSecret,
             });
 
             // Attach user to socket object so it can be accessed in Gateway
