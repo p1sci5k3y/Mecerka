@@ -22,6 +22,7 @@ enum OrderStatus {
   PENDING
   CONFIRMED
   COMPLETED
+  DELIVERED
   CANCELLED
 }
 
@@ -37,6 +38,7 @@ model User {
   updatedAt DateTime @updatedAt
   emailVerified Boolean @default(false)
   verificationToken String? @unique
+  verificationTokenExpiresAt DateTime?
   mfaSecret String?  // Stores the TOTP secret
   mfaEnabled Boolean @default(false)
   mfaFailedAttempts Int @default(0)
@@ -161,7 +163,7 @@ model RunnerProfile {
 
   // Status & Metrics
   isActive      Boolean  @default(true)
-  ratingAvg     Decimal  @default(5.0) @db.Decimal(3, 2)
+  ratingAvg     Decimal? @db.Decimal(3, 2)
   ratingCount   Int      @default(0)
 
   createdAt     DateTime @default(now())

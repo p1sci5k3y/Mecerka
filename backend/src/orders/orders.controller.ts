@@ -78,4 +78,13 @@ export class OrdersController {
   findAll(@Request() req: { user: UserFromJwt }) {
     return this.ordersService.findAll(req.user.userId, req.user.roles);
   }
+
+  @Get(':id')
+  @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER, Role.ADMIN)
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.ordersService.findOne(id, req.user.userId, req.user.roles);
+  }
 }

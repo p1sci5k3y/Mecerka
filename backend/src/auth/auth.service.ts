@@ -11,9 +11,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as argon2 from 'argon2';
-import { Role, User } from '@prisma/client';
-import { DISPOSABLE_DOMAINS } from '../common/utils/disposable-domains';
-import * as crypto from 'crypto';
+import { Role } from '@prisma/client';
+import * as crypto from 'node:crypto';
 
 @Injectable()
 export class AuthService {
@@ -44,15 +43,20 @@ export class AuthService {
         password: hashedPassword,
         name: name || email.split('@')[0], // Default name
         roles: role ? [role] : [Role.CLIENT], // Default role array
-        mfaEnabled: true, // User must set up MFA explicitly
+        mfaEnabled: false, // User must set up MFA explicitly
         verificationToken,
+        verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         emailVerified: false,
       },
     });
 
-    this.logger.log(`Created new user ${user.id} (${user.email}) with verification token`);
+    this.logger.log(`Created new user ${user.id} with verification token`);
 
-    await this.emailService.sendVerificationEmail(user.email, verificationToken);
+    try {
+      await this.emailService.sendVerificationEmail(user.email, verificationToken);
+    } catch (e) {
+      this.logger.error(`Failed to send verification email to user ${user.id}:`, e);
+    }
 
     return {
       message: 'Cuenta creada. Por favor, revisa tu correo para verificar tu cuenta.',
@@ -64,22 +68,23 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      this.logger.warn(`Login failed: User not found for ${email}`);
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      this.logger.warn(`Login failed: User not found for ${emailHash}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
     if (!user.emailVerified) {
-      this.logger.warn(`Login failed: Email not verified for ${email}`);
-      throw new UnauthorizedException('Debes validar tu correo antes de iniciar sesión.');
+      this.logger.warn(`Login failed: Email not verified for user ${user.id}`);
+      throw new UnauthorizedException('Credenciales inválidas');
     }
 
     const isPasswordValid = await argon2.verify(user.password, password);
     if (!isPasswordValid) {
-      this.logger.warn(`Login failed: Invalid password for ${email}`);
+      this.logger.warn(`Login failed: Invalid password for user ${user.id}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    this.logger.log(`User logged in: ${user.id} (${user.email})`);
+    this.logger.log(`User logged in: ${user.id}`);
 
     const sessionPayload = { sub: user.id, email: user.email, roles: user.roles };
     const accessToken = this.jwtService.sign(sessionPayload);
@@ -98,7 +103,7 @@ export class AuthService {
 
   async verifyEmail(token: string) {
     const user = await this.prisma.user.findUnique({ where: { verificationToken: token } });
-    if (!user) {
+    if (!user?.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
       throw new BadRequestException('Token de verificación inválido o expirado.');
     }
 
