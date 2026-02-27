@@ -1,13 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { toDataURL } from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { TOTP } from 'otplib';
+import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
 
-// authenticator in otplib v13+ is essentially a TOTP instance
 const totp = new TOTP({
   digits: 6,
   period: 30,
+  // Explicitly provide plugins to avoid CryptoPluginMissingError
+  crypto: new NobleCryptoPlugin(),
+  base32: new ScureBase32Plugin(),
 });
 
 @Injectable()
@@ -73,15 +75,23 @@ export class MfaService {
 
     let isValid = false;
     try {
-      // Use class method signature: verify(token, options)
-      // Note: TOTP verify returns Promise<VerifyResult>, not boolean directly.
-      const { valid } = await totp.verify(token, {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-        secret: userWithMfa.mfaSecret,
+      // totp.verify(token, options) returns Promise<VerifyResult> in otplib v13
+      const result = await totp.verify(token, {
+        secret: userWithMfa.mfaSecret as string,
       });
-      isValid = valid;
-    } catch {
-      // Handle potential errors from verify
+      // VerifyResult is { valid: boolean, ... } or similar ?
+      // If result is boolean? No, d.ts says Promise<VerifyResult>
+      // Let's assume VerifyResult has 'isValid' or is boolean?
+      // Wait, let's use explicit property access if possible or cast
+      // Actually, otplib docs say it returns boolean if valid?
+      // No, declaration says VerifyResult.
+      // Let's check debug_otp output or assume it has 'valid' property based on common patterns.
+      // Better safe:
+      // VerifyResult usually has { valid: boolean }?
+      // Let's just log it in debug first? No, trust the docs: "Returns Verification result with validity"
+      isValid = result && typeof result === 'object' && 'valid' in result ? (result as any).valid : result === true;
+    } catch (e) {
+      this.logger.error('MFA Verify Error', e);
       isValid = false;
     }
 

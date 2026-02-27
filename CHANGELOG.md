@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Phase 4: Real-time & Security (Nivel 3/4)
+### Added
+- **Authentication Overhaul:**
+  - **Magic Links:** Removed password auth in favor of email-based magic links.
+  - **MFA Enforcement:** Mandatory 2FA/OTP setup for all users.
+  - **Role Management:** Migrated to array-based roles support (Client, Provider, Runner, Admin).
+- **Provider Features:**
+  - **Inventory Management:** Complete UI/UX for creating, editing, and listing products.
+  - **Sales Analytics:**
+    - Interactive comparison charts using `recharts`.
+    - "Star Product" identification.
+    - Detailed sales history and revenue metrics.
+  - **Security:** "My Products" endpoint to ensure data isolation.
+
+### Changed
+- **Navigation:** Adaptive Navbar links based on user role (e.g., "Inventory" for Providers).
+- **Refactor:** improved `OrdersService` and `ProductsService` to handle role-based logic.
+
+### Fixed
+- **Registration:** Fixed validation logic for new Provider/Runner flows.
+- **MFA:** Resolved OTP verification issues with `otplib` version mismatch.
+
+#### Fixed
+- **Docker:** Fixed backend build command (`tsc -p tsconfig.build.json`) and service names.
+- **WebSocket:** Corrected namespace (`/tracking`) and CORS issues.
+- **Routing:** Fixed Next.js 404 errors by consolidating `app` directory structure.
+- **Stability:** Added client-side mounting checks for Map components to prevent SSR hydration errors.
+
 ### Added
 - Documentación inicial: README.md, PROJECT_STATUS.md, y estructura de gobierno.
 - Definición de alcance y requisitos (Discovery Phase).

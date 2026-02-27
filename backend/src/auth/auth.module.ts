@@ -18,6 +18,6 @@ import { MfaService } from './mfa.service';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, MfaService],
-  exports: [AuthService, MfaService],
+  exports: [AuthService, MfaService, JwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }

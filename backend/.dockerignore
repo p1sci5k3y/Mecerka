@@ -8,3 +8,7 @@ coverage
 .git
 .gitignore
 test
+.vscode
+.idea
+*.md
+

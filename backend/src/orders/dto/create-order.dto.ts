@@ -3,6 +3,8 @@ import {
   IsArray,
   IsInt,
   IsPositive,
+  IsString,
+  IsOptional,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -23,4 +25,11 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
   items: OrderItemDto[];
+
+  @IsOptional()
+  @IsString()
+  deliveryAddress?: string;
+
+  @IsString()
+  pin: string;
 }
