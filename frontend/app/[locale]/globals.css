@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Paper (#FBF6EE) */
+    --background: 37 50% 96%; 
+    /* Ink (#1E1B16) */
+    --foreground: 38 15% 10%; 
+    
+    --card: 37 50% 96%;
+    --card-foreground: 38 15% 10%;
+ 
+    --popover: 37 50% 96%;
+    --popover-foreground: 38 15% 10%;
+ 
+    /* Clay (#A24A2A) */
+    --primary: 16 59% 40%; 
+    --primary-foreground: 37 50% 96%;
+ 
+    /* Leaf (#2F5D50) */
+    --secondary: 163 33% 28%; 
+    --secondary-foreground: 37 50% 96%;
+ 
+    /* Mist (#E8DED1) */
+    --muted: 34 30% 86%; 
+    --muted-foreground: 38 15% 40%;
+ 
+    /* Sun (#F2C14E) */
+    --accent: 42 87% 63%; 
+    --accent-foreground: 38 15% 10%;
+ 
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    /* Mist */
+    --border: 34 30% 86%;
+    --input: 34 30% 86%;
+    /* Clay */
+    --ring: 16 59% 40%;
+ 
+    /* Organic, softer borders */
+    --radius: 0.75rem; 
+  }
+ 
+  .dark {
+    /* Mapped to Dark Ink */
+    --background: 38 15% 10%; 
+    --foreground: 37 50% 96%;
+ 
+    --card: 38 15% 12%;
+    --card-foreground: 37 50% 96%;
+ 
+    --popover: 38 15% 12%;
+    --popover-foreground: 37 50% 96%;
+ 
+    --primary: 16 59% 50%;
+    --primary-foreground: 38 15% 10%;
+ 
+    --secondary: 163 33% 38%;
+    --secondary-foreground: 37 50% 96%;
+ 
+    --muted: 38 15% 20%;
+    --muted-foreground: 34 30% 70%;
+ 
+    --accent: 42 87% 63%;
+    --accent-foreground: 38 15% 10%;
+ 
+    --destructive: 0 62.8% 40.6%;
+    --destructive-foreground: 37 50% 96%;
+ 
+    --border: 38 15% 20%;
+    --input: 38 15% 20%;
+    --ring: 16 59% 50%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}

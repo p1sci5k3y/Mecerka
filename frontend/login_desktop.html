@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mercado Vivo - Artisan Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;family=Newsreader:ital,wght@0,400;0,600;1,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#e07b61",
+                        "background-light": "#f8f6f6",
+                        "background-dark": "#201512",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "serif": ["Newsreader", "serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased h-screen overflow-hidden">
+<div class="flex h-full w-full">
+<!-- Left Column: Login Form -->
+<div class="w-full lg:w-1/2 flex flex-col justify-between p-8 lg:p-16 xl:p-24 bg-[#FBF6EE] dark:bg-background-dark transition-colors duration-300">
+<!-- Header/Logo -->
+<div class="flex items-center gap-3">
+<div class="text-primary">
+<span class="material-symbols-outlined text-4xl">grid_view</span>
+</div>
+<h1 class="font-serif text-2xl font-semibold tracking-tight">Mercado Vivo</h1>
+</div>
+<!-- Login Content -->
+<div class="max-w-md w-full mx-auto">
+<div class="mb-10">
+<h2 class="font-serif text-4xl lg:text-5xl mb-4 italic">Welcome back</h2>
+<p class="text-slate-600 dark:text-slate-400 font-light leading-relaxed">
+                        Sign in to access your curated collection of handmade treasures and connect with master artisans.
+                    </p>
+</div>
+<form class="space-y-6">
+<div class="space-y-2">
+<label class="text-xs uppercase tracking-widest font-semibold text-slate-500" for="email">Email Address</label>
+<input class="w-full bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:ring-0 focus:border-primary px-0 py-3 text-lg font-light transition-all placeholder:text-slate-400" id="email" placeholder="artisanal@mercadovivo.com" type="email"/>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-center">
+<label class="text-xs uppercase tracking-widest font-semibold text-slate-500" for="password">Password</label>
+<a class="text-xs uppercase tracking-widest font-semibold text-primary hover:opacity-80 transition-opacity" href="#">Forgot?</a>
+</div>
+<div class="relative">
+<input class="w-full bg-transparent border-0 border-b border-slate-300 dark:border-slate-700 focus:ring-0 focus:border-primary px-0 py-3 text-lg font-light transition-all placeholder:text-slate-400" id="password" placeholder="••••••••" type="password"/>
+<button class="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors" type="button">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<div class="pt-6">
+<button class="w-full bg-primary text-white py-4 rounded-lg font-medium tracking-wide hover:shadow-lg hover:shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
+                            Sign In to Mercado
+                            <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+<div class="flex items-center gap-4 py-4">
+<div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div>
+<span class="text-xs text-slate-400 uppercase tracking-tighter">or continue with</span>
+<div class="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors" type="button">
+<img alt="Google" class="w-5 h-5" data-alt="Google logo icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2E0Yr4ov3sNptO8UviwDYcHJHiIrFmPbG-1r5o1fA2GIvadZIQB5PvvJY9CGOfEsQ_JUyQ4A0jf-2bx4B0RfSJH59ypks2e6lJXzQR4LKeJSttcaSodODvgXCpnyJ6SHUuX09AUrUlFnckQkuGUy0rEdtmguxfRA7kcXVWMfbMmZcC-i8VACnH4IEZsHTnYP4O8vMw7wjHNOp0O0yyNVAsVB316ewL17RDDy-WtD1ajGZXThzkUAb3TlkjXV-z5Xz7cufs04tKW8"/>
+<span class="text-sm font-medium">Google</span>
+</button>
+<button class="flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors" type="button">
+<img alt="Apple" class="w-5 h-5" data-alt="Apple logo icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxRCC68Vav1jmjFbubjb8KlpTBpqwfdOHhDSiDPEgvAvour5UNi8g5-BDU2DvErVTx44Id-Cpzpb20umcVh4UH4pRU_tuKieLVjJ5UvZwef5lEZDA-4tEtx1g-nwDCnT80lYCX30__r8rgvUcobgthFoV8haaXXfKpohWO6EOL_X8kELfEtRBbuAVmlpZxc1jWwIfkoFtOIA2HmV_sR3ui47EVyBraCSUl6eNNnzArj5xGgQA-q5djrDSnaCfGTb_l8wluti2NIPc"/>
+<span class="text-sm font-medium">Apple</span>
+</button>
+</div>
+</form>
+<p class="mt-12 text-center text-sm text-slate-500">
+                    New to our marketplace? 
+                    <a class="text-primary font-semibold hover:underline underline-offset-4" href="#">Create an account</a>
+</p>
+</div>
+<!-- Footer -->
+<div class="flex flex-wrap justify-center lg:justify-start gap-6 text-[10px] uppercase tracking-[0.2em] text-slate-400">
+<a class="hover:text-primary transition-colors" href="#">Sustainability</a>
+<a class="hover:text-primary transition-colors" href="#">Privacy</a>
+<a class="hover:text-primary transition-colors" href="#">Terms</a>
+<a class="hover:text-primary transition-colors" href="#">Journal</a>
+</div>
+</div>
+<!-- Right Column: Visual Inspiration -->
+<div class="hidden lg:block lg:w-1/2 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Artisanal pottery and handcrafted textiles in warm sunlight" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCppnsmbfjHrbB2bO_r1q6Hut95Cg2ZceH49cxQyAB2vNKSQKVbkny-g3MefmL40VH9-z4yaSQBoZ-KAUx2J6B0avrK0rtGmIEKoeBNW3BPx77PiJQfQjKZqyYvBm5TiJf9haG_tzhRXdmHamGS1KI9Rec5lBhlx0gNvz_uVDgx9vufMZ-HoCnxJ85gMfPniDNo6T77erzdJ6Zn5ICMsQ5vCLjsCF5Lhrx0_Z_E-3BkhrI6retC2dXF5cv-wUY_fa4mKLqMctr4uf4');">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20"></div>
+<!-- Floating Quote/Detail -->
+<div class="absolute bottom-12 left-12 right-12 text-white p-8 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
+<div class="flex items-center gap-2 mb-4">
+<div class="h-px w-8 bg-primary"></div>
+<span class="text-xs uppercase tracking-[0.3em] font-light">Featured Artisan</span>
+</div>
+<h3 class="font-serif text-3xl mb-2">Elena Rossi</h3>
+<p class="font-light text-slate-200 italic">"Every piece of pottery tells a story of the earth it came from and the hands that shaped its destiny."</p>
+<div class="mt-6 flex gap-4">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-primary text-sm">location_on</span>
+<span class="text-xs font-light tracking-widest uppercase" data-location="Florence, Italy">Florence, Italy</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>
