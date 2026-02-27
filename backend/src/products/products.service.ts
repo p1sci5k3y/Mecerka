@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   create(createProductDto: CreateProductDto, providerId: number) {
     return this.prisma.product.create({
@@ -22,6 +22,19 @@ export class ProductsService {
 
   findAll() {
     return this.prisma.product.findMany({
+      include: {
+        city: true,
+        category: true,
+        provider: {
+          select: { id: true, name: true, email: true },
+        },
+      },
+    });
+  }
+
+  findMyProducts(providerId: number) {
+    return this.prisma.product.findMany({
+      where: { providerId },
       include: {
         city: true,
         category: true,

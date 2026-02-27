@@ -6,47 +6,55 @@ import {
   Request,
   UseGuards,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserFromJwt } from './interfaces/auth.interfaces';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
-
-import { MfaService } from './mfa.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) {}
+  ) { }
 
   @Post('register')
-  register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
   }
 
   @Post('login')
-  login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto);
   }
 
-  // ...
-
-  // ...
-
-  @Post('reset-password')
-  resetPassword(@Body() resetDto: ResetPasswordDto) {
-    return this.authService.resetPassword(resetDto.email);
+  @Get('verify')
+  async verifyEmail(@Query('token') token: string) {
+    if (!token) {
+      throw new BadRequestException('Token is required');
+    }
+    return this.authService.verifyEmail(token);
   }
+
+  // Removed register, login, reset-password as we are moving to passwordless
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  getProfile(@Request() req: { user: UserFromJwt }) {
-    return req.user;
+  async getProfile(@Request() req: { user: UserFromJwt }) {
+    const user = await this.authService.findById(req.user.userId);
+    if (!user) throw new BadRequestException('User not found');
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      roles: user.roles,
+      mfaEnabled: user.mfaEnabled,
+    };
   }
 
   @Post('mfa/setup')

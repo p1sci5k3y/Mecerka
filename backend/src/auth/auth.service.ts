@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
@@ -11,6 +12,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as argon2 from 'argon2';
 import { Role, User } from '@prisma/client';
+import { DISPOSABLE_DOMAINS } from '../common/utils/disposable-domains';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -24,104 +27,93 @@ export class AuthService {
     // empty
   }
 
-  async register(registerDto: RegisterDto) {
-    const { email, password, name, role } = registerDto;
+  async register(dto: RegisterDto) {
+    const { email, password, name, role } = dto;
 
-    const userExists = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (userExists) {
-      throw new ConflictException('Email already in use');
+    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      throw new ConflictException('Un usuario con este correo ya existe');
     }
 
     const hashedPassword = await argon2.hash(password);
-    const userRole = role || Role.CLIENT;
+    const verificationToken = crypto.randomUUID();
 
     const user = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        name: name || '',
-        role: userRole,
+        name: name || email.split('@')[0], // Default name
+        roles: role ? [role] : [Role.CLIENT], // Default role array
+        mfaEnabled: true, // User must set up MFA explicitly
+        verificationToken,
+        emailVerified: false,
       },
     });
 
-    this.emailService
-      .sendEmail(
-        email,
-        'Welcome to Mecerka',
-        `<h1>Welcome ${name || 'User'}!</h1><p>Thanks for registering.</p>`,
-      )
-      .catch((err) =>
-        this.logger.error(
-          `Failed to send welcome email to ${email}`,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-          err.stack,
-        ),
-      );
+    this.logger.log(`Created new user ${user.id} (${user.email}) with verification token`);
+
+    await this.emailService.sendVerificationEmail(user.email, verificationToken);
 
     return {
-      id: user.id,
-      email: user.email,
-      role: user.role,
+      message: 'Cuenta creada. Por favor, revisa tu correo para verificar tu cuenta.',
     };
   }
 
-  async validateUser(
-    email: string,
-    pass: string,
-  ): Promise<Omit<User, 'password'> | null> {
+  async login(dto: LoginDto) {
+    const { email, password } = dto;
     const user = await this.prisma.user.findUnique({ where: { email } });
-    if (user && (await argon2.verify(user.password, pass))) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { password, ...result } = user;
-      return result;
+
+    if (!user) {
+      this.logger.warn(`Login failed: User not found for ${email}`);
+      throw new UnauthorizedException('Credenciales inválidas');
     }
-    return null;
+
+    if (!user.emailVerified) {
+      this.logger.warn(`Login failed: Email not verified for ${email}`);
+      throw new UnauthorizedException('Debes validar tu correo antes de iniciar sesión.');
+    }
+
+    const isPasswordValid = await argon2.verify(user.password, password);
+    if (!isPasswordValid) {
+      this.logger.warn(`Login failed: Invalid password for ${email}`);
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
+    this.logger.log(`User logged in: ${user.id} (${user.email})`);
+
+    const sessionPayload = { sub: user.id, email: user.email, roles: user.roles };
+    const accessToken = this.jwtService.sign(sessionPayload);
+
+    return {
+      access_token: accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        roles: user.roles,
+        mfaEnabled: user.mfaEnabled,
+        hasPin: !!user.pin
+      }
+    };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.validateUser(loginDto.email, loginDto.password);
+  async verifyEmail(token: string) {
+    const user = await this.prisma.user.findUnique({ where: { verificationToken: token } });
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new BadRequestException('Token de verificación inválido o expirado.');
     }
 
-    // user is typed now
-    const payload = { sub: user.id, role: user.role };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, verificationToken: null },
+    });
+
+    return { message: 'Cuenta verificada con éxito.' };
   }
 
   async findById(id: number) {
-    return this.prisma.user.findUnique({ where: { id } });
-  }
-
-  async resetPassword(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-
-    if (user) {
-      // Fire and forget - do not await
-      this.emailService
-        .sendEmail(
-          email,
-          'Password Reset Request',
-          '<p>This is a mock password reset email.</p>',
-        )
-        .catch((err) =>
-          this.logger.error(
-            `Failed to send password reset email to ${email}`,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            err.stack,
-          ),
-        );
-    }
-
-    // Always return success to prevent enumeration
-    return {
-      message:
-        'If an account with that email exists, a reset email has been sent',
-    };
+    this.logger.log(`Finding user by ID: ${id}`);
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) this.logger.warn(`User ${id} not found`);
+    return user;
   }
 }
