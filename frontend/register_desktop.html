@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Mercado Vivo - Join Our Community</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#e07d61",
+                "background-light": "#fbf6ee",
+                "background-dark": "#201512",
+              },
+              fontFamily: {
+                "display": ["Inter", "sans-serif"],
+                "serif": ["Newsreader", "serif"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+      </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .serif-text {
+            font-family: 'Newsreader', serif;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex items-center justify-center overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- Left Column: Registration Form -->
+<div class="w-full lg:w-1/2 flex flex-col justify-between p-8 lg:p-20 overflow-y-auto">
+<header class="flex items-center gap-2 mb-12">
+<div class="text-primary">
+<svg class="size-6" fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-xl font-bold tracking-tight">Mercado Vivo</h2>
+</header>
+<div class="max-w-md w-full mx-auto">
+<h1 class="serif-text text-4xl lg:text-5xl text-slate-900 dark:text-slate-100 mb-4 font-medium italic">Create an Account</h1>
+<p class="text-slate-600 dark:text-slate-400 text-lg mb-10">Discover premium artisanal treasures curated from around the world.</p>
+<form class="space-y-6">
+<div class="space-y-2">
+<label class="text-slate-800 dark:text-slate-200 text-sm font-medium">Full Name</label>
+<input class="w-full h-14 px-4 bg-white dark:bg-background-dark/50 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400" placeholder="Sofia Alva" type="text"/>
+</div>
+<div class="space-y-2">
+<label class="text-slate-800 dark:text-slate-200 text-sm font-medium">Email Address</label>
+<input class="w-full h-14 px-4 bg-white dark:bg-background-dark/50 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400" placeholder="hello@example.com" type="email"/>
+</div>
+<div class="space-y-2 relative">
+<label class="text-slate-800 dark:text-slate-200 text-sm font-medium">Password</label>
+<input class="w-full h-14 px-4 bg-white dark:bg-background-dark/50 border border-primary/20 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all outline-none text-slate-900 dark:text-slate-100 placeholder:text-slate-400" placeholder="••••••••" type="password"/>
+<span class="material-symbols-outlined absolute right-4 top-11 text-slate-400 cursor-pointer select-none">visibility</span>
+</div>
+<div class="flex items-center gap-2 py-2">
+<input class="rounded border-primary/30 text-primary focus:ring-primary" id="terms" type="checkbox"/>
+<label class="text-sm text-slate-600 dark:text-slate-400" for="terms">I agree to the <a class="text-primary hover:underline" href="#">Terms of Service</a> and <a class="text-primary hover:underline" href="#">Privacy Policy</a></label>
+</div>
+<button class="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold rounded-lg shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2" type="submit">
+                        Create Account
+                    </button>
+</form>
+<div class="mt-8 pt-8 border-t border-primary/10 flex flex-col gap-4 text-center">
+<p class="text-slate-600 dark:text-slate-400 text-sm">Already have an account? <a class="text-primary font-bold hover:underline" href="#">Log In</a></p>
+</div>
+</div>
+<footer class="mt-auto pt-10 text-slate-400 text-xs">
+                © 2024 Mercado Vivo Artisanal Shop. All rights reserved.
+            </footer>
+</div>
+<!-- Right Column: Editorial Visuals -->
+<div class="hidden lg:block lg:w-1/2 relative">
+<div class="absolute inset-0 bg-cover bg-center" data-alt="Close up of organic linen and dry botanical elements" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCaT8Sb6iLYCQlq0xXQHStmsw7ZyhvwGrEWt2WY9YHSw_jakJU0U6UyAktYTfRTIgktQi8nmr1j3qTUVKBtFXr-TRn3vr-v6MylU_lB28xz6X32LOuWEAdt-ITDvMacV_-_hlDnFvk158ctiPQWQlDDGJjfab5hvfJkPjKJuVnIqSKlOgIPsQVBj_qCvKEhi8jo1s5G8sCcsMqT1GV747nw7kELj5PDFsZ_k_2Iwd7iKuhn7M51H3tsApWIZdaz3kNqoR29LP6KVdg')">
+<div class="absolute inset-0 bg-primary/10 mix-blend-multiply"></div>
+</div>
+<div class="absolute bottom-20 left-12 right-12 text-white">
+<div class="p-8 backdrop-blur-md bg-black/10 border border-white/20 rounded-xl">
+<span class="material-symbols-outlined text-primary mb-4 text-3xl">format_quote</span>
+<p class="serif-text text-3xl italic leading-relaxed mb-6">"Our mission is to preserve the soul of craftsmanship by connecting you directly with the world's most talented artisans."</p>
+<div class="flex items-center gap-3">
+<div class="w-10 h-px bg-white/50"></div>
+<span class="uppercase tracking-widest text-xs font-semibold">The Founders, Mercado Vivo</span>
+</div>
+</div>
+</div>
+<div class="absolute top-8 right-8 flex gap-4">
+<a class="text-white hover:text-primary transition-colors" href="#"><span class="material-symbols-outlined">shopping_bag</span></a>
+<a class="text-white hover:text-primary transition-colors" href="#"><span class="material-symbols-outlined">help</span></a>
+</div>
+</div>
+</div>
+
+```</body></html>

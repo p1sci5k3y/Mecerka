@@ -1,0 +1,18 @@
+{
+    "Navbar": {
+        "catalog": "Catálogo",
+        "login": "Iniciar sesión",
+        "register": "Crear cuenta",
+        "dashboard": "Panel",
+        "profile": "Perfil",
+        "logout": "Cerrar sesión",
+        "cart": "Carrito",
+        "inventory": "Inventario"
+    },
+    "Landing": {
+        "heroTitle": "Tu mercado local, ahora digital",
+        "heroSubtitle": "Conecta con proveedores locales y recibe productos frescos en tu puerta.",
+        "cta": "Empezar a comprar",
+        "providerCta": "¿Eres proveedor?"
+    }
+}
