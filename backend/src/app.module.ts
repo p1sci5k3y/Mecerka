@@ -3,26 +3,29 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { CitiesModule } from './cities/cities.module';
-
 import { CategoriesModule } from './categories/categories.module';
 import { AuthModule } from './auth/auth.module';
 import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { AdminModule } from './admin/admin.module';
 import { EmailModule } from './email/email.module';
+import { RunnerModule } from './runner/runner.module';
+import { UsersModule } from './users/app-users.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    CitiesModule,
-    CategoriesModule,
-    AuthModule,
-    ProductsModule,
-    OrdersModule,
-    AdminModule,
-    EmailModule,
-  ],
-  controllers: [AppController],
-  providers: [AppService],
+    imports: [
+        PrismaModule,
+        CitiesModule,
+        CategoriesModule,
+        AuthModule,
+        ProductsModule,
+        OrdersModule,
+        AdminModule,
+        EmailModule,
+        RunnerModule,
+        UsersModule,
+    ],
+    controllers: [AppController],
+    providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

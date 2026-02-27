@@ -35,8 +35,9 @@ async function main() {
                 email: adminEmail,
                 password: hashedPassword,
                 name: 'Admin',
-                role: Role.ADMIN,
-                mfaEnabled: false
+                roles: [Role.ADMIN],
+                mfaEnabled: false,
+                emailVerified: true
             }
         });
         console.log('Created admin user: admin@meceka.local');
@@ -55,6 +56,157 @@ async function main() {
             await prisma.category.create({ data: category });
             console.log(`Created category: ${category.name}`);
         }
+    }
+
+
+    // Runners (Mock Data)
+    const runners = [
+        {
+            email: 'runner1@meceka.local',
+            name: 'Runner Pro (Sol)',
+            baseLat: 40.4168, // Puerta del Sol
+            baseLng: -3.7038,
+            priceBase: 2.50,
+            maxDistanceKm: 10,
+            ratingAvg: 4.9,
+            isActive: true
+        },
+        {
+            email: 'runner2@meceka.local',
+            name: 'Runner Eco (Atocha)',
+            baseLat: 40.4065, // Atocha
+            baseLng: -3.6896,
+            price: 15.5,
+            pricePerKm: 0.40,
+            ratingAvg: 4.2,
+            isActive: true
+        },
+        {
+            email: 'runner3@meceka.local',
+            name: 'Runner Far (Chamartín)',
+            baseLat: 40.4720, // Chamartín
+            baseLng: -3.6820,
+            priceBase: 2.00,
+            pricePerKm: 0.50,
+            ratingAvg: 4.5,
+            isActive: true
+        }
+    ];
+
+    for (const r of runners) {
+        const userExists = await prisma.user.findUnique({ where: { email: r.email } });
+        if (!userExists) {
+            const hashedPassword = await argon2.hash('Runner123!');
+            const user = await prisma.user.create({
+                data: {
+                    email: r.email,
+                    password: hashedPassword,
+                    name: r.name,
+                    roles: [Role.RUNNER],
+                    mfaEnabled: false,
+                    emailVerified: true,
+                    runnerProfile: {
+                        create: {
+                            baseLat: r.baseLat,
+                            baseLng: r.baseLng,
+                            priceBase: r.priceBase,
+                            pricePerKm: r.pricePerKm,
+                            ratingAvg: r.ratingAvg,
+                            isActive: r.isActive
+                        }
+                    }
+                }
+            });
+            console.log(`Created runner: ${user.name}`);
+        }
+    }
+
+
+    // --- MOCK DATA: Providers & Products ---
+    console.log('Seeding Providers & Products...');
+
+    // Get dependencies
+    const madrid = await prisma.city.findUnique({ where: { slug: 'madrid' } });
+    const alimentacion = await prisma.category.findUnique({ where: { slug: 'alimentacion' } });
+    const moda = await prisma.category.findUnique({ where: { slug: 'moda' } });
+
+    if (madrid && alimentacion && moda) {
+        // 1. Create Provider
+        const providerEmail = 'provider@meceka.local';
+        let provider = await prisma.user.findUnique({ where: { email: providerEmail } });
+
+        if (!provider) {
+            const pwd = await argon2.hash('Provider123!');
+            provider = await prisma.user.create({
+                data: {
+                    email: providerEmail,
+                    password: pwd,
+                    name: 'Mercado Central',
+                    roles: [Role.PROVIDER],
+                    mfaEnabled: false,
+                    emailVerified: true,
+                    // Mercado Central -> Plaza Mayor, Madrid
+                    address: 'Plaza Mayor, 1',
+                    latitude: 40.4155,
+                    longitude: -3.7074
+                }
+            });
+            console.log(`Created provider: ${provider.name}`);
+        }
+
+        // 2. Create Products for Provider
+        const products = [
+            { name: 'Manzanas Golden (1kg)', price: 2.50, stock: 100, categoryId: alimentacion.id },
+            { name: 'Pan Artesano', price: 1.20, stock: 50, categoryId: alimentacion.id },
+            { name: 'Camiseta Básica', price: 15.00, stock: 200, categoryId: moda.id } // Different category
+        ];
+
+        for (const p of products) {
+            // Check if product exists for this provider (simple check by name)
+            const exists = await prisma.product.findFirst({
+                where: { name: p.name, providerId: provider.id }
+            });
+
+            if (!exists) {
+                await prisma.product.create({
+                    data: {
+                        name: p.name,
+                        description: `Delicious ${p.name}`,
+                        price: p.price,
+                        stock: p.stock,
+                        imageUrl: 'https://images.unsplash.com/photo-1568724309179-1c662888c385',
+                        providerId: provider.id,
+                        cityId: madrid.id, // All in Madrid for now
+                        categoryId: p.categoryId
+                    }
+                });
+                console.log(`Created product: ${p.name}`);
+            }
+        }
+    }
+
+    // --- MOCK DATA: Clients ---
+    console.log('Seeding Clients...');
+    const clientEmail = 'client@meceka.local';
+    let client = await prisma.user.findUnique({ where: { email: clientEmail } });
+
+    if (!client) {
+        const pwd = await argon2.hash('Client123!');
+        client = await prisma.user.create({
+            data: {
+                email: clientEmail,
+                password: pwd,
+                name: 'Juan Cliente',
+                roles: [Role.CLIENT],
+                mfaEnabled: false,
+                emailVerified: true,
+                // Juan Cliente -> Parque del Retiro, Madrid
+                address: 'Parque del Retiro',
+                latitude: 40.4180,
+                longitude: -3.6830
+            }
+        });
+        console.log(`Created client: ${client.name}`);
     }
 
     console.log('Seeding completed.');

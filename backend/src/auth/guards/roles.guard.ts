@@ -6,7 +6,7 @@ import { UserFromJwt } from '../interfaces/auth.interfaces';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(private reflector: Reflector) { }
 
   canActivate(context: ExecutionContext): boolean {
     const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
@@ -18,6 +18,8 @@ export class RolesGuard implements CanActivate {
     }
     const request = context.switchToHttp().getRequest<{ user: UserFromJwt }>();
     const user = request.user;
-    return requiredRoles.some((role) => user.role === role);
+
+    // Check if user has AT LEAST ONE of the required roles
+    return requiredRoles.some((requiredRole) => user.roles.includes(requiredRole));
   }
 }
