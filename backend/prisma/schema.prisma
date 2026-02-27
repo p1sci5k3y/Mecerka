@@ -15,11 +15,13 @@ enum Role {
   CLIENT
   PROVIDER
   ADMIN
+  RUNNER
 }
 
 enum OrderStatus {
   PENDING
   CONFIRMED
+  COMPLETED
   CANCELLED
 }
 
@@ -27,19 +29,32 @@ model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String
+  pin       String?  // Hashed transaction PIN for purchases
   name      String
-  role      Role     @default(CLIENT)
+  // role      Role     @default(CLIENT) // Removed in favor of roles array
+  roles     Role[]   @default([CLIENT])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  emailVerified Boolean @default(false)
+  verificationToken String? @unique
   mfaSecret String?  // Stores the TOTP secret
   mfaEnabled Boolean @default(false)
   mfaFailedAttempts Int @default(0)
   mfaLockUntil DateTime?
   active    Boolean  @default(true)
 
+  // Geolocation
+  address   String?
+  latitude  Float?
+  longitude Float?
+
   // Relations
   orders    Order[]  // As Client
   products  Product[] // As Provider (if role is PROVIDER)
+  
+  // Runner Relations
+  runnerProfile RunnerProfile?
+  runnerOrders  Order[] @relation("RunnerOrders")
 }
 
 model City {
@@ -102,6 +117,18 @@ model Order {
   client      User        @relation(fields: [clientId], references: [id])
   city        City        @relation(fields: [cityId], references: [id])
   items       OrderItem[]
+
+  // Delivery Information
+  deliveryAddress String?
+  deliveryLat     Float?
+  deliveryLng     Float?
+
+  // Runner Matching
+  runnerId           Int?
+  deliveryDistanceKm Decimal?    @db.Decimal(10, 2)
+  runnerBaseFee      Decimal?    @db.Decimal(10, 2)
+  runnerPerKmFee     Decimal?    @db.Decimal(10, 2)
+  runner             User?       @relation("RunnerOrders", fields: [runnerId], references: [id])
 }
 
 model OrderItem {
@@ -116,4 +143,30 @@ model OrderItem {
   // Relations
   order           Order    @relation(fields: [orderId], references: [id])
   product         Product  @relation(fields: [productId], references: [id])
+}
+
+model RunnerProfile {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @unique
+  
+  // Location
+  baseLat       Float
+  baseLng       Float
+  maxDistanceKm Float    @default(10.0)
+
+  // Pricing
+  priceBase     Decimal  @default(2.00) @db.Decimal(10, 2)
+  pricePerKm    Decimal  @default(0.50) @db.Decimal(10, 2)
+  minFee        Decimal  @default(3.00) @db.Decimal(10, 2)
+
+  // Status & Metrics
+  isActive      Boolean  @default(true)
+  ratingAvg     Decimal  @default(5.0) @db.Decimal(3, 2)
+  ratingCount   Int      @default(0)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          User     @relation(fields: [userId], references: [id])
 }

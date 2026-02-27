@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  IsStrongPassword,
 } from 'class-validator';
 import { Role } from '@prisma/client';
 
@@ -14,7 +15,16 @@ export class RegisterDto {
 
   @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(12)
+  @IsStrongPassword({
+    minLength: 12,
+    minLowercase: 1,
+    minUppercase: 1,
+    minNumbers: 1,
+    minSymbols: 1,
+  }, {
+    message: 'La contraseña es débil. Debe tener al menos 12 caracteres, 1 mayúscula, 1 minúscula, 1 número y 1 símbolo.',
+  })
   password: string;
 
   @IsString()

@@ -9,7 +9,7 @@ import { Role } from '@prisma/client';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // --- User Management ---
   async getAllUsers() {
@@ -18,7 +18,7 @@ export class AdminService {
         id: true,
         email: true,
         name: true,
-        role: true,
+        roles: true,
         createdAt: true,
         mfaEnabled: true,
         active: true,
@@ -33,8 +33,8 @@ export class AdminService {
     }
     return this.prisma.user.update({
       where: { id },
-      data: { role },
-      select: { id: true, role: true },
+      data: { roles: [role] }, // Replaces existing roles with the new single role
+      select: { id: true, roles: true },
     });
   }
 
@@ -158,8 +158,8 @@ export class AdminService {
       revenueAggregate,
     ] = await Promise.all([
       this.prisma.user.count(),
-      this.prisma.user.count({ where: { role: Role.PROVIDER } }),
-      this.prisma.user.count({ where: { role: Role.CLIENT } }),
+      this.prisma.user.count({ where: { roles: { has: Role.PROVIDER } } }),
+      this.prisma.user.count({ where: { roles: { has: Role.CLIENT } } }),
       this.prisma.order.count(),
       this.prisma.order.aggregate({
         _sum: { totalPrice: true },

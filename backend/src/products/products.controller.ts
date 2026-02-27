@@ -21,7 +21,7 @@ import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,6 +31,13 @@ export class ProductsController {
     @Request() req: { user: UserFromJwt },
   ) {
     return this.productsService.create(createProductDto, req.user.userId);
+  }
+
+  @Get('my-products')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROVIDER)
+  findMyProducts(@Request() req: { user: UserFromJwt }) {
+    return this.productsService.findMyProducts(req.user.userId);
   }
 
   @Get()
