@@ -1,4 +1,4 @@
-import { Controller, Post, UseGuards, Request, ConflictException, Body } from '@nestjs/common';
+import { Controller, Post, UseGuards, Request, ConflictException, NotFoundException, Body } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Role } from '@prisma/client';
@@ -35,7 +35,7 @@ export class UsersController {
         console.log('User found:', user);
 
         if (!user) {
-            throw new ConflictException('User not found');
+            throw new NotFoundException('User not found');
         }
 
         if (user.roles.includes(Role.PROVIDER)) {
@@ -70,36 +70,37 @@ export class UsersController {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
 
         if (!user) {
-            throw new ConflictException('User not found');
+            throw new NotFoundException('User not found');
         }
 
         if (user.roles.includes(Role.RUNNER)) {
             throw new ConflictException('User is already a runner (role exists)');
         }
 
-        // Check if runner profile exists, create if not
-        const runnerProfile = await this.prisma.runnerProfile.findUnique({
-            where: { userId },
-        });
-
-        if (!runnerProfile) {
-            // Create default runner profile
-            await this.prisma.runnerProfile.create({
-                data: {
-                    userId,
-                    baseLat: 0, // Should be updated by user later
-                    baseLng: 0,
-                }
+        const updatedUser = await this.prisma.$transaction(async (tx) => {
+            const runnerProfile = await tx.runnerProfile.findUnique({
+                where: { userId },
             });
-        }
 
-        const updatedUser = await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-                roles: {
-                    push: Role.RUNNER,
+            if (!runnerProfile) {
+                // Create default runner profile
+                await tx.runnerProfile.create({
+                    data: {
+                        userId,
+                        baseLat: 0, // Should be updated by user later
+                        baseLng: 0,
+                    }
+                });
+            }
+
+            return tx.user.update({
+                where: { id: userId },
+                data: {
+                    roles: {
+                        push: Role.RUNNER,
+                    },
                 },
-            },
+            });
         });
 
         // Generate fresh token with updated roles

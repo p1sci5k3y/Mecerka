@@ -51,8 +51,28 @@ We will replace the password-based authentication system with **Passwordless Log
 
 ### Negative
 - **Email Dependency**: Access to email is strictly required to log in.
-- **Session Jacking**: If an email account is compromised, the app account is compromised (mitigated by MFA, which is the next step).
+- **Expired Links Support**: Explicit magic link expiration rules (e.g., 15 minutes) may lead to increased support requests for expired links.
+- **Session Jacking Risk**: If an email account is compromised, the app account is potentially exposed (mitigated significantly by deploying MFA/TOTP workflows alongside magic links).
+
+## Mitigations & Workflow Enhancements
+
+### JWT Validity & JTI
+Magic Links must enforce an explicit expiration time of 15 minutes. To ensure magic links are strictly single-use, the system implements a `jti` (JWT ID) checking process mapped against the `User.verificationToken` or a cache blocklist, invalidating the link immediately post-consumption.
+
+### JIT Provisioning Security
+Just-In-Time (JIT) provisioning happens upon magic link generation. To prevent spam abuse and rapid database bloat, the `POST /auth/magic-link` endpoint is protected by rate limiting (`@Throttle`), restricting generation frequency per IP/email. 
+
+### Disposable Domains
+The disposable domain blocklist strategy is expanded to prevent temporary emails from polluting the initial JIT phase, ensuring user base integrity safely blocks fast-rotating inbox services from abusing free accounts.
+
+### Two-Step Link Flow
+Email security scanners (like enterprise firewalls) often automatically visit URLs found in emails, inadvertently consuming single-use tokens. To prevent this, the magic link lands on a frontend verification barrier page (two-step flow) where the user must explicitly click a button to finalize the login.
+
+## Migration & Rollback Strategy
+- **Phase 1**: Both password logins and magic links act in parallel while users are funneled into transitioning. The `User.password` column is retained.
+- **Phase 2**: `POST /auth/login` password checks are deprecated. JIT provisioning relies exclusively on token logic.
+- **Rollback Plan**: In the event of catastrophic email API failure (e.g., SendGrid/Mailtrap outage), emergency passwords or legacy `LoginDto` endpoints can be momentarily re-enabled from configuration toggles to ensure business continuity.
 
 ## Compliance
 
-This decision aligns with the requirement to modernize the platform and fix the reported "incorrect password" security ambiguity.
+This decision aligns with the requirement to modernize the platform and fix the reported "incorrect password" security ambiguity, adopting ASVS compliant session practices.

@@ -25,7 +25,7 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    private logger = new Logger('RunnerGateway');
+    private readonly logger = new Logger('RunnerGateway');
 
     constructor(private readonly ordersService: OrdersService) { }
 
@@ -43,22 +43,22 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
         @ConnectedSocket() client: Socket,
     ) {
         // User attached by WsJwtAuthGuard
-        const user = (client as any).user as { sub: number; role: Role };
-        if (!user) throw new WsException('Unauthorized');
+        const user = (client as any).user as { sub: number; roles: Role[] };
+        if (!user || !Array.isArray(user.roles)) throw new WsException('Unauthorized');
 
-        const order = await this.ordersService.findOne(data.orderId).catch(() => null);
-        if (!order) throw new WsException('Order not found');
+        const order = await this.ordersService.findOne(data.orderId, user.sub, user.roles).catch(() => null);
+        if (!order) throw new WsException('Order not found or access denied');
 
         // Authorization Logic
         let isAuthorized = false;
 
-        if (user.role === Role.ADMIN) {
+        if (user.roles.includes(Role.ADMIN)) {
             isAuthorized = true;
         } else if (order.clientId === user.sub) {
             isAuthorized = true; // Client owns the order
         } else if (order.runnerId === user.sub) {
             isAuthorized = true; // Runner assigned to order
-        } else if (user.role === Role.PROVIDER) {
+        } else if (user.roles.includes(Role.PROVIDER)) {
             // Check if provider owns any product in the order
             const ownsProduct = order.items.some(
                 (item) => item.product.providerId === user.sub,
@@ -78,12 +78,24 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     @SubscribeMessage('updateLocation')
-    handleUpdateLocation(
+    async handleUpdateLocation(
         @MessageBody() data: { orderId: number; lat: number; lng: number },
         @ConnectedSocket() client: Socket,
     ) {
-        // Ensure only the assigned runner can update location? 
-        // For now, let's keep it simple, but ideally check user.sub === order.runnerId
+        if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.orderId !== 'number') {
+            throw new WsException('Invalid location payload');
+        }
+
+        const user = (client as any).user as { sub: number; roles: Role[] };
+        if (!user) throw new WsException('Unauthorized');
+
+        // Verify order assignment securely before rebroadcasting
+        const order = await this.ordersService.findOne(data.orderId, user.sub, user.roles).catch(() => null);
+
+        if (!order || order.runnerId !== user.sub) {
+            throw new WsException('Forbidden: Not the assigned runner for this order');
+        }
+
         const room = `order_${data.orderId}`;
         this.logger.log(
             `Location update for ${room}: ${data.lat}, ${data.lng}`,

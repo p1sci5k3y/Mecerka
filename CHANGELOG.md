@@ -7,8 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Phase 4: Real-time & Security (Nivel 3/4)
-### Added
+### Phase 4: Real-time (WebSocket infrastructure) & Security (Nivel 3/4)
+#### Added
 - **Authentication Overhaul:**
   - **Magic Links:** Removed password auth in favor of email-based magic links.
   - **MFA Enforcement:** Mandatory 2FA/OTP setup for all users.
@@ -21,15 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Detailed sales history and revenue metrics.
   - **Security:** "My Products" endpoint to ensure data isolation.
 
-### Changed
+#### Changed
 - **Navigation:** Adaptive Navbar links based on user role (e.g., "Inventory" for Providers).
-- **Refactor:** improved `OrdersService` and `ProductsService` to handle role-based logic.
-
-### Fixed
-- **Registration:** Fixed validation logic for new Provider/Runner flows.
-- **MFA:** Resolved OTP verification issues with `otplib` version mismatch.
+- **Refactor:** Improved `OrdersService` and `ProductsService` to handle role-based logic.
 
 #### Fixed
+- **Registration:** Fixed validation logic for new Provider/Runner flows.
+- **MFA:** Resolved OTP verification issues with `otplib` version mismatch.
 - **Docker:** Fixed backend build command (`tsc -p tsconfig.build.json`) and service names.
 - **WebSocket:** Corrected namespace (`/tracking`) and CORS issues.
 - **Routing:** Fixed Next.js 404 errors by consolidating `app` directory structure.

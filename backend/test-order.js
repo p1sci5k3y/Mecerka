@@ -6,7 +6,12 @@ async function testOrder() {
     const user = await prisma.user.findUnique({ where: { email: 'e2e-client-final-bypass-v3@test.com' } });
     if (!user) throw new Error("User not found");
 
-    const token = jwt.sign({ sub: user.id, email: user.email, roles: user.roles }, process.env.JWT_SECRET || 'dev_secret_key_change_in_prod', { expiresIn: '1h' });
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+        throw new Error("JWT_SECRET environment variable is missing");
+    }
+
+    const token = jwt.sign({ sub: user.id, email: user.email, roles: user.roles }, jwtSecret, { expiresIn: '1h' });
 
     const payload = {
         items: [
@@ -32,4 +37,5 @@ async function testOrder() {
     console.log('Response:', data);
 }
 
+// eslint-disable-next-line unicorn/prefer-top-level-await
 testOrder().finally(() => prisma.$disconnect());

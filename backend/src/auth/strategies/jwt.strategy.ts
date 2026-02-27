@@ -14,7 +14,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): UserFromJwt {
-    console.log(`[JwtStrategy] Validating payload: ${JSON.stringify(payload)}`);
-    return { userId: payload.sub, roles: payload.roles };
+    let roles: string[] = [];
+    if (Array.isArray(payload.roles)) {
+      roles = payload.roles;
+    } else if (payload.role) {
+      roles = [payload.role];
+    }
+    return { userId: payload.sub, roles };
   }
 }
