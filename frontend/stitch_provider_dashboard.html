@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#e07b61",
+                        "background-light": "#FBF8F3",
+                        "background-dark": "#201512",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"],
+                        "serif": ["Newsreader", "serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<title>Mecerka Artisan Dashboard</title>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-primary/10 px-6 lg:px-20 py-4 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md sticky top-0 z-50">
+<div class="flex items-center gap-12">
+<div class="flex items-center gap-3">
+<div class="text-primary">
+<span class="material-symbols-outlined text-3xl">auto_awesome</span>
+</div>
+<h2 class="text-primary text-2xl font-serif font-bold leading-tight tracking-tight">Mecerka</h2>
+</div>
+<nav class="hidden md:flex items-center gap-8">
+<a class="text-slate-900 dark:text-slate-100 text-sm font-medium hover:text-primary transition-colors border-b-2 border-primary pb-1" href="#">Dashboard</a>
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Catálogo</a>
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Pedidos</a>
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Mensajes</a>
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Ajustes</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-6 items-center">
+<label class="hidden sm:flex flex-col min-w-40 h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full border border-primary/20 bg-white dark:bg-zinc-800">
+<div class="text-slate-400 flex items-center justify-center pl-3">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-transparent focus:ring-0 text-sm placeholder:text-slate-400 px-3" placeholder="Buscar pedidos..." value=""/>
+</div>
+</label>
+<div class="flex gap-3">
+<button class="flex items-center justify-center rounded-full size-10 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-full size-10 bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+<span class="material-symbols-outlined">person</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary/20" data-alt="Perfil de la artesana Elena" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAbYN6D1BbB3VbWgKMZRm6MqrPsw1R5XLMh0rkctNNrYs_gPDqUWnFXNrzPnlJugrZB7gDbbcxKBdfOI4GbGZOs2pW2FuRngCDUpwXQGZdXdJCzc_JjTeC7h52kR2Rl7K5Xtb8ly5BLkuVnJflZd9e7oO4v0J1QkOMO5uCZFnKcOoF4KgQbUq3jESxDBVEUip5xmcT5IbkTyuVHXdnKGDKsEUUUR9B0IAFeleJCAb83XhoIm_hBzcJum4XDVGLHYuxEpDP2PFATwBo");'></div>
+</div>
+</header>
+<main class="px-6 lg:px-20 py-10 max-w-[1400px] mx-auto w-full">
+<!-- Welcome Section -->
+<div class="flex flex-col gap-2 mb-10">
+<h1 class="text-slate-900 dark:text-slate-100 text-5xl font-serif italic leading-tight">Taller de Elena</h1>
+<p class="text-slate-500 dark:text-slate-400 text-lg">Bienvenida de nuevo a tu espacio creativo y panel de gestión.</p>
+</div>
+<!-- KPI Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-zinc-900 shadow-sm border border-primary/5 hover:border-primary/20 transition-all">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Facturación Mensual</p>
+<span class="material-symbols-outlined text-primary/60">payments</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold font-serif">€1,250</p>
+<div class="flex items-center gap-1 text-emerald-600 font-medium text-sm">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+12.5%</span>
+<span class="text-slate-400 text-xs font-normal ml-1">vs mes ant.</span>
+</div>
+</div>
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-zinc-900 shadow-sm border border-primary/5 hover:border-primary/20 transition-all">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Pedidos Totales</p>
+<span class="material-symbols-outlined text-primary/60">shopping_bag</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold font-serif">45</p>
+<div class="flex items-center gap-1 text-emerald-600 font-medium text-sm">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+5.2%</span>
+</div>
+</div>
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-zinc-900 shadow-sm border border-primary/5 hover:border-primary/20 transition-all">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Productos Vendidos</p>
+<span class="material-symbols-outlined text-primary/60">inventory_2</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold font-serif">120</p>
+<div class="flex items-center gap-1 text-emerald-600 font-medium text-sm">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+<span>+8.1%</span>
+</div>
+</div>
+<div class="flex flex-col gap-3 rounded-xl p-6 bg-white dark:bg-zinc-900 shadow-sm border border-primary/5 hover:border-primary/20 transition-all">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium uppercase tracking-wider">Ticket Promedio</p>
+<span class="material-symbols-outlined text-primary/60">receipt_long</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold font-serif">€28</p>
+<div class="flex items-center gap-1 text-rose-500 font-medium text-sm">
+<span class="material-symbols-outlined text-sm">trending_down</span>
+<span>-2.4%</span>
+</div>
+</div>
+</div>
+<!-- Sales Chart Section -->
+<div class="bg-white dark:bg-zinc-900 rounded-xl p-8 shadow-sm border border-primary/5 mb-12">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+<div>
+<h2 class="text-slate-900 dark:text-slate-100 text-2xl font-serif font-bold">Tendencia de Ventas</h2>
+<p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Actividad de los últimos 30 días de facturación</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col items-end">
+<p class="text-primary text-2xl font-bold leading-none">€14,200</p>
+<p class="text-slate-400 text-[10px] uppercase font-bold tracking-widest mt-1">Total Periodo</p>
+</div>
+<button class="flex items-center gap-2 px-4 py-2 border border-primary/20 rounded-lg text-sm text-slate-700 dark:text-slate-300 hover:bg-primary/5 transition-colors">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+                                Mayo 2024
+                            </button>
+</div>
+</div>
+<div class="h-[300px] w-full relative">
+<!-- Chart Mockup -->
+<svg fill="none" height="100%" preserveaspectratio="none" viewbox="0 0 1000 300" width="100%" xmlns="http://www.w3.org/2000/svg">
+<path class="drop-shadow-xl opacity-80" d="M0 220C50 210 100 120 150 140C200 160 250 250 300 230C350 210 400 100 450 80C500 60 550 150 600 130C650 110 700 40 750 60C800 80 850 200 900 180C950 160 1000 20 1000 20" stroke="#e07b61" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"></path>
+<path class="opacity-10" d="M0 220C50 210 100 120 150 140C200 160 250 250 300 230C350 210 400 100 450 80C500 60 550 150 600 130C650 110 700 40 750 60C800 80 850 200 900 180C950 160 1000 20 V300 H0 Z" fill="url(#chartGradient)"></path>
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#e07b61"></stop>
+<stop offset="100%" stop-color="#e07b61" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<!-- Grid lines -->
+<line stroke="#e07b61" stroke-opacity="0.05" x1="0" x2="1000" y1="50" y2="50"></line>
+<line stroke="#e07b61" stroke-opacity="0.05" x1="0" x2="1000" y1="150" y2="150"></line>
+<line stroke="#e07b61" stroke-opacity="0.05" x1="0" x2="1000" y1="250" y2="250"></line>
+</svg>
+<div class="flex justify-between mt-6 px-2">
+<p class="text-slate-400 text-xs font-medium">01 May</p>
+<p class="text-slate-400 text-xs font-medium">07 May</p>
+<p class="text-slate-400 text-xs font-medium">14 May</p>
+<p class="text-slate-400 text-xs font-medium">21 May</p>
+<p class="text-slate-400 text-xs font-medium">30 May</p>
+</div>
+</div>
+</div>
+<!-- Latest Orders Table -->
+<div class="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-primary/5 overflow-hidden">
+<div class="p-6 border-b border-primary/5 flex justify-between items-center">
+<h2 class="text-slate-900 dark:text-slate-100 text-xl font-serif font-bold">Últimos Pedidos</h2>
+<a class="text-primary text-sm font-semibold hover:underline" href="#">Ver todos los pedidos</a>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left">
+<thead class="bg-primary/5">
+<tr>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Nº Pedido</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Cliente</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Monto</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-primary/5">
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#MC-4592</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-primary">MS</div>
+<span class="text-sm text-slate-700 dark:text-slate-300">Marina Soler</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">14 Mayo, 2024</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Confirmado</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">€84.00</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#MC-4591</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-primary">JL</div>
+<span class="text-sm text-slate-700 dark:text-slate-300">Javier López</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">13 Mayo, 2024</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Pendiente</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">€42.50</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#MC-4589</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-primary">RG</div>
+<span class="text-sm text-slate-700 dark:text-slate-300">Rosa García</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">12 Mayo, 2024</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Confirmado</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">€115.00</td>
+</tr>
+<tr class="hover:bg-primary/5 transition-colors">
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#MC-4588</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-bold text-primary">CT</div>
+<span class="text-sm text-slate-700 dark:text-slate-300">Carlos Torres</span>
+</div>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">12 Mayo, 2024</td>
+<td class="px-6 py-4">
+<span class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Confirmado</span>
+</td>
+<td class="px-6 py-4 text-sm font-bold text-slate-900 dark:text-slate-100 text-right">€28.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<!-- Bottom decorative element -->
+<footer class="mt-auto px-6 lg:px-20 py-10 border-t border-primary/5">
+<div class="flex flex-col md:flex-row justify-between items-center gap-6 opacity-60">
+<p class="text-xs font-medium tracking-widest uppercase">Mecerka Artisan Program © 2024</p>
+<div class="flex gap-8">
+<a class="text-xs font-medium uppercase hover:text-primary transition-colors" href="#">Soporte</a>
+<a class="text-xs font-medium uppercase hover:text-primary transition-colors" href="#">Documentación</a>
+<a class="text-xs font-medium uppercase hover:text-primary transition-colors" href="#">Comunidad</a>
+</div>
+</div>
+</footer>
+</div>
+</div>
+</body></html>

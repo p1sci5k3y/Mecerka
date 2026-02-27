@@ -1,0 +1,18 @@
+{
+    "Navbar": {
+        "catalog": "Catalog",
+        "login": "Login",
+        "register": "Sign Up",
+        "dashboard": "Dashboard",
+        "profile": "Profile",
+        "logout": "Logout",
+        "cart": "Cart",
+        "inventory": "Inventory"
+    },
+    "Landing": {
+        "heroTitle": "Your local market, now digital",
+        "heroSubtitle": "Connect with local providers and get fresh products delivered to your door.",
+        "cta": "Start Shopping",
+        "providerCta": "Are you a provider?"
+    }
+}
