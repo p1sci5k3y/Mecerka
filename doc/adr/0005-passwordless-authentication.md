@@ -71,7 +71,24 @@ Email security scanners (like enterprise firewalls) often automatically visit UR
 ## Migration & Rollback Strategy
 - **Phase 1**: Both password logins and magic links act in parallel while users are funneled into transitioning. The `User.password` column is retained.
 - **Phase 2**: `POST /auth/login` password checks are deprecated. JIT provisioning relies exclusively on token logic.
-- **Rollback Plan**: In the event of catastrophic email API failure (e.g., SendGrid/Mailtrap outage), business continuity can be ensured by temporarily switching to one of the following options via configuration toggles: issuing administrator-generated temporary passwords, re-enabling retained user password authentication, or activating legacy `LoginDto` endpoints.
+- **Rollback Plan**: In the event of catastrophic email API failure (e.g., SendGrid/Mailtrap outage), business continuity can be ensured by temporarily switching to one of the following options via configuration toggles:
+  - **Administrator-Generated Temporary Passwords**: Administrators can issue short-lived temporary passwords applied directly to user accounts. This emergency fallback must strictly adhere to the following secure delivery and operational protocols:
+    - *Secure Delivery Channels (in order of preference)*:
+      1. **Secure Admin Portal**: Users retrieve a one-time password digitally after confirming multi-factor authentication (if pre-configured).
+      2. **SMS with OTP**: A system-generated text message containing the recovery password is sent to the registered mobile number.
+      3. **Voice Call Verification**: An automated voice call dictates the temporary password to the registered number.
+      4. **Support-Assisted Phone Verification**: Manual verification where customer support performs strict identity checks (e.g., verifying recent order details or PII) before securely relaying the temporary password.
+    - *Required Safeguards*:
+      - **Short TTL**: Temporary passwords must expire quickly (e.g., within 15 to 30 minutes of issuance).
+      - **Forced Reset**: Users must be forced to set a new password or re-authenticate via Magic Link immediately upon their first successful login.
+      - **Audit Trail**: Every issuance of a temporary password must be rigidly logged, including the timestamp, the administrator responsible, and the channel used.
+      - **Admin Authorization**: Only administrators with explicitly elevated Privileged Access Management (PAM) roles can trigger the generation of these passwords, requiring strong MFA on the admin side.
+    - *Operational Steps*:
+      - Only authorized administrators or automated Tier-1 support workflows can trigger this process.
+      - The user initiates the request via the fallback recovery portal.
+      - The system attempts automated delivery (Portal -> SMS -> Voice). If all fail or are unconfigured, it escalates to Support-Assisted Verification.
+  - **Re-enabling Retained User Password Authentication / Legacy `LoginDto` endpoints**: This applies *only* to users who migrated from the prior password-based system and still have an accessible password hash.
+  - *Constraint*: JIT-provisioned users (those created via Magic Links who received high-entropy, inaccessible passwords securely buried in the DB) will NOT have their access restored via legacy password endpoints. Those users will strictly rely on administrator-generated temp passwords while the email infrastructure is recovering.
 
 ## Compliance
 

@@ -37,31 +37,28 @@ export class AuthService {
     const hashedPassword = await argon2.hash(password);
     const verificationToken = crypto.randomUUID();
 
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name: name || email.split('@')[0], // Default name
-        roles: role ? [role] : [Role.CLIENT], // Default role array
-        mfaEnabled: false, // User must set up MFA explicitly
-        verificationToken,
-        verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        emailVerified: false,
-      },
-    });
-
-    this.logger.log(`Created new user ${user.id} with verification token`);
-
     try {
-      await this.emailService.sendVerificationEmail(user.email, verificationToken);
+      await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name: name || email.split('@')[0], // Default name
+            roles: role ? [role] : [Role.CLIENT], // Default role array
+            mfaEnabled: false, // User must set up MFA explicitly
+            verificationToken,
+            verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            emailVerified: false,
+          },
+        });
+
+        this.logger.log(`Creating new user ${user.id} with verification token within transaction`);
+
+        await this.emailService.sendVerificationEmail(user.email, verificationToken);
+      });
     } catch (e) {
-      this.logger.error(`Failed to send verification email to user ${user.id}:`, e);
-      try {
-        await this.prisma.user.delete({ where: { id: user.id } });
-      } catch (deleteError) {
-        this.logger.error(`Failed to rollback user ${user.id} creation after email error:`, deleteError);
-      }
-      throw new BadRequestException('No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.');
+      this.logger.error(`Failed to register user (email or db error) for ${email}:`, e);
+      throw new BadRequestException('No se pudo completar el registro. Por favor, intenta de nuevo más tarde.');
     }
 
     return {
