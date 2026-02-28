@@ -78,7 +78,7 @@ async function main() {
             name: 'Runner Eco (Atocha)',
             baseLat: 40.4065, // Atocha
             baseLng: -3.6896,
-            priceBase: 15.5,
+            priceBase: 1.5,
             pricePerKm: 0.4,
             maxDistanceKm: 10,
             ratingAvg: 4.2,

@@ -2,7 +2,7 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -27,23 +27,23 @@ enum OrderStatus {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  pin       String?  // Hashed transaction PIN for purchases
-  name      String
+  id                         Int       @id @default(autoincrement())
+  email                      String    @unique
+  password                   String
+  pin                        String? // Hashed transaction PIN for purchases
+  name                       String
   // role      Role     @default(CLIENT) // Removed in favor of roles array
-  roles     Role[]   @default([CLIENT])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  emailVerified Boolean @default(false)
-  verificationToken String? @unique
+  roles                      Role[]    @default([CLIENT])
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  emailVerified              Boolean   @default(false)
+  verificationToken          String?   @unique
   verificationTokenExpiresAt DateTime?
-  mfaSecret String?  // Stores the TOTP secret
-  mfaEnabled Boolean @default(false)
-  mfaFailedAttempts Int @default(0)
-  mfaLockUntil DateTime?
-  active    Boolean  @default(true)
+  mfaSecret                  String? // Stores the TOTP secret
+  mfaEnabled                 Boolean   @default(false)
+  mfaFailedAttempts          Int       @default(0)
+  mfaLockUntil               DateTime?
+  active                     Boolean   @default(true)
 
   // Geolocation
   address   String?
@@ -51,12 +51,12 @@ model User {
   longitude Float?
 
   // Relations
-  orders    Order[]  // As Client
-  products  Product[] // As Provider (if role is PROVIDER)
-  
+  orders   Order[] // As Client
+  products Product[] // As Provider (if role is PROVIDER)
+
   // Runner Relations
   runnerProfile RunnerProfile?
-  runnerOrders  Order[] @relation("RunnerOrders")
+  runnerOrders  Order[]        @relation("RunnerOrders")
 }
 
 model City {
@@ -67,8 +67,8 @@ model City {
   createdAt DateTime @default(now())
 
   // Relations
-  products  Product[]
-  orders    Order[]
+  products Product[]
+  orders   Order[]
 }
 
 model Category {
@@ -79,7 +79,7 @@ model Category {
   createdAt DateTime @default(now())
 
   // Relations
-  products  Product[]
+  products Product[]
 }
 
 model Product {
@@ -93,32 +93,32 @@ model Product {
   updatedAt   DateTime @updatedAt
 
   // Foreign Keys
-  providerId  Int
-  cityId      Int
-  categoryId  Int
+  providerId Int
+  cityId     Int
+  categoryId Int
 
   // Relations
-  provider    User     @relation(fields: [providerId], references: [id])
-  city        City     @relation(fields: [cityId], references: [id])
-  category    Category @relation(fields: [categoryId], references: [id])
-  orderItems  OrderItem[]
+  provider   User        @relation(fields: [providerId], references: [id])
+  city       City        @relation(fields: [cityId], references: [id])
+  category   Category    @relation(fields: [categoryId], references: [id])
+  orderItems OrderItem[]
 }
 
 model Order {
-  id          Int         @id @default(autoincrement())
-  totalPrice  Decimal     @db.Decimal(10, 2)
-  status      OrderStatus @default(PENDING)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id         Int         @id @default(autoincrement())
+  totalPrice Decimal     @db.Decimal(10, 2)
+  status     OrderStatus @default(PENDING)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
 
   // Foreign Keys
-  clientId    Int
-  cityId      Int
+  clientId Int
+  cityId   Int
 
   // Relations
-  client      User        @relation(fields: [clientId], references: [id])
-  city        City        @relation(fields: [cityId], references: [id])
-  items       OrderItem[]
+  client User        @relation(fields: [clientId], references: [id])
+  city   City        @relation(fields: [cityId], references: [id])
+  items  OrderItem[]
 
   // Delivery Information
   deliveryAddress String?
@@ -127,48 +127,48 @@ model Order {
 
   // Runner Matching
   runnerId           Int?
-  deliveryDistanceKm Decimal?    @db.Decimal(10, 2)
-  runnerBaseFee      Decimal?    @db.Decimal(10, 2)
-  runnerPerKmFee     Decimal?    @db.Decimal(10, 2)
-  runner             User?       @relation("RunnerOrders", fields: [runnerId], references: [id])
+  deliveryDistanceKm Decimal? @db.Decimal(10, 2)
+  runnerBaseFee      Decimal? @db.Decimal(10, 2)
+  runnerPerKmFee     Decimal? @db.Decimal(10, 2)
+  runner             User?    @relation("RunnerOrders", fields: [runnerId], references: [id])
 }
 
 model OrderItem {
-  id              Int      @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
   quantity        Int
-  priceAtPurchase Decimal  @db.Decimal(10, 2)
+  priceAtPurchase Decimal @db.Decimal(10, 2)
 
   // Foreign Keys
-  orderId         Int
-  productId       Int
+  orderId   Int
+  productId Int
 
   // Relations
-  order           Order    @relation(fields: [orderId], references: [id])
-  product         Product  @relation(fields: [productId], references: [id])
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 }
 
 model RunnerProfile {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @unique
-  
+  id     Int @id @default(autoincrement())
+  userId Int @unique
+
   // Location
-  baseLat       Float
-  baseLng       Float
-  maxDistanceKm Float    @default(10.0)
+  baseLat       Float?
+  baseLng       Float?
+  maxDistanceKm Float  @default(10.0)
 
   // Pricing
-  priceBase     Decimal  @default(2.00) @db.Decimal(10, 2)
-  pricePerKm    Decimal  @default(0.50) @db.Decimal(10, 2)
-  minFee        Decimal  @default(3.00) @db.Decimal(10, 2)
+  priceBase  Decimal @default(2.00) @db.Decimal(10, 2)
+  pricePerKm Decimal @default(0.50) @db.Decimal(10, 2)
+  minFee     Decimal @default(3.00) @db.Decimal(10, 2)
 
   // Status & Metrics
-  isActive      Boolean  @default(true)
-  ratingAvg     Decimal? @db.Decimal(3, 2)
-  ratingCount   Int      @default(0)
+  isActive    Boolean @default(true)
+  ratingAvg   Decimal @default(5.00) @db.Decimal(3, 2)
+  ratingCount Int     @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user          User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }

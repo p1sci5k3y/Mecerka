@@ -22,7 +22,12 @@ async function main() {
         if (existing) {
             await prisma.user.update({
                 where: { email: user.email },
-                data: { mfaEnabled: true, roles: user.roles },
+                data: {
+                    mfaEnabled: true,
+                    roles: user.roles,
+                    name: user.name,
+                    password: hashedPassword
+                },
             });
             console.log('Updated existing user:', user.email);
         } else {

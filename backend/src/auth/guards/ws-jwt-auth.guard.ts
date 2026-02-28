@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
@@ -6,10 +7,17 @@ import { Socket } from 'socket.io';
 @Injectable()
 export class WsJwtAuthGuard implements CanActivate {
     private readonly logger = new Logger('WsJwtAuthGuard');
+    private readonly jwtSecret: string;
 
     constructor(
         private readonly jwtService: JwtService,
-    ) { }
+        private readonly configService: ConfigService,
+    ) {
+        this.jwtSecret = this.configService.get<string>('JWT_SECRET') || '';
+        if (!this.jwtSecret) {
+            throw new Error('JWT_SECRET configuration is missing');
+        }
+    }
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
         try {
@@ -25,13 +33,8 @@ export class WsJwtAuthGuard implements CanActivate {
                 throw new WsException('Unauthorized');
             }
 
-            const jwtSecret = process.env.JWT_SECRET;
-            if (!jwtSecret) {
-                throw new Error('JWT_SECRET configuration is missing');
-            }
-
             const payload = await this.jwtService.verifyAsync(token, {
-                secret: jwtSecret,
+                secret: this.jwtSecret,
             });
 
             // Attach user to socket object so it can be accessed in Gateway

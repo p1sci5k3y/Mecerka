@@ -67,17 +67,16 @@ export class UsersController {
     @Post('roles/runner')
     async becomeRunner(@Request() req: any) {
         const userId = req.user.userId;
-        const user = await this.prisma.user.findUnique({ where: { id: userId } });
-
-        if (!user) {
-            throw new NotFoundException('User not found');
-        }
-
-        if (user.roles.includes(Role.RUNNER)) {
-            throw new ConflictException('User is already a runner (role exists)');
-        }
 
         const updatedUser = await this.prisma.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({ where: { id: userId } });
+            if (!user) {
+                throw new NotFoundException('User not found');
+            }
+            if (user.roles.includes(Role.RUNNER)) {
+                throw new ConflictException('User is already a runner (role exists)');
+            }
+
             const runnerProfile = await tx.runnerProfile.findUnique({
                 where: { userId },
             });
@@ -87,8 +86,8 @@ export class UsersController {
                 await tx.runnerProfile.create({
                     data: {
                         userId,
-                        baseLat: 0, // Should be updated by user later
-                        baseLng: 0,
+                        baseLat: null, // Should be updated by user later
+                        baseLng: null,
                     }
                 });
             }
