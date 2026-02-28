@@ -12,6 +12,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UserFromJwt } from './interfaces/auth.interfaces';
@@ -41,6 +42,12 @@ export class AuthController {
       throw new BadRequestException('Token is required');
     }
     return this.authService.verifyEmail(token);
+  }
+
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  @Post('resend-verification')
+  async resendVerificationEmail(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerificationEmail(dto.email);
   }
 
 
