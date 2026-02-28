@@ -37,8 +37,9 @@ export class AuthService {
     const hashedPassword = await argon2.hash(password);
     const verificationToken = crypto.randomUUID();
 
+    let createdUser;
     try {
-      await this.prisma.$transaction(async (tx) => {
+      createdUser = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             email,
@@ -52,13 +53,22 @@ export class AuthService {
           },
         });
 
-        this.logger.log(`Creating new user ${user.id} with verification token within transaction`);
-
-        await this.emailService.sendVerificationEmail(user.email, verificationToken);
+        this.logger.log(`Created new user ${user.id} and committed to DB`);
+        return user;
       });
     } catch (e) {
-      this.logger.error(`Failed to register user (email or db error) for ${email}:`, e);
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      this.logger.error(`Failed to register user (db error) for ${emailHash}:`, e);
       throw new BadRequestException('No se pudo completar el registro. Por favor, intenta de nuevo más tarde.');
+    }
+
+    try {
+      await this.emailService.sendVerificationEmail(createdUser.email, verificationToken);
+    } catch (e) {
+      this.logger.error(`Failed to send verification email to user ${createdUser.id}:`, e);
+      const emailHash = crypto.createHash('sha256').update(createdUser.email).digest('hex').substring(0, 8);
+      // Simulate creating a retry record or queuing a job via queueService (pending implementation).
+      this.logger.warn(`Verification email for ${emailHash} failed. Logged for retry. User can use /auth/resend-verification endpoint.`);
     }
 
     return {
@@ -123,5 +133,39 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) this.logger.warn(`User ${id} not found`);
     return user;
+  }
+
+  async resendVerificationEmail(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Prevent enumeration
+      return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
+    }
+    if (user.emailVerified) {
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      this.logger.warn(`Resend verification requested for already verified account: ${emailHash}`);
+      return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
+    }
+
+    const verificationToken = crypto.randomUUID();
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        verificationToken,
+        verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    try {
+      // Direct call here; ideally enqueue to a queueService.
+      await this.emailService.sendVerificationEmail(user.email, verificationToken);
+    } catch (e) {
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      this.logger.error(`Failed to resend verification email for ${emailHash}:`, e);
+      this.logger.warn(`Verification email resend failed for ${emailHash}. Please trigger manual resend or queue job (pending queueService).`);
+      throw new BadRequestException('No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.');
+    }
+
+    return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
   }
 }

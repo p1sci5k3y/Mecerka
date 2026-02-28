@@ -75,11 +75,12 @@ export class MfaService {
 
     let isValid = false;
     try {
-      // @ts-expect-error The otplib runtime signature expects a single options object despite the typings
-      isValid = Boolean(totp.verify({
-        token,
+      // otplib v13.x correctly types verify() as returning Promise<VerifyResult>. 
+      // The options object goes in the second parameter without @ts-expect-error.
+      const verifyResult = await totp.verify(token, {
         secret: userWithMfa.mfaSecret as string,
-      }));
+      });
+      isValid = Boolean(verifyResult);
     } catch (e) {
       this.logger.error('MFA Verify Error', e);
       isValid = false;
