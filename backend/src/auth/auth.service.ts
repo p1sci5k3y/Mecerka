@@ -56,7 +56,11 @@ export class AuthService {
       await this.emailService.sendVerificationEmail(user.email, verificationToken);
     } catch (e) {
       this.logger.error(`Failed to send verification email to user ${user.id}:`, e);
-      await this.prisma.user.delete({ where: { id: user.id } });
+      try {
+        await this.prisma.user.delete({ where: { id: user.id } });
+      } catch (deleteError) {
+        this.logger.error(`Failed to rollback user ${user.id} creation after email error:`, deleteError);
+      }
       throw new BadRequestException('No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.');
     }
 
