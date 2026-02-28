@@ -217,6 +217,9 @@ export class OrdersService {
   }
 
   async acceptOrder(id: number, runnerId: number) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found');
+
     const result = await this.prisma.order.updateMany({
       where: {
         id,
@@ -238,6 +241,9 @@ export class OrdersService {
   }
 
   async completeOrder(id: number, runnerId: number) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found');
+
     const result = await this.prisma.order.updateMany({
       where: {
         id,

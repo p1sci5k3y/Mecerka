@@ -2,10 +2,10 @@ import { Role } from '@prisma/client';
 
 import { Request } from 'express';
 
+// JwtPayload normalizing to roles: Role[]
 export interface JwtPayload {
   sub: number;
-  roles?: Role[];
-  role?: Role;
+  roles: Role[];
 }
 
 export interface UserFromJwt {

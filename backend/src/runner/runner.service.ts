@@ -47,6 +47,8 @@ export class RunnerService {
     // 2. Filter key logic (in-memory) & Calculate Fee
     const availableRunners = runners
       .map((runner) => {
+        if (runner.baseLat === null || runner.baseLng === null) return null;
+
         const distance = this.calculateDistance(
           runner.baseLat,
           runner.baseLng,
@@ -124,7 +126,7 @@ export class RunnerService {
       });
 
       if (result.count === 0) {
-        throw new BadRequestException('El pedido ya no está disponible para ser asignado.');
+        throw new BadRequestException('The order is no longer available to be assigned.');
       }
 
       return tx.order.findUnique({ where: { id: orderId } });
