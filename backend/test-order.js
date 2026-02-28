@@ -38,4 +38,9 @@ async function testOrder() {
 }
 
 // eslint-disable-next-line unicorn/prefer-top-level-await
-testOrder().finally(() => prisma.$disconnect());
+testOrder()
+    .catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());

@@ -75,7 +75,6 @@ export class MfaService {
 
     let isValid = false;
     try {
-      // @ts-expect-error otplib types might be incompatible with the current TS settings
       isValid = Boolean(totp.verify({
         token,
         secret: userWithMfa.mfaSecret as string,
