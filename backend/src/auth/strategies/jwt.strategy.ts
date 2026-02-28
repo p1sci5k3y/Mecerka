@@ -1,6 +1,7 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { JwtPayload, UserFromJwt } from '../interfaces/auth.interfaces';
 
 @Injectable()
@@ -14,7 +15,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload): UserFromJwt {
-    let roles: string[] = [];
+    let roles: Role[] = [];
     if (Array.isArray(payload.roles)) {
       roles = payload.roles;
     } else if (payload.role) {
