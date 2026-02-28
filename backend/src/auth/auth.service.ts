@@ -53,7 +53,7 @@ export class AuthService {
           },
         });
 
-        this.logger.log(`Created new user ${user.id} and committed to DB`);
+        this.logger.log(`Created new user ${user.id} in transaction`);
         return user;
       });
     } catch (e) {
@@ -148,13 +148,6 @@ export class AuthService {
     }
 
     const verificationToken = crypto.randomUUID();
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        verificationToken,
-        verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-      },
-    });
 
     try {
       // Direct call here; ideally enqueue to a queueService.
@@ -164,6 +157,20 @@ export class AuthService {
       this.logger.error(`Failed to resend verification email for ${emailHash}:`, e);
       this.logger.warn(`Verification email resend failed for ${emailHash}. Please trigger manual resend or queue job (pending queueService).`);
       throw new BadRequestException('No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.');
+    }
+
+    try {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          verificationToken,
+          verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        },
+      });
+    } catch (e) {
+      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      this.logger.error(`Failed to update verification token in DB after successful email for ${emailHash}:`, e);
+      throw new BadRequestException('Se envió el correo, pero ocurrió un error interno al registrar el token.');
     }
 
     return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
