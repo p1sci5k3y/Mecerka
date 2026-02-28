@@ -75,10 +75,10 @@ export class MfaService {
 
     let isValid = false;
     try {
-      isValid = Boolean(totp.verify({
-        token,
+      const verifyResult = await totp.verify(token, {
         secret: userWithMfa.mfaSecret as string,
-      }));
+      });
+      isValid = Boolean(verifyResult);
     } catch (e) {
       this.logger.error('MFA Verify Error', e);
       isValid = false;

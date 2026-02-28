@@ -18,8 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     let roles: Role[] = [];
     if (Array.isArray(payload.roles)) {
       roles = payload.roles;
-    } else if (payload.role) {
-      roles = [payload.role];
     }
     return { userId: payload.sub, roles };
   }

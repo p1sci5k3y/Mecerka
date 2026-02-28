@@ -162,9 +162,9 @@ model RunnerProfile {
   minFee     Decimal @default(3.00) @db.Decimal(10, 2)
 
   // Status & Metrics
-  isActive    Boolean @default(true)
-  ratingAvg   Decimal @default(5.00) @db.Decimal(3, 2)
-  ratingCount Int     @default(0)
+  isActive    Boolean  @default(true)
+  ratingAvg   Decimal? @db.Decimal(3, 2)
+  ratingCount Int      @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
