@@ -76,8 +76,9 @@ export class MfaService {
     let isValid = false;
     try {
       // otplib v13.x correctly types verify() as returning Promise<VerifyResult>. 
-      // The options object goes in the second parameter without @ts-expect-error.
-      const verifyResult = await totp.verify(token, {
+      // @ts-ignore - User specifically requested to pass a single options object
+      const verifyResult = await totp.verify({
+        token,
         secret: userWithMfa.mfaSecret as string,
       });
       isValid = Boolean(verifyResult);

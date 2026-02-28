@@ -77,12 +77,13 @@ Email security scanners (like enterprise firewalls) often automatically visit UR
       1. **Secure Admin Portal** (*Planned Roadmap*): Users retrieve a one-time password digitally after confirming multi-factor authentication.
       2. **SMS with OTP** (*Planned Roadmap*): A system-generated text message containing the recovery password is sent to the registered mobile number.
       3. **Voice Call Verification** (*Planned Roadmap*): An automated voice call dictates the temporary password.
-      4. **Support-Assisted Phone Verification** (*Implemented*): Manual verification where customer support performs strict identity checks before securely relaying the temporary password. **DISCLAIMER:** Temporary passwords currently lack TTL and forced-reset protections and must not be used in production until "Short TTL" and "Forced Reset" are implemented.
+      4. **Support-Assisted Phone Verification** (*Planned - Blocker*): Manual verification where customer support performs strict identity checks before securely relaying the temporary password.
     - *Required Safeguards*:
-      - **Short TTL** (*Planned*): Temporary passwords must expire quickly (e.g., within 15 to 30 minutes of issuance).
-      - **Forced Reset** (*Planned*): Users must be forced to set a new password or re-authenticate via Magic Link immediately upon their first successful login.
+      - **Short TTL** (*Planned - Blocker*): Temporary passwords must expire quickly (e.g., within 15 to 30 minutes of issuance).
+      - **Forced Reset** (*Planned - Blocker*): Users must be forced to set a new password or re-authenticate via Magic Link immediately upon their first successful login.
       - **Audit Trail** (*Implemented*): Every issuance of a temporary password must be rigidly logged, including the timestamp, the administrator responsible, and the channel used.
       - **Admin Authorization** (*Implemented*): Only administrators with explicitly elevated Privileged Access Management (PAM) roles can trigger the generation of these passwords.
+      - **Note:** All items marked "Planned" in this safeguards list must be completed before any delivery channel can be considered production-ready.
     - *Operational Steps*:
       - Only authorized administrators or automated Tier-1 support workflows can trigger this process.
       - The user initiates the request via the fallback recovery portal.
