@@ -71,7 +71,7 @@ Email security scanners (like enterprise firewalls) often automatically visit UR
 ## Migration & Rollback Strategy
 - **Phase 1**: Both password logins and magic links act in parallel while users are funneled into transitioning. The `User.password` column is retained.
 - **Phase 2**: `POST /auth/login` password checks are deprecated. JIT provisioning relies exclusively on token logic.
-- **Rollback Plan**: In the event of catastrophic email API failure (e.g., SendGrid/Mailtrap outage), administrator-generated temporary passwords (or re-enabling retained user password authentication) or legacy `LoginDto` endpoints can be temporarily re-enabled from configuration toggles to ensure business continuity.
+- **Rollback Plan**: In the event of catastrophic email API failure (e.g., SendGrid/Mailtrap outage), business continuity can be ensured by temporarily switching to one of the following options via configuration toggles: issuing administrator-generated temporary passwords, re-enabling retained user password authentication, or activating legacy `LoginDto` endpoints.
 
 ## Compliance
 
