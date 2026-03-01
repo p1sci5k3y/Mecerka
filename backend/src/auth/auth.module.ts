@@ -31,4 +31,4 @@ import { MfaService } from './mfa.service';
   providers: [AuthService, JwtStrategy, MfaService],
   exports: [AuthService, MfaService, JwtModule],
 })
-export class AuthModule { }
+export class AuthModule {}

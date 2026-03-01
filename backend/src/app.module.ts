@@ -17,31 +17,33 @@ import { PaymentsModule } from './payments/payments.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
-    imports: [
-        EventEmitterModule.forRoot(),
-        PrismaModule,
-        CitiesModule,
-        CategoriesModule,
-        AuthModule,
-        ProductsModule,
-        OrdersModule,
-        AdminModule,
-        EmailModule,
-        RunnerModule,
-        UsersModule,
-        ThrottlerModule.forRoot([{
-            ttl: 60000,
-            limit: 10,
-        }]),
-        PaymentsModule,
-    ],
-    controllers: [AppController],
-    providers: [
-        AppService,
-        {
-            provide: APP_GUARD,
-            useClass: ThrottlerGuard,
-        },
-    ],
+  imports: [
+    EventEmitterModule.forRoot(),
+    PrismaModule,
+    CitiesModule,
+    CategoriesModule,
+    AuthModule,
+    ProductsModule,
+    OrdersModule,
+    AdminModule,
+    EmailModule,
+    RunnerModule,
+    UsersModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 10,
+      },
+    ]),
+    PaymentsModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
-export class AppModule { }
+export class AppModule {}

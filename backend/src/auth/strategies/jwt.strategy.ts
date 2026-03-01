@@ -3,18 +3,38 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtPayload, UserFromJwt } from '../interfaces/auth.interfaces';
+import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error('JWT_SECRET configuration is missing in JwtStrategy');
-    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKeyProvider: (request: any, rawJwtToken: any, done: any) => {
+        const currentSecret =
+          process.env.JWT_SECRET_CURRENT || process.env.JWT_SECRET;
+        const previousSecret = process.env.JWT_SECRET_PREVIOUS;
+
+        if (!currentSecret) {
+          return done(new Error('JWT_SECRET configuration is missing'), null);
+        }
+
+        try {
+          jwt.verify(rawJwtToken, currentSecret);
+          return done(null, currentSecret);
+        } catch (err) {
+          if (previousSecret) {
+            try {
+              jwt.verify(rawJwtToken, previousSecret);
+              return done(null, previousSecret);
+            } catch {
+              return done(err, currentSecret);
+            }
+          }
+          return done(err, currentSecret);
+        }
+      },
     });
   }
 

@@ -20,7 +20,7 @@ import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @Roles(Role.CLIENT)
@@ -55,6 +55,24 @@ export class OrdersController {
     return this.ordersService.completeOrder(id, req.user.userId);
   }
 
+  @Patch(':id/in-transit')
+  @Roles(Role.RUNNER)
+  markInTransit(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.ordersService.markInTransit(id, req.user.userId);
+  }
+
+  @Patch(':id/cancel')
+  @Roles(Role.CLIENT, Role.ADMIN)
+  cancelOrder(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.ordersService.cancelOrder(id, req.user.userId, req.user.roles);
+  }
+
   @Get('provider/stats')
   @Roles(Role.PROVIDER)
   getProviderStats(@Request() req: { user: UserFromJwt }) {
@@ -80,7 +98,11 @@ export class OrdersController {
     @Body('status') status: ProviderOrderStatus,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.ordersService.updateProviderOrderStatus(id, req.user.userId, status);
+    return this.ordersService.updateProviderOrderStatus(
+      id,
+      req.user.userId,
+      status,
+    );
   }
 
   @Get()
