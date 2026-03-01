@@ -9,10 +9,19 @@ import {
     WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
-import { WsJwtAuthGuard } from '../auth/guards/ws-jwt-auth.guard';
-import { OrdersService } from '../orders/orders.service';
-import { Role } from '@prisma/client';
+import { Logger } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { Role, DeliveryStatus } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { OnEvent } from '@nestjs/event-emitter';
+
+interface SocketWithUser extends Socket {
+    data: {
+        userId: string;
+        roles: Role[];
+    };
+}
 
 @WebSocketGateway({
     namespace: 'tracking',
@@ -20,86 +29,200 @@ import { Role } from '@prisma/client';
         origin: '*', // Allow all for now, in prod restrict to frontend URL
     },
 })
-@UseGuards(WsJwtAuthGuard)
 export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    private readonly logger = new Logger('RunnerGateway');
+    private readonly logger = new Logger(RunnerGateway.name);
+    private readonly jwtSecret: string;
+    private locationRateLimits: Map<string, number> = new Map();
 
-    constructor(private readonly ordersService: OrdersService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly jwtService: JwtService,
+        private readonly configService: ConfigService,
+    ) {
+        this.jwtSecret = this.configService.get<string>('JWT_SECRET') || '';
+        if (!this.jwtSecret) {
+            this.logger.error('JWT_SECRET configuration is missing');
+        }
+    }
 
-    handleConnection(client: Socket) {
-        this.logger.log(`Client connected: ${client.id}`);
+    async handleConnection(client: Socket) {
+        try {
+            const token = this.extractToken(client);
+            if (!token) {
+                this.logger.warn(`No token provided, disconnecting client ${client.id}`);
+                client.disconnect(true);
+                return;
+            }
+
+            const payload = await this.jwtService.verifyAsync(token, {
+                secret: this.jwtSecret,
+            });
+
+            // Associate user identity aggressively inside the socket object
+            (client as SocketWithUser).data = {
+                userId: payload.sub,
+                roles: payload.roles || [],
+            };
+
+            this.logger.log(`Client authenticated and connected: ${client.id} (User: ${payload.sub})`);
+        } catch (error) {
+            this.logger.error(`Handshake authentication failed: ${error.message} (Client ${client.id})`);
+            client.disconnect(true);
+        }
     }
 
     handleDisconnect(client: Socket) {
         this.logger.log(`Client disconnected: ${client.id}`);
+        // Clean up rate limits on disconnect to avoid memory leaks
+        const userId = (client as SocketWithUser).data?.userId;
+        if (userId) {
+            // Remove any keys matching this userId pattern conceptually, or we can just rely on the TTL
+            // Simple TTL cleanup might be better to avoid tracking all keys per user, but for now we iterate
+            for (const key of this.locationRateLimits.keys()) {
+                if (key.startsWith(`${userId}:`)) {
+                    this.locationRateLimits.delete(key);
+                }
+            }
+        }
+    }
+
+    private extractToken(client: Socket): string | undefined {
+        // Support standard Auth headers
+        const [type, headerToken] = client.handshake.headers?.authorization?.split(' ') ?? [];
+        if (type === 'Bearer' && headerToken) return headerToken;
+
+        // Support standard Socket.IO auth object
+        const authToken = client.handshake.auth?.token;
+        if (typeof authToken === 'string') return authToken;
+
+        // Fallback to query
+        const queryToken = client.handshake.query.token;
+        if (typeof queryToken === 'string') return queryToken;
+
+        return undefined;
     }
 
     @SubscribeMessage('joinOrder')
     async handleJoinOrder(
         @MessageBody() data: { orderId: string },
-        @ConnectedSocket() client: Socket,
+        @ConnectedSocket() client: SocketWithUser,
     ) {
-        // User attached by WsJwtAuthGuard
-        const user = (client as any).user as { sub: string; roles: Role[] };
-        if (!user || !Array.isArray(user.roles)) throw new WsException('Unauthorized');
+        if (!client.data || !client.data.userId) throw new WsException('Unauthorized');
+        const { userId, roles } = client.data;
 
-        const order = await this.ordersService.findOne(data.orderId, user.sub, user.roles).catch(() => null);
-        if (!order) throw new WsException('Order not found or access denied');
+        // DB Strict check minimum fields to avoid exposing everything
+        const order = await this.prisma.order.findUnique({
+            where: { id: data.orderId },
+            select: {
+                id: true,
+                status: true,
+                clientId: true,
+                runnerId: true,
+                providerOrders: {
+                    select: { providerId: true },
+                },
+            },
+        });
 
-        // Authorization Logic
-        let isAuthorized = false;
-
-        if (user.roles.includes(Role.ADMIN)) {
-            isAuthorized = true;
-        } else if (order.clientId === user.sub) {
-            isAuthorized = true; // Client owns the order
-        } else if (order.runnerId === user.sub) {
-            isAuthorized = true; // Runner assigned to order
-        } else if (user.roles.includes(Role.PROVIDER)) {
-            // Check if provider owns any product in the order
-            const ownsProduct = order.providerOrders.some(
-                (po) => po.providerId === user.sub,
-            );
-            if (ownsProduct) isAuthorized = true;
+        if (!order) {
+            this.logger.warn(`Join rejected: Order ${data.orderId} not found (User ${userId})`);
+            throw new WsException('Order not found or access denied');
         }
 
-        if (!isAuthorized) {
-            this.logger.warn(`User ${user.sub} attempted to join unauthorized order ${data.orderId}`);
+        let roleSegment = '';
+
+        if (roles.includes(Role.ADMIN)) {
+            roleSegment = 'admin';
+        } else if (order.clientId === userId) {
+            roleSegment = 'client';
+        } else if (order.runnerId === userId) {
+            roleSegment = 'runner';
+        } else if (order.providerOrders.some((po) => po.providerId === userId)) {
+            // If strict isolated provider events needed in the future:
+            // roleSegment = `provider:${userId}`
+            // Ignoring for now as per instructions (maximum 3 rooms, 'order:{id}' and 'order:{id}:client');
+            // We just join the global order room.
+            roleSegment = 'provider';
+        }
+
+        if (!roleSegment) {
+            this.logger.warn(`User ${userId} attempted to join unauthorized order ${data.orderId}`);
             throw new WsException('Forbidden');
         }
 
-        const room = `order_${data.orderId}`;
-        client.join(room);
-        this.logger.log(`Client ${client.id} (User ${user.sub}) joined room ${room}`);
-        return { event: 'joinedRoom', room };
+        const globalRoom = `order:${data.orderId}`;
+        client.join(globalRoom);
+
+        let clientRoom = globalRoom;
+        if (roleSegment === 'client') {
+            clientRoom = `${globalRoom}:client`;
+            client.join(clientRoom);
+        }
+
+        this.logger.log(`Client ${client.id} (User ${userId}) joined room ${globalRoom} [Role: ${roleSegment}]`);
+        return { event: 'joinedRoom', room: globalRoom };
     }
 
     @SubscribeMessage('updateLocation')
     async handleUpdateLocation(
         @MessageBody() data: { orderId: string; lat: number; lng: number },
-        @ConnectedSocket() client: Socket,
+        @ConnectedSocket() client: SocketWithUser,
     ) {
         if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.orderId !== 'string') {
             throw new WsException('Invalid location payload');
         }
 
-        const user = (client as any).user as { sub: string; roles: Role[] };
-        if (!user) throw new WsException('Unauthorized');
+        if (!client.data || !client.data.userId) throw new WsException('Unauthorized');
+        const { userId, roles } = client.data;
 
-        // Verify order assignment securely before rebroadcasting
-        const order = await this.ordersService.findOne(data.orderId, user.sub, user.roles).catch(() => null);
-
-        if (!order || order.runnerId !== user.sub) {
-            throw new WsException('Forbidden: Not the assigned runner for this order');
+        if (!roles.includes(Role.RUNNER)) {
+            throw new WsException('Forbidden: Only RUNNER role can emit locations');
         }
 
-        const room = `order_${data.orderId}`;
-        this.logger.log(
-            `Location update for ${room}: ${data.lat}, ${data.lng}`,
-        );
-        this.server.to(room).emit('locationUpdated', data);
+        // Rate limit: 1 sec TTL sliding window
+        const rateLimitKey = `${userId}:${data.orderId}`;
+        const lastEmitted = this.locationRateLimits.get(rateLimitKey);
+        const now = Date.now();
+        if (lastEmitted && now - lastEmitted < 1000) {
+            throw new WsException('Rate limit exceeded: 1 update per second allowed');
+        }
+        this.locationRateLimits.set(rateLimitKey, now);
+
+        // Security check DB
+        const order = await this.prisma.order.findUnique({
+            where: { id: data.orderId },
+            select: { runnerId: true, status: true },
+        });
+
+        if (!order || order.runnerId !== userId) {
+            throw new WsException('Forbidden: Not the assigned runner for this order');
+        }
+        if (order.status !== DeliveryStatus.IN_TRANSIT) {
+            throw new WsException('Forbidden: Location can only be updated while IN_TRANSIT');
+        }
+
+        const clientRoom = `order:${data.orderId}:client`;
+
+        // Broadcast EXCLUSIVELY to the client's sub-room
+        this.server.to(clientRoom).emit('locationUpdated', {
+            orderId: data.orderId,
+            lat: data.lat,
+            lng: data.lng,
+        });
+    }
+
+    // INTERNAL EVENT BUS LISTENERS (Post-DB Commits)
+
+    @OnEvent('order.stateChanged')
+    handleOrderStateChanged(payload: { orderId: string; status: DeliveryStatus }) {
+        // Emit to the general order room so clients, providers, and runners see the new status
+        this.server.to(`order:${payload.orderId}`).emit('orderStatusChanged', {
+            orderId: payload.orderId,
+            status: payload.status,
+        });
+        this.logger.log(`Broadcasted state bypass order.stateChanged: order:${payload.orderId} -> ${payload.status}`);
     }
 }
