@@ -9,10 +9,15 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma, Role, DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { canTransitionOrder } from './utils/state-machine';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) { }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
     const { items, deliveryAddress, pin, deliveryLat, deliveryLng } = createOrderDto;
@@ -282,6 +287,10 @@ export class OrdersService {
       const allRejected = confirmedProviderOrderIds.length === 0;
 
       if (allRejected) {
+        if (!canTransitionOrder(order.status, DeliveryStatus.CANCELLED)) {
+          throw new Error(`Illegal state transition from ${order.status} to CANCELLED`);
+        }
+
         const updated = await tx.order.update({
           where: { id: order.id },
           data: {
@@ -291,12 +300,18 @@ export class OrdersService {
           },
         });
 
+        this.eventEmitter.emit('order.stateChanged', { orderId: updated.id, status: updated.status });
+
         return {
           orderId: updated.id,
           finalStatus: updated.status,
           rejectedProviderOrderIds,
           confirmedProviderOrderIds,
         };
+      }
+
+      if (!canTransitionOrder(order.status, DeliveryStatus.CONFIRMED)) {
+        throw new Error(`Illegal state transition from ${order.status} to CONFIRMED`);
       }
 
       const updated = await tx.order.update({
@@ -307,6 +322,8 @@ export class OrdersService {
           confirmedAt: new Date()
         },
       });
+
+      this.eventEmitter.emit('order.stateChanged', { orderId: updated.id, status: updated.status });
 
       return {
         orderId: updated.id,
@@ -331,10 +348,18 @@ export class OrdersService {
       );
 
       if (hasReadyForPickup) {
+        if (!canTransitionOrder(order.status, DeliveryStatus.READY_FOR_ASSIGNMENT)) {
+          return; // Suppress and silently bypass illegal assignments
+        }
+
         await tx.order.update({
           where: { id: orderId },
           data: { status: DeliveryStatus.READY_FOR_ASSIGNMENT },
         });
+
+        // Event emitted outside tx? Here we await it inside tx flow to ensure logic fires next inline,
+        // although technically eventEmitter fires synchronously within the execution thread.
+        this.eventEmitter.emit('order.stateChanged', { orderId, status: DeliveryStatus.READY_FOR_ASSIGNMENT });
       }
     });
   }
@@ -378,6 +403,9 @@ export class OrdersService {
   async acceptOrder(id: string, runnerId: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
+    if (!canTransitionOrder(order.status, DeliveryStatus.ASSIGNED)) {
+      throw new BadRequestException('Order cannot transition to ASSIGNED');
+    }
 
     const result = await this.prisma.order.updateMany({
       where: {
@@ -396,12 +424,17 @@ export class OrdersService {
       throw new BadRequestException('Order is already accepted, cannot be assigned, or you are trying to deliver your own order');
     }
 
+    this.eventEmitter.emit('order.stateChanged', { orderId: id, status: DeliveryStatus.ASSIGNED });
+
     return this.prisma.order.findUnique({ where: { id } });
   }
 
   async completeOrder(id: string, runnerId: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
+    if (!canTransitionOrder(order.status, DeliveryStatus.DELIVERED)) {
+      throw new BadRequestException('Order cannot transition to DELIVERED');
+    }
 
     // ToDo: Invariant Rule 2 verification
     // Must check if all sub-orders are PICKED_UP before delivering, or trust current DB status logic.
@@ -420,6 +453,8 @@ export class OrdersService {
     if (result.count === 0) {
       throw new BadRequestException('Order cannot be completed in its current state (Must be IN_TRANSIT), or you are not the assigned runner');
     }
+
+    this.eventEmitter.emit('order.stateChanged', { orderId: id, status: DeliveryStatus.DELIVERED });
 
     return this.prisma.order.findUnique({ where: { id } });
   }
