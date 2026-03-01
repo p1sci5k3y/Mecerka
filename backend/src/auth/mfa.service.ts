@@ -23,7 +23,7 @@ export class MfaService {
     // empty
   }
 
-  async generateMfaSecret(userId: number, email: string) {
+  async generateMfaSecret(userId: string, email: string) {
     const secret = totp.generateSecret();
     const otpauthUrl = totp.toURI({
       label: email,
@@ -58,7 +58,7 @@ export class MfaService {
     };
   }
 
-  async verifyMfaToken(userId: number, token: string): Promise<boolean> {
+  async verifyMfaToken(userId: string, token: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.mfaSecret) {
       return false;

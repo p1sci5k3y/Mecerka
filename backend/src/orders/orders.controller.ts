@@ -7,7 +7,7 @@ import {
   UseGuards,
   Request,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -40,7 +40,7 @@ export class OrdersController {
   @Patch(':id/accept')
   @Roles(Role.RUNNER)
   acceptOrder(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
     return this.ordersService.acceptOrder(id, req.user.userId);
@@ -49,7 +49,7 @@ export class OrdersController {
   @Patch(':id/complete')
   @Roles(Role.RUNNER)
   completeOrder(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
     return this.ordersService.completeOrder(id, req.user.userId);
@@ -82,7 +82,7 @@ export class OrdersController {
   @Get(':id')
   @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER, Role.ADMIN)
   findOne(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
     return this.ordersService.findOne(id, req.user.userId, req.user.roles);

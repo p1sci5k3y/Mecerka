@@ -8,13 +8,13 @@ import {
   ValidateNested,
   Matches,
   Length,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class OrderItemDto {
-  @IsInt()
-  @IsPositive()
-  productId: number;
+  @IsUUID()
+  productId: string;
 
   @IsInt()
   @IsPositive()

@@ -4,12 +4,12 @@ import { Request } from 'express';
 
 // JwtPayload normalizing to roles: Role[]
 export interface JwtPayload {
-  sub: number;
+  sub: string;
   roles: Role[];
 }
 
 export interface UserFromJwt {
-  userId: number;
+  userId: string;
   roles: Role[];
 }
 
