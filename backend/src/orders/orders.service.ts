@@ -14,7 +14,7 @@ import * as argon2 from 'argon2';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) { }
 
-  async create(createOrderDto: CreateOrderDto, clientId: number) {
+  async create(createOrderDto: CreateOrderDto, clientId: string) {
     const { items, deliveryAddress, pin } = createOrderDto;
 
     // 0. Verify Transactional PIN
@@ -47,7 +47,7 @@ export class OrdersService {
         'All products must belong to the same city',
       );
     }
-    const cityId = distinctCityIds.values().next().value as number;
+    const cityId = distinctCityIds.values().next().value as string;
 
     // 3. Verify Stock and Calculate Total
     let totalPrice = 0;
@@ -110,7 +110,7 @@ export class OrdersService {
     });
   }
 
-  findAll(userId: number, roles: Role[]) {
+  findAll(userId: string, roles: Role[]) {
     if (roles.includes(Role.PROVIDER)) {
       return this.prisma.order.findMany({
         where: {
@@ -167,7 +167,7 @@ export class OrdersService {
     return [];
   }
 
-  async findOne(id: number, userId: number, roles: Role[]) {
+  async findOne(id: string, userId: string, roles: Role[]) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -216,7 +216,7 @@ export class OrdersService {
     });
   }
 
-  async acceptOrder(id: number, runnerId: number) {
+  async acceptOrder(id: string, runnerId: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -240,7 +240,7 @@ export class OrdersService {
     return this.prisma.order.findUnique({ where: { id } });
   }
 
-  async completeOrder(id: number, runnerId: number) {
+  async completeOrder(id: string, runnerId: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -262,7 +262,7 @@ export class OrdersService {
     return this.prisma.order.findUnique({ where: { id } });
   }
 
-  async getProviderStats(providerId: number) {
+  async getProviderStats(providerId: string) {
     const orders = await this.prisma.order.findMany({
       where: {
         items: {
@@ -308,7 +308,7 @@ export class OrdersService {
     };
   }
 
-  async getProviderSalesChart(providerId: number) {
+  async getProviderSalesChart(providerId: string) {
     // Get orders from last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -347,7 +347,7 @@ export class OrdersService {
     }));
   }
 
-  async getProviderTopProducts(providerId: number) {
+  async getProviderTopProducts(providerId: string) {
     const orders = await this.prisma.order.findMany({
       where: {
         items: {
@@ -363,7 +363,7 @@ export class OrdersService {
       },
     });
 
-    const productStats: Record<number, { name: string; revenue: number; quantity: number }> = {};
+    const productStats: Record<string, { name: string; revenue: number; quantity: number }> = {};
 
     orders.forEach(order => {
       order.items.forEach(item => {

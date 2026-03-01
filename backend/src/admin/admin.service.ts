@@ -27,7 +27,7 @@ export class AdminService {
     });
   }
 
-  async updateUserRole(id: number, role: Role, currentAdminId: number) {
+  async updateUserRole(id: string, role: Role, currentAdminId: string) {
     if (id === currentAdminId) {
       throw new ForbiddenException('Cannot change your own role');
     }
@@ -38,7 +38,7 @@ export class AdminService {
     });
   }
 
-  async activateUser(id: number, currentAdminId: number) {
+  async activateUser(id: string, currentAdminId: string) {
     if (id === currentAdminId) {
       throw new ForbiddenException('Cannot activate yourself');
     }
@@ -49,7 +49,7 @@ export class AdminService {
     });
   }
 
-  async blockUser(id: number, currentAdminId: number) {
+  async blockUser(id: string, currentAdminId: string) {
     if (id === currentAdminId) {
       throw new ForbiddenException('Cannot block yourself');
     }
@@ -74,7 +74,7 @@ export class AdminService {
   }
 
   async updateCity(
-    id: number,
+    id: string,
     data: Partial<{ name: string; slug: string; active: boolean }>,
   ) {
     if (data.slug) {
@@ -88,7 +88,7 @@ export class AdminService {
     return this.prisma.city.update({ where: { id }, data });
   }
 
-  async deleteCity(id: number) {
+  async deleteCity(id: string) {
     // Check for dependencies
     const products = await this.prisma.product.count({ where: { cityId: id } });
     if (products > 0)
@@ -123,7 +123,7 @@ export class AdminService {
   }
 
   async updateCategory(
-    id: number,
+    id: string,
     data: Partial<{ name: string; slug: string; image_url: string }>,
   ) {
     if (data.slug) {
@@ -137,7 +137,7 @@ export class AdminService {
     return this.prisma.category.update({ where: { id }, data });
   }
 
-  async deleteCategory(id: number) {
+  async deleteCategory(id: string) {
     const products = await this.prisma.product.count({
       where: { categoryId: id },
     });
