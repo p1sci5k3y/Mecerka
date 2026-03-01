@@ -19,7 +19,7 @@ import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class RunnerController {
-  constructor(private readonly runnerService: RunnerService) { }
+  constructor(private readonly runnerService: RunnerService) {}
 
   @Post('preview-delivery')
   @Roles(Role.CLIENT, Role.ADMIN)

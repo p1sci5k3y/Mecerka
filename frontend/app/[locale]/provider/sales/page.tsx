@@ -1,74 +1,112 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import {
-  BarChart3,
-  DollarSign,
-  Package,
-  Loader2,
-  TrendingUp,
-  Star,
-  Award,
-} from "lucide-react"
+import { useEffect, useState, useMemo } from "react"
+import { Loader2, DollarSign, Package, Clock, Inbox, PlayCircle, CheckCircle } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { ordersService } from "@/lib/services/orders-service"
-import { Badge } from "@/components/ui/badge"
-import type { Order, ProviderStats, SalesChartData, TopProduct } from "@/lib/types"
-
-// Recharts components
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
-} from 'recharts'
+import type { Order } from "@/lib/types"
+import { OrderKanbanColumn } from "@/components/provider/OrderKanbanColumn"
+import { useNow } from "@/hooks/use-now"
+import { toast } from "sonner" // Asumiendo uso de sonner para toasts no intrusivos
 
 export default function ProviderSalesPage() {
   return (
     <ProtectedRoute allowedRoles={["PROVIDER"]}>
-      <SalesContent />
+      <ProviderKanbanContent />
     </ProtectedRoute>
   )
 }
 
-function SalesContent() {
+function ProviderKanbanContent() {
   const { user } = useAuth()
-  const [stats, setStats] = useState<ProviderStats | null>(null)
-  const [chartData, setChartData] = useState<SalesChartData[]>([])
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const now = useNow(30000) // Se actualiza cada 30 segundos
+  // TODO: Conectar WebSocket inmersivo real en lugar o además de polling
+  // const { socket } = useSocket()
+
+  // Refetch orders silently
+  const fetchOrders = async (silent = false) => {
+    try {
+      if (!silent) setLoading(true)
+      const data = await ordersService.getAll()
+      setOrders(data)
+    } catch (e) {
+      console.error("Failed to load provider orders", e)
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsData, chartRes, topRes] = await Promise.all([
-          ordersService.getProviderStats(),
-          ordersService.getSalesChart(),
-          ordersService.getTopProducts()
-        ])
+    fetchOrders()
 
-        // Stats might come inside an object depending on how api.get wraps it? 
-        // In orders-service we use api.get<ProviderStats>, which returns the object directly usually.
-        // Let's assume typescript types are correct.
-        setStats(statsData)
-        setChartData(chartRes)
-        setTopProducts(topRes)
-      } catch (e) {
-        console.error("Failed to load sales data", e)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchData()
+    // Configurar polling silencioso o WebSockets aquí
+    const interval = setInterval(() => fetchOrders(true), 15000)
+    return () => clearInterval(interval)
   }, [])
+
+  // Manejador de estado 100% dependiente de API y 409
+  const handleStatusChange = async (providerOrderId: string, currentStatus: string, nextStatus: string) => {
+    try {
+      await ordersService.updateProviderOrderStatus(providerOrderId, nextStatus)
+      // Refetch silencioso
+      toast.success("Pedido actualizado correctamente")
+      fetchOrders(true)
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        toast.error("El estado del pedido cambió hace unos segundos. Reiniciando vista...")
+      } else {
+        toast.error("Error al actualizar el pedido.")
+      }
+      fetchOrders(true) // Forzar sincro fallida
+    }
+  }
+
+  const handleReject = async (providerOrderId: string) => {
+    try {
+      await ordersService.updateProviderOrderStatus(providerOrderId, "REJECTED_BY_STORE")
+      toast("Has rechazado el pedido. Se retirará de tu vista.", {
+        description: "El sistema buscará alternativas si es posible."
+      })
+      fetchOrders(true)
+    } catch (err: any) {
+      toast.error("Error al rechazar. Verificando estado...")
+      fetchOrders(true)
+    }
+  }
+
+  // Cálculos de Hero Header puramente en memoria
+  const heroStats = useMemo(() => {
+    if (!user) return { today: 0, revenue: 0, prep: 0 }
+
+    let totalToday = 0
+    let revToday = 0
+    let prepToday = 0
+
+    const todayStr = new Date().toISOString().split('T')[0]
+
+    orders.forEach(o => {
+      const po = o.providerOrders.find(p => p.providerId === String(user.userId))
+      if (!po) return
+
+      // Es de hoy?
+      const isToday = po.createdAt?.startsWith(todayStr) || o.createdAt.startsWith(todayStr)
+
+      if (isToday && po.status !== 'REJECTED_BY_STORE' && po.status !== 'CANCELLED') {
+        totalToday++
+        revToday += po.subtotal
+      }
+      if (po.status === 'PREPARING' || po.status === 'ACCEPTED') {
+        prepToday++
+      }
+    })
+
+    return { today: totalToday, revenue: revToday, prep: prepToday }
+  }, [orders, user])
 
   if (loading) {
     return (
@@ -78,139 +116,83 @@ function SalesContent() {
     )
   }
 
-  const starProduct = topProducts.length > 0 ? topProducts[0] : null
-
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main className="flex-1">
-        <div className="mx-auto max-w-6xl px-4 py-8 lg:px-8">
-          <div className="mb-8">
+      <main className="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full">
+        {/* HERO STATS */}
+        <div className="mb-8 flex flex-col gap-4">
+          <div>
             <h1 className="font-display text-3xl font-bold text-foreground">
-              Panel de ventas
+              Panel Operativo
             </h1>
-            <p className="mt-1 text-muted-foreground">
-              Hola {user?.name}, aquí tienes el rendimiento de tu negocio
+            <p className="text-muted-foreground mt-1">
+              Hola, {user?.name}. Supervisa tus envíos en tiempo real.
             </p>
           </div>
-
-          {/* Key Metrics */}
-          <div className="mb-8 grid gap-4 sm:grid-cols-4">
-            {[
-              {
-                label: "Ingresos totales",
-                value: `${stats?.totalRevenue.toFixed(2)} €` || "0.00 €",
-                icon: DollarSign,
-              },
-              {
-                label: "Pedidos totales",
-                value: stats?.totalOrders || 0,
-                icon: BarChart3,
-              },
-              {
-                label: "Productos vendidos",
-                value: stats?.itemsSold || 0,
-                icon: Package,
-              },
-              {
-                label: "Ticket medio",
-                value: `${stats?.averageTicket.toFixed(2)} €` || "0.00 €",
-                icon: TrendingUp,
-              },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="flex items-center gap-4 rounded-xl border border-border bg-card p-5"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <stat.icon className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="font-display text-xl font-bold text-card-foreground">
-                    {stat.value}
-                  </p>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Package className="h-5 w-5" />
               </div>
-            ))}
-          </div>
-
-          {/* Gráfico y Producto Estrella */}
-          <div className="mb-8 grid gap-8 lg:grid-cols-3">
-            {/* Chart */}
-            <div className="rounded-xl border border-border bg-card p-6 lg:col-span-2">
-              <h3 className="mb-6 font-display text-lg font-semibold">Evolución de ventas (30 días)</h3>
-              <div className="h-[300px] w-full">
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis
-                        dataKey="date"
-                        fontSize={12}
-                        tickFormatter={(val) => new Date(val).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })}
-                      />
-                      <YAxis fontSize={12} tickFormatter={(val) => `${val}€`} />
-                      <Tooltip
-                        formatter={(val: number) => [`${val.toFixed(2)} €`, "Ventas"]}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString()}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="amount"
-                        stroke="#000000" // Use theme color properly in future
-                        strokeWidth={2}
-                        activeDot={{ r: 8 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-muted-foreground">
-                    No hay datos suficientes
-                  </div>
-                )}
+              <div>
+                <p className="text-xs text-muted-foreground">Pedidos Activos Hoy</p>
+                <p className="font-display text-xl font-bold">{heroStats.today}</p>
               </div>
             </div>
-
-            {/* Star Product */}
-            <div className="rounded-xl border border-border bg-card p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-display text-lg font-semibold">Producto Estrella</h3>
-                <Award className="h-5 w-5 text-yellow-500" />
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-500/10 text-yellow-500">
+                <Clock className="h-5 w-5" />
               </div>
-
-              {starProduct ? (
-                <div className="flex flex-col items-center justify-center pt-4 text-center">
-                  <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
-                    <Star className="h-10 w-10 fill-current" />
-                  </div>
-                  <h4 className="text-xl font-bold">{starProduct.name}</h4>
-                  <p className="text-sm text-muted-foreground">{starProduct.quantity} unidades vendidas</p>
-                  <div className="mt-4 rounded-lg bg-secondary/50 px-4 py-2">
-                    <p className="text-sm font-medium">Ingresos generados</p>
-                    <p className="text-2xl font-bold text-primary">{starProduct.revenue.toFixed(2)} €</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex h-40 items-center justify-center text-muted-foreground text-sm">
-                  Calculando producto estrella...
-                </div>
-              )}
-
-              <div className="mt-6 border-t border-border pt-4">
-                <h5 className="mb-3 text-sm font-medium">Top Productos</h5>
-                <div className="space-y-3">
-                  {topProducts.slice(1, 4).map((prod, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <span className="truncate text-muted-foreground">{prod.name}</span>
-                      <span className="font-medium">{prod.revenue.toFixed(0)}€</span>
-                    </div>
-                  ))}
-                </div>
+              <div>
+                <p className="text-xs text-muted-foreground">En Preparación</p>
+                <p className="font-display text-xl font-bold">{heroStats.prep}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-500">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Ingresos (Hoy)</p>
+                <p className="font-display text-xl font-bold">{heroStats.revenue.toFixed(2)} €</p>
               </div>
             </div>
           </div>
+        </div>
 
+        {/* KANBAN BOARD */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <OrderKanbanColumn
+            title="Nuevos"
+            icon={<Inbox className="h-5 w-5" />}
+            orders={orders}
+            providerId={String(user?.userId)}
+            validStatuses={["PENDING"]}
+            now={now}
+            onStatusChange={handleStatusChange}
+            onReject={handleReject}
+          />
+          <OrderKanbanColumn
+            title="En Preparación"
+            icon={<PlayCircle className="h-5 w-5" />}
+            orders={orders}
+            providerId={String(user?.userId)}
+            validStatuses={["ACCEPTED", "PREPARING"]}
+            now={now}
+            onStatusChange={handleStatusChange}
+            onReject={handleReject}
+          />
+          <OrderKanbanColumn
+            title="Listos"
+            icon={<CheckCircle className="h-5 w-5" />}
+            orders={orders}
+            providerId={String(user?.userId)}
+            validStatuses={["READY_FOR_PICKUP"]}
+            now={now}
+            onStatusChange={handleStatusChange}
+            onReject={handleReject}
+          />
         </div>
       </main>
       <Footer />

@@ -29,7 +29,9 @@ export class AuthService {
   async register(dto: RegisterDto) {
     const { email, password, name, role } = dto;
 
-    const existingUser = await this.prisma.user.findUnique({ where: { email } });
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
     if (existingUser) {
       throw new ConflictException('Un usuario con este correo ya existe');
     }
@@ -48,7 +50,9 @@ export class AuthService {
             roles: role ? [role] : [Role.CLIENT], // Default role array
             mfaEnabled: false, // User must set up MFA explicitly
             verificationToken,
-            verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            verificationTokenExpiresAt: new Date(
+              Date.now() + 24 * 60 * 60 * 1000,
+            ),
             emailVerified: false,
           },
         });
@@ -57,22 +61,44 @@ export class AuthService {
         return user;
       });
     } catch (e) {
-      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
-      this.logger.error(`Failed to register user (db error) for ${emailHash}:`, e);
-      throw new BadRequestException('No se pudo completar el registro. Por favor, intenta de nuevo más tarde.');
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
+      this.logger.error(
+        `Failed to register user (db error) for ${emailHash}:`,
+        e,
+      );
+      throw new BadRequestException(
+        'No se pudo completar el registro. Por favor, intenta de nuevo más tarde.',
+      );
     }
 
     try {
-      await this.emailService.sendVerificationEmail(createdUser.email, verificationToken);
+      await this.emailService.sendVerificationEmail(
+        createdUser.email,
+        verificationToken,
+      );
     } catch (e) {
-      this.logger.error(`Failed to send verification email to user ${createdUser.id}:`, e);
-      const emailHash = crypto.createHash('sha256').update(createdUser.email).digest('hex').substring(0, 8);
+      this.logger.error(
+        `Failed to send verification email to user ${createdUser.id}:`,
+        e,
+      );
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(createdUser.email)
+        .digest('hex')
+        .substring(0, 8);
       // Simulate creating a retry record or queuing a job via queueService (pending implementation).
-      this.logger.warn(`Verification email for ${emailHash} failed. Logged for retry. User can use /auth/resend-verification endpoint.`);
+      this.logger.warn(
+        `Verification email for ${emailHash} failed. Logged for retry. User can use /auth/resend-verification endpoint.`,
+      );
     }
 
     return {
-      message: 'Cuenta creada. Por favor, revisa tu correo para verificar tu cuenta.',
+      message:
+        'Cuenta creada. Por favor, revisa tu correo para verificar tu cuenta.',
     };
   }
 
@@ -81,7 +107,11 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
 
     if (!user) {
-      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
       this.logger.warn(`Login failed: User not found for ${emailHash}`);
       throw new UnauthorizedException('Credenciales inválidas');
     }
@@ -99,7 +129,11 @@ export class AuthService {
 
     this.logger.log(`User logged in: ${user.id}`);
 
-    const sessionPayload = { sub: user.id, email: user.email, roles: user.roles };
+    const sessionPayload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.roles,
+    };
     const accessToken = this.jwtService.sign(sessionPayload);
 
     return {
@@ -109,15 +143,22 @@ export class AuthService {
         email: user.email,
         roles: user.roles,
         mfaEnabled: user.mfaEnabled,
-        hasPin: !!user.pin
-      }
+        hasPin: !!user.pin,
+      },
     };
   }
 
   async verifyEmail(token: string) {
-    const user = await this.prisma.user.findUnique({ where: { verificationToken: token } });
-    if (!user?.verificationTokenExpiresAt || user.verificationTokenExpiresAt < new Date()) {
-      throw new BadRequestException('Token de verificación inválido o expirado.');
+    const user = await this.prisma.user.findUnique({
+      where: { verificationToken: token },
+    });
+    if (
+      !user?.verificationTokenExpiresAt ||
+      user.verificationTokenExpiresAt < new Date()
+    ) {
+      throw new BadRequestException(
+        'Token de verificación inválido o expirado.',
+      );
     }
 
     await this.prisma.user.update({
@@ -139,24 +180,50 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       // Prevent enumeration
-      return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
+      return {
+        message:
+          'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
+      };
     }
     if (user.emailVerified) {
-      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
-      this.logger.warn(`Resend verification requested for already verified account: ${emailHash}`);
-      return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
+      this.logger.warn(
+        `Resend verification requested for already verified account: ${emailHash}`,
+      );
+      return {
+        message:
+          'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
+      };
     }
 
     const verificationToken = crypto.randomUUID();
 
     try {
       // Direct call here; ideally enqueue to a queueService.
-      await this.emailService.sendVerificationEmail(user.email, verificationToken);
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        verificationToken,
+      );
     } catch (e) {
-      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
-      this.logger.error(`Failed to resend verification email for ${emailHash}:`, e);
-      this.logger.warn(`Verification email resend failed for ${emailHash}. Please trigger manual resend or queue job (pending queueService).`);
-      throw new BadRequestException('No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.');
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
+      this.logger.error(
+        `Failed to resend verification email for ${emailHash}:`,
+        e,
+      );
+      this.logger.warn(
+        `Verification email resend failed for ${emailHash}. Please trigger manual resend or queue job (pending queueService).`,
+      );
+      throw new BadRequestException(
+        'No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.',
+      );
     }
 
     try {
@@ -164,15 +231,29 @@ export class AuthService {
         where: { id: user.id },
         data: {
           verificationToken,
-          verificationTokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          verificationTokenExpiresAt: new Date(
+            Date.now() + 24 * 60 * 60 * 1000,
+          ),
         },
       });
     } catch (e) {
-      const emailHash = crypto.createHash('sha256').update(email).digest('hex').substring(0, 8);
-      this.logger.error(`Failed to update verification token in DB after successful email for ${emailHash}:`, e);
-      throw new BadRequestException('Se envió el correo, pero ocurrió un error interno al registrar el token.');
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
+      this.logger.error(
+        `Failed to update verification token in DB after successful email for ${emailHash}:`,
+        e,
+      );
+      throw new BadRequestException(
+        'Se envió el correo, pero ocurrió un error interno al registrar el token.',
+      );
     }
 
-    return { message: 'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.' };
+    return {
+      message:
+        'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
+    };
   }
 }
