@@ -48,12 +48,16 @@ async function main() {
 
 // eslint-disable-next-line unicorn/prefer-top-level-await
 (async () => {
+    let hasError = false;
     try {
         await main();
     } catch (e) {
         console.error(e);
-        process.exit(1);
+        hasError = true;
     } finally {
         await prisma.$disconnect();
+        if (hasError) {
+            process.exit(1);
+        }
     }
 })();

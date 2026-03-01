@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma, Role, DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 @Injectable()
@@ -15,127 +15,109 @@ export class OrdersService {
   constructor(private readonly prisma: PrismaService) { }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
-    const { items, deliveryAddress, pin } = createOrderDto;
+    const { items, deliveryAddress, pin, deliveryLat, deliveryLng } = createOrderDto;
 
     // 0. Verify Transactional PIN
     const user = await this.prisma.user.findUnique({ where: { id: clientId } });
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
-    if (!user.pin) {
-      throw new BadRequestException('Debes configurar un PIN de compra en tu perfil.');
-    }
-    const isPinValid = await argon2.verify(user.pin, pin);
-    if (!isPinValid) {
-      throw new UnauthorizedException('PIN de compra incorrecto.');
-    }
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (!user.pin) throw new BadRequestException('Debes configurar un PIN de compra en tu perfil.');
 
-    // 1. Fetch products
+    const isPinValid = await argon2.verify(user.pin, pin);
+    if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
+
+    // 1. Fetch products & validate active
     const productIds = items.map((item) => item.productId);
     const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: { id: { in: productIds }, isActive: true },
     });
 
     if (products.length !== productIds.length) {
-      throw new NotFoundException('Some products not found');
+      throw new NotFoundException('Some products were not found or are no longer active');
     }
-
-    // 2. Validate City (Single city rule)
     if (products.length === 0) {
       throw new BadRequestException('Order must contain at least one product');
     }
 
+    // 2. Validate single City boundary
     const distinctCityIds = new Set(products.map((p) => p.cityId));
     if (distinctCityIds.size > 1) {
-      throw new BadRequestException(
-        'All products must belong to the same city',
-      );
+      throw new BadRequestException('All products must belong to the same city');
     }
     const cityId = distinctCityIds.values().next().value as string;
 
-    // 3. Verify Stock and Calculate Total
-    let totalPrice = 0;
-    const orderItemsData: Prisma.OrderItemCreateWithoutOrderInput[] = [];
-
+    // 3. Optimistic Stock Check
     for (const item of items) {
-      const product = products.find((p) => p.id === item.productId);
-      if (!product) {
-        throw new NotFoundException(`Product ${item.productId} not found`);
-      }
-
+      const product = products.find((p) => p.id === item.productId)!;
       if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Insufficient stock for product ${product.name}`,
-        );
+        throw new BadRequestException(`Insufficient stock for product ${product.name}`);
       }
-
-      const itemTotal = Number(product.price) * item.quantity;
-      totalPrice += itemTotal;
-
-      orderItemsData.push({
-        quantity: item.quantity,
-        priceAtPurchase: product.price,
-        product: { connect: { id: product.id } },
-      });
     }
 
-    // 4. Transaction: Create Order & Update Stock
-    return this.prisma.$transaction(async (tx) => {
-      // Create Order
-      const order = await tx.order.create({
-        data: {
-          clientId,
-          cityId,
-          totalPrice,
-          status: 'PENDING',
-          deliveryAddress,
-          items: {
-            create: orderItemsData,
-          },
-        },
-        include: {
-          items: true,
-        },
-      });
+    // 4. Group by Provider payload
+    const providerGroups: Record<string, { items: any[]; subtotal: number }> = {};
+    let orderTotalPrice = 0;
 
-      // Update Stocks
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
-          },
-        });
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId)!;
+      const providerId = product.providerId;
+      const itemTotal = Number(product.price) * item.quantity;
+
+      orderTotalPrice += itemTotal;
+
+      if (!providerGroups[providerId]) {
+        providerGroups[providerId] = { items: [], subtotal: 0 };
       }
 
-      return order;
+      providerGroups[providerId].items.push({
+        productId: product.id,
+        quantity: item.quantity,
+        priceAtPurchase: product.price,
+      });
+      providerGroups[providerId].subtotal += itemTotal;
+    }
+
+    // 5. Calculate Logistics Economics dynamically on root payload
+    const baseCityFee = 3.50; // ToDo: Fetch from config/DB map
+    const multiStopPenalty = 1.50;
+    const providerCount = Object.keys(providerGroups).length;
+    const deliveryFee = baseCityFee + ((providerCount - 1) * multiStopPenalty);
+
+    // 6. Create Order and ProviderOrders (NO STOCK LOCK YET)
+    const order = await this.prisma.order.create({
+      data: {
+        clientId,
+        cityId,
+        totalPrice: orderTotalPrice,
+        deliveryFee,
+        status: DeliveryStatus.PENDING,
+        deliveryAddress,
+        deliveryLat,
+        deliveryLng,
+        providerOrders: {
+          create: Object.entries(providerGroups).map(([providerId, group]) => ({
+            providerId,
+            status: ProviderOrderStatus.PENDING,
+            subtotal: group.subtotal,
+            items: { create: group.items },
+          })),
+        },
+      },
+      include: {
+        providerOrders: { include: { items: true } },
+      },
     });
+
+    return order;
   }
 
   findAll(userId: string, roles: Role[]) {
     if (roles.includes(Role.PROVIDER)) {
       return this.prisma.order.findMany({
-        where: {
-          items: {
-            some: {
-              product: {
-                providerId: userId,
-              },
-            },
-          },
-        },
+        where: { providerOrders: { some: { providerId: userId } } },
         include: {
-          items: {
-            where: {
-              product: {
-                providerId: userId,
-              },
-            },
-            include: {
-              product: true,
-            },
+          providerOrders: {
+            where: { providerId: userId },
+            include: { items: { include: { product: true } } },
           },
           city: true,
         },
@@ -145,11 +127,7 @@ export class OrdersService {
       return this.prisma.order.findMany({
         where: { runnerId: userId },
         include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
+          providerOrders: { include: { items: { include: { product: true } } } },
           city: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -158,11 +136,7 @@ export class OrdersService {
       return this.prisma.order.findMany({
         where: { clientId: userId },
         include: {
-          items: {
-            include: {
-              product: true,
-            },
-          },
+          providerOrders: { include: { items: { include: { product: true } } } },
           city: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -175,13 +149,12 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
-        items: {
-          include: {
-            product: true,
-          },
+        providerOrders: {
+          include: { items: { include: { product: true } } },
         },
       },
     });
+
     if (!order) {
       throw new NotFoundException(`Order ${id} not found`);
     }
@@ -190,7 +163,7 @@ export class OrdersService {
 
     const isClient = order.clientId === userId;
     const isRunner = order.runnerId === userId;
-    const isProvider = order.items.some((item) => item.product.providerId === userId);
+    const isProvider = order.providerOrders.some((po) => po.providerId === userId);
 
     if (!isClient && !isRunner && !isProvider) {
       throw new ForbiddenException('You do not have permission to view this order');
@@ -199,17 +172,199 @@ export class OrdersService {
     return order;
   }
 
+  async confirmPayment(
+    orderId: string,
+    paymentRef?: string,
+  ): Promise<{
+    orderId: string;
+    finalStatus: DeliveryStatus;
+    rejectedProviderOrderIds: string[];
+    confirmedProviderOrderIds: string[];
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: {
+          providerOrders: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      });
+
+      if (!order) throw new Error('Order not found');
+
+      // Idempotency: if not PENDING, return current state
+      if (order.status !== DeliveryStatus.PENDING) {
+        return {
+          orderId: order.id,
+          finalStatus: order.status,
+          rejectedProviderOrderIds: [],
+          confirmedProviderOrderIds: order.providerOrders
+            .filter(
+              (po) =>
+                po.status !== ProviderOrderStatus.REJECTED_BY_STORE &&
+                po.status !== ProviderOrderStatus.CANCELLED,
+            )
+            .map((po) => po.id),
+        };
+      }
+
+      const rejectedProviderOrderIds: string[] = [];
+      const confirmedProviderOrderIds: string[] = [];
+
+      for (const po of order.providerOrders) {
+        if (
+          po.status === ProviderOrderStatus.CANCELLED ||
+          po.status === ProviderOrderStatus.REJECTED_BY_STORE
+        ) {
+          rejectedProviderOrderIds.push(po.id);
+          continue;
+        }
+
+        let providerOk = true;
+
+        // Phase A: Verificación de stock (optimista)
+        const productIds = po.items.map((i) => i.productId);
+        const products = await tx.product.findMany({
+          where: { id: { in: productIds } },
+          select: { id: true, stock: true, isActive: true },
+        });
+        const productMap = new Map(products.map((p) => [p.id, p]));
+
+        for (const item of po.items) {
+          const p = productMap.get(item.productId);
+          if (!p || !p.isActive || p.stock < item.quantity) {
+            providerOk = false;
+            break;
+          }
+        }
+
+        if (!providerOk) {
+          rejectedProviderOrderIds.push(po.id);
+          continue;
+        }
+
+        // Phase B: Decrement real con concurrencia
+        for (const item of po.items) {
+          const res = await tx.product.updateMany({
+            where: {
+              id: item.productId,
+              isActive: true,
+              stock: { gte: item.quantity },
+            },
+            data: { stock: { decrement: item.quantity } },
+          });
+
+          if (res.count !== 1) {
+            providerOk = false;
+            break;
+          }
+        }
+
+        if (!providerOk) {
+          throw new Error('Concurrent stock update detected; retry payment confirmation');
+        }
+
+        confirmedProviderOrderIds.push(po.id);
+      }
+
+      // 2) Actualizar ProviderOrders rechazados (Rechazo Parcial)
+      if (rejectedProviderOrderIds.length > 0) {
+        await tx.providerOrder.updateMany({
+          where: { id: { in: rejectedProviderOrderIds } },
+          data: { status: ProviderOrderStatus.REJECTED_BY_STORE },
+        });
+      }
+
+      // 3) Resolver estado final
+      const allRejected = confirmedProviderOrderIds.length === 0;
+
+      if (allRejected) {
+        const updated = await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: DeliveryStatus.CANCELLED,
+            ...(paymentRef ? { paymentRef } : {}),
+            confirmedAt: new Date(),
+          },
+        });
+
+        return {
+          orderId: updated.id,
+          finalStatus: updated.status,
+          rejectedProviderOrderIds,
+          confirmedProviderOrderIds,
+        };
+      }
+
+      const updated = await tx.order.update({
+        where: { id: order.id },
+        data: {
+          status: DeliveryStatus.CONFIRMED,
+          ...(paymentRef ? { paymentRef } : {}),
+          confirmedAt: new Date()
+        },
+      });
+
+      return {
+        orderId: updated.id,
+        finalStatus: updated.status,
+        rejectedProviderOrderIds,
+        confirmedProviderOrderIds,
+      };
+    });
+  }
+
+  async evaluateReadyForAssignment(orderId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { providerOrders: true },
+      });
+      if (!order) return;
+      if (order.status !== DeliveryStatus.CONFIRMED) return;
+
+      const hasReadyForPickup = order.providerOrders.some(
+        (po) => po.status === ProviderOrderStatus.READY_FOR_PICKUP
+      );
+
+      if (hasReadyForPickup) {
+        await tx.order.update({
+          where: { id: orderId },
+          data: { status: DeliveryStatus.READY_FOR_ASSIGNMENT },
+        });
+      }
+    });
+  }
+
+  async updateProviderOrderStatus(providerOrderId: string, providerId: string, status: ProviderOrderStatus) {
+    const po = await this.prisma.providerOrder.findUnique({ where: { id: providerOrderId } });
+    if (!po) throw new NotFoundException('ProviderOrder not found');
+    if (po.providerId !== providerId) throw new ForbiddenException('You do not have permission to update this provider order');
+
+    const updated = await this.prisma.providerOrder.update({
+      where: { id: providerOrderId },
+      data: { status },
+    });
+
+    if (status === ProviderOrderStatus.READY_FOR_PICKUP) {
+      await this.evaluateReadyForAssignment(po.orderId);
+    }
+
+    return updated;
+  }
+
   async getAvailableOrders() {
     return this.prisma.order.findMany({
       where: {
-        status: 'PENDING',
+        status: DeliveryStatus.READY_FOR_ASSIGNMENT,
         runnerId: null,
       },
       include: {
-        items: {
-          include: {
-            product: true,
-          },
+        providerOrders: {
+          include: { items: { include: { product: true } } },
         },
         city: true,
         client: {
@@ -227,18 +382,18 @@ export class OrdersService {
     const result = await this.prisma.order.updateMany({
       where: {
         id,
-        status: 'PENDING',
+        status: DeliveryStatus.READY_FOR_ASSIGNMENT,
         runnerId: null,
         clientId: { not: runnerId },
       },
       data: {
         runnerId,
-        status: 'CONFIRMED',
+        status: DeliveryStatus.ASSIGNED,
       },
     });
 
     if (result.count === 0) {
-      throw new BadRequestException('Order is already accepted, not pending, or you cannot accept your own order');
+      throw new BadRequestException('Order is already accepted, cannot be assigned, or you are trying to deliver your own order');
     }
 
     return this.prisma.order.findUnique({ where: { id } });
@@ -248,60 +403,48 @@ export class OrdersService {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
 
+    // ToDo: Invariant Rule 2 verification
+    // Must check if all sub-orders are PICKED_UP before delivering, or trust current DB status logic.
+
     const result = await this.prisma.order.updateMany({
       where: {
         id,
         runnerId,
-        status: 'CONFIRMED',
+        status: DeliveryStatus.IN_TRANSIT,
       },
       data: {
-        status: 'COMPLETED',
+        status: DeliveryStatus.DELIVERED,
       },
     });
 
     if (result.count === 0) {
-      throw new BadRequestException('Order cannot be completed in its current state, or you are not the assigned runner');
+      throw new BadRequestException('Order cannot be completed in its current state (Must be IN_TRANSIT), or you are not the assigned runner');
     }
 
     return this.prisma.order.findUnique({ where: { id } });
   }
 
   async getProviderStats(providerId: string) {
-    const orders = await this.prisma.order.findMany({
+    const providerOrders = await this.prisma.providerOrder.findMany({
       where: {
-        items: {
-          some: {
-            product: {
-              providerId,
-            },
-          },
-        },
-        status: { not: 'CANCELLED' },
+        providerId,
+        status: { not: ProviderOrderStatus.CANCELLED },
       },
       include: {
-        items: {
-          where: {
-            product: {
-              providerId,
-            },
-          },
-        },
+        items: true,
       },
     });
 
-    const totalRevenue = orders.reduce((sum, order) => {
-      const orderTotal = order.items.reduce((acc, item) => acc + Number(item.priceAtPurchase) * item.quantity, 0);
-      return sum + orderTotal;
+    const totalRevenue = providerOrders.reduce((sum, po) => {
+      const poTotal = po.items.reduce((acc, item) => acc + Number(item.priceAtPurchase) * item.quantity, 0);
+      return sum + poTotal;
     }, 0);
 
-    const totalOrders = orders.length;
-
-    const itemsSold = orders.reduce((sum, order) => {
-      const orderItems = order.items.reduce((acc, item) => acc + item.quantity, 0);
-      return sum + orderItems;
+    const totalOrders = providerOrders.length;
+    const itemsSold = providerOrders.reduce((sum, po) => {
+      return sum + po.items.reduce((acc, item) => acc + item.quantity, 0);
     }, 0);
 
-    // Calculate average ticket
     const averageTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     return {
@@ -313,38 +456,29 @@ export class OrdersService {
   }
 
   async getProviderSalesChart(providerId: string) {
-    // Get orders from last 30 days
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const orders = await this.prisma.order.findMany({
+    const providerOrders = await this.prisma.providerOrder.findMany({
       where: {
+        providerId,
         createdAt: { gte: thirtyDaysAgo },
-        items: {
-          some: {
-            product: { providerId },
-          },
-        },
-        status: { not: 'CANCELLED' },
+        status: { not: ProviderOrderStatus.CANCELLED },
       },
       include: {
-        items: {
-          where: { product: { providerId } },
-        },
+        items: true,
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    // Group by date
     const salesByDate: Record<string, number> = {};
 
-    orders.forEach(order => {
-      const date = order.createdAt.toISOString().split('T')[0];
-      const orderTotal = order.items.reduce((acc, item) => acc + Number(item.priceAtPurchase) * item.quantity, 0);
-      salesByDate[date] = (salesByDate[date] || 0) + orderTotal;
+    providerOrders.forEach(po => {
+      const date = po.createdAt.toISOString().split('T')[0];
+      const poTotal = po.items.reduce((acc, item) => acc + Number(item.priceAtPurchase) * item.quantity, 0);
+      salesByDate[date] = (salesByDate[date] || 0) + poTotal;
     });
 
-    // Format for frontend (array of { date, amount })
     return Object.entries(salesByDate).map(([date, amount]) => ({
       date,
       amount,
@@ -352,25 +486,20 @@ export class OrdersService {
   }
 
   async getProviderTopProducts(providerId: string) {
-    const orders = await this.prisma.order.findMany({
+    const providerOrders = await this.prisma.providerOrder.findMany({
       where: {
-        items: {
-          some: { product: { providerId } },
-        },
-        status: { not: 'CANCELLED' },
+        providerId,
+        status: { not: ProviderOrderStatus.CANCELLED },
       },
       include: {
-        items: {
-          where: { product: { providerId } },
-          include: { product: true },
-        },
+        items: { include: { product: true } },
       },
     });
 
     const productStats: Record<string, { name: string; revenue: number; quantity: number }> = {};
 
-    orders.forEach(order => {
-      order.items.forEach(item => {
+    providerOrders.forEach(po => {
+      po.items.forEach(item => {
         if (!productStats[item.productId]) {
           productStats[item.productId] = {
             name: item.product.name,
@@ -385,6 +514,6 @@ export class OrdersService {
 
     return Object.values(productStats)
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5); // Return top 5
+      .slice(0, 5);
   }
 }
