@@ -60,8 +60,8 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
             isAuthorized = true; // Runner assigned to order
         } else if (user.roles.includes(Role.PROVIDER)) {
             // Check if provider owns any product in the order
-            const ownsProduct = order.items.some(
-                (item) => item.product.providerId === user.sub,
+            const ownsProduct = order.providerOrders.some(
+                (po) => po.providerId === user.sub,
             );
             if (ownsProduct) isAuthorized = true;
         }

@@ -18,21 +18,32 @@ enum Role {
   RUNNER
 }
 
-enum OrderStatus {
+enum DeliveryStatus {
   PENDING
   CONFIRMED
-  COMPLETED
+  READY_FOR_ASSIGNMENT
+  ASSIGNED
+  IN_TRANSIT
   DELIVERED
   CANCELLED
 }
 
+enum ProviderOrderStatus {
+  PENDING
+  ACCEPTED
+  PREPARING
+  READY_FOR_PICKUP
+  PICKED_UP
+  REJECTED_BY_STORE
+  CANCELLED
+}
+
 model User {
-  id                         String    @id @default(uuid())
+  id                         String    @id @default(uuid()) @db.Uuid
   email                      String    @unique
   password                   String
   pin                        String? // Hashed transaction PIN for purchases
   name                       String
-  // role      Role     @default(CLIENT) // Removed in favor of roles array
   roles                      Role[]    @default([CLIENT])
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
@@ -51,16 +62,15 @@ model User {
   longitude Float?
 
   // Relations
-  orders   Order[] // As Client
-  products Product[] // As Provider (if role is PROVIDER)
-
-  // Runner Relations
-  runnerProfile RunnerProfile?
-  runnerOrders  Order[]        @relation("RunnerOrders")
+  orders         Order[]         @relation("ClientOrders")
+  runnerProfile  RunnerProfile?
+  products       Product[]       @relation("ProviderProducts")
+  runnerOrders   Order[]         @relation("RunnerOrders")
+  providerOrders ProviderOrder[] @relation("ProviderOrders")
 }
 
 model City {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique
   slug      String   @unique
   active    Boolean  @default(true)
@@ -72,7 +82,7 @@ model City {
 }
 
 model Category {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique
   slug      String   @unique
   image_url String?
@@ -83,7 +93,7 @@ model Category {
 }
 
 model Product {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String
   description String?
   price       Decimal  @db.Decimal(10, 2)
@@ -91,65 +101,108 @@ model Product {
   imageUrl    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  isActive    Boolean  @default(true)
 
   // Foreign Keys
-  providerId String
-  cityId     String
-  categoryId String
+  providerId String @db.Uuid
+  cityId     String @db.Uuid
+  categoryId String @db.Uuid
 
   // Relations
-  provider   User        @relation(fields: [providerId], references: [id])
+  provider   User        @relation("ProviderProducts", fields: [providerId], references: [id])
   city       City        @relation(fields: [cityId], references: [id])
   category   Category    @relation(fields: [categoryId], references: [id])
   orderItems OrderItem[]
+
+  @@index([providerId])
+  @@index([cityId])
+  @@index([categoryId])
+  @@index([isActive])
 }
 
 model Order {
-  id         String      @id @default(uuid())
-  totalPrice Decimal     @db.Decimal(10, 2)
-  status     OrderStatus @default(PENDING)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id         String         @id @default(uuid()) @db.Uuid
+  totalPrice Decimal        @db.Decimal(10, 2)
+  status     DeliveryStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
   // Foreign Keys
-  clientId String
-  cityId   String
+  clientId String  @db.Uuid
+  cityId   String  @db.Uuid
+  runnerId String? @db.Uuid
 
   // Relations
-  client User        @relation(fields: [clientId], references: [id])
-  city   City        @relation(fields: [cityId], references: [id])
-  items  OrderItem[]
+  client User  @relation("ClientOrders", fields: [clientId], references: [id])
+  city   City  @relation(fields: [cityId], references: [id])
+  runner User? @relation("RunnerOrders", fields: [runnerId], references: [id])
+
+  providerOrders ProviderOrder[]
 
   // Delivery Information
   deliveryAddress String?
   deliveryLat     Float?
   deliveryLng     Float?
 
-  // Runner Matching
-  runnerId           String?
+  // Payment Tracking (Idempotency)
+  paymentRef      String?  @unique
+  confirmedAt     DateTime?
+
+  // Runner Matching Fees
+  deliveryFee        Decimal  @default(0.00) @db.Decimal(10, 2)
   deliveryDistanceKm Decimal? @db.Decimal(10, 2)
   runnerBaseFee      Decimal? @db.Decimal(10, 2)
   runnerPerKmFee     Decimal? @db.Decimal(10, 2)
-  runner             User?    @relation("RunnerOrders", fields: [runnerId], references: [id])
+
+  @@index([clientId])
+  @@index([cityId])
+  @@index([runnerId])
+  @@index([status])
+}
+
+model ProviderOrder {
+  id        String              @id @default(uuid()) @db.Uuid
+  status    ProviderOrderStatus @default(PENDING)
+  subtotal  Decimal             @db.Decimal(10, 2)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  // Foreign Keys
+  orderId    String @db.Uuid
+  providerId String @db.Uuid
+
+  // Relations
+  order    Order @relation(fields: [orderId], references: [id])
+  provider User  @relation("ProviderOrders", fields: [providerId], references: [id])
+
+  items OrderItem[]
+
+  @@index([orderId])
+  @@index([providerId])
+  @@index([status])
 }
 
 model OrderItem {
-  id              String  @id @default(uuid())
+  id              String  @id @default(uuid()) @db.Uuid
   quantity        Int
   priceAtPurchase Decimal @db.Decimal(10, 2)
 
   // Foreign Keys
-  orderId   String
-  productId String
+  providerOrderId String @db.Uuid
+  productId       String @db.Uuid
 
   // Relations
-  order   Order   @relation(fields: [orderId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  providerOrder ProviderOrder @relation(fields: [providerOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@unique([providerOrderId, productId])
+  @@index([providerOrderId])
+  @@index([productId])
 }
 
 model RunnerProfile {
-  id     String @id @default(uuid())
-  userId String @unique
+  id     String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
 
   // Location
   baseLat       Float?
