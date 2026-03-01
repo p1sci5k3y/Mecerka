@@ -3,7 +3,7 @@ import {
   Post,
   Body,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -30,7 +30,7 @@ export class RunnerController {
   @Post(':id/select-runner')
   @Roles(Role.CLIENT, Role.ADMIN)
   async selectRunner(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SelectRunnerDto,
     @Request() req: { user: UserFromJwt },
   ) {

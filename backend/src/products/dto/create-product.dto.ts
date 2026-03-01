@@ -7,6 +7,7 @@ import {
   IsString,
   Min,
   IsUrl,
+  IsUUID,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -33,11 +34,9 @@ export class CreateProductDto {
   @IsOptional()
   imageUrl?: string;
 
-  @IsInt()
-  @Type(() => Number)
-  cityId: number;
+  @IsUUID()
+  cityId: string;
 
-  @IsInt()
-  @Type(() => Number)
-  categoryId: number;
+  @IsUUID()
+  categoryId: string;
 }

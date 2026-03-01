@@ -39,11 +39,11 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('joinOrder')
     async handleJoinOrder(
-        @MessageBody() data: { orderId: number },
+        @MessageBody() data: { orderId: string },
         @ConnectedSocket() client: Socket,
     ) {
         // User attached by WsJwtAuthGuard
-        const user = (client as any).user as { sub: number; roles: Role[] };
+        const user = (client as any).user as { sub: string; roles: Role[] };
         if (!user || !Array.isArray(user.roles)) throw new WsException('Unauthorized');
 
         const order = await this.ordersService.findOne(data.orderId, user.sub, user.roles).catch(() => null);
@@ -79,14 +79,14 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     @SubscribeMessage('updateLocation')
     async handleUpdateLocation(
-        @MessageBody() data: { orderId: number; lat: number; lng: number },
+        @MessageBody() data: { orderId: string; lat: number; lng: number },
         @ConnectedSocket() client: Socket,
     ) {
-        if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.orderId !== 'number') {
+        if (typeof data.lat !== 'number' || typeof data.lng !== 'number' || typeof data.orderId !== 'string') {
             throw new WsException('Invalid location payload');
         }
 
-        const user = (client as any).user as { sub: number; roles: Role[] };
+        const user = (client as any).user as { sub: string; roles: Role[] };
         if (!user) throw new WsException('Unauthorized');
 
         // Verify order assignment securely before rebroadcasting

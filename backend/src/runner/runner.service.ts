@@ -79,9 +79,9 @@ export class RunnerService {
   }
 
   async selectRunner(
-    orderId: number,
+    orderId: string,
     dto: SelectRunnerDto,
-    userId: number,
+    userId: string,
     roles: Role[],
   ) {
     const order = await this.prisma.order.findUnique({
