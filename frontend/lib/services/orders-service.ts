@@ -1,31 +1,60 @@
 import { api } from "@/lib/api"
-import type { Order, BackendOrder, CreateOrderPayload } from "@/lib/types"
+import type { Order, BackendOrder, CreateOrderPayload, OrderItem } from "@/lib/types"
 
 function transformOrder(bo: BackendOrder): Order {
+  // If backend returns items directly (e.g., from an old endpoint) vs nested providerOrders
+  const flattenedItems: OrderItem[] = []
+
+  if (bo.items) {
+    flattenedItems.push(...bo.items.map(mapBackendItem))
+  }
+
+  if (bo.providerOrders) {
+    bo.providerOrders.forEach(po => {
+      if (po.items) {
+        flattenedItems.push(...po.items.map(mapBackendItem))
+      }
+    })
+  }
+
   return {
     id: String(bo.id),
     userId: "Unknown",
     total: Number.parseFloat(bo.totalPrice),
     status: bo.status,
     createdAt: bo.createdAt,
+    updatedAt: bo.updatedAt || bo.createdAt,
     city: bo.city?.name,
-    items: bo.items?.map(item => ({
-      id: String(item.id),
-      productId: String(item.productId),
-      quantity: item.quantity,
-      unitPrice: Number.parseFloat(item.priceAtPurchase),
-      product: item.product ? {
-        id: String(item.product.id),
-        name: item.product.name,
-        description: item.product.description || "",
-        price: Number.parseFloat(item.product.price),
-        stock: item.product.stock,
-        city: item.product.city?.name || "N/A",
-        category: item.product.category?.name || "N/A",
-        providerId: String(item.product.providerId),
-        createdAt: item.product.createdAt
-      } : undefined
+    items: flattenedItems,
+    providerOrders: bo.providerOrders?.map(po => ({
+      id: String(po.id),
+      providerId: String(po.providerId),
+      status: po.status,
+      subtotal: Number.parseFloat(po.subtotal),
+      items: (po.items || []).map(mapBackendItem),
+      createdAt: po.createdAt,
+      updatedAt: po.updatedAt || po.createdAt
     })) || []
+  }
+}
+
+function mapBackendItem(item: any): OrderItem {
+  return {
+    id: String(item.id),
+    productId: String(item.productId),
+    quantity: item.quantity,
+    unitPrice: Number.parseFloat(item.priceAtPurchase),
+    product: item.product ? {
+      id: String(item.product.id),
+      name: item.product.name,
+      description: item.product.description || "",
+      price: Number.parseFloat(item.product.price),
+      stock: item.product.stock,
+      city: item.product.city?.name || "N/A",
+      category: item.product.category?.name || "N/A",
+      providerId: String(item.product.providerId),
+      createdAt: item.product.createdAt
+    } : undefined
   }
 }
 
@@ -69,6 +98,9 @@ export const ordersService = {
   getAvailable: async () => {
     const data = await api.get<BackendOrder[]>("/orders/available")
     return data.map(transformOrder)
+  },
+  updateProviderOrderStatus: async (providerOrderId: string, status: string) => {
+    return api.patch(`/orders/provider-order/${providerOrderId}/status`, { status })
   },
   accept: async (id: string) => {
     return api.patch<BackendOrder>(`/orders/${id}/accept`)

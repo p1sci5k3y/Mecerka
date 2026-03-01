@@ -45,13 +45,25 @@ export interface OrderItem {
   product?: Product
 }
 
+export interface ProviderOrder {
+  id: string
+  providerId: string
+  status: "PENDING" | "ACCEPTED" | "PREPARING" | "READY_FOR_PICKUP" | "PICKED_UP" | "DELIVERED" | "CANCELLED" | "REJECTED_BY_STORE"
+  subtotal: number
+  items: OrderItem[]
+  createdAt?: string
+  updatedAt?: string
+}
+
 export interface Order {
   id: string
   userId: string // optional/unknown
   total: number
-  status: "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED"
+  status: "PENDING" | "CONFIRMED" | "READY_FOR_ASSIGNMENT" | "ASSIGNED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
   createdAt: string
+  updatedAt?: string
   items: OrderItem[]
+  providerOrders: ProviderOrder[]
   city?: string // mapped from backend city object if needed
   deliveryAddress?: string
 }
@@ -130,12 +142,24 @@ export interface BackendOrderItem {
   product?: BackendProduct
 }
 
+export interface BackendProviderOrder {
+  id: string
+  providerId: string
+  status: "PENDING" | "ACCEPTED" | "PREPARING" | "READY_FOR_PICKUP" | "PICKED_UP" | "DELIVERED" | "CANCELLED" | "REJECTED_BY_STORE"
+  subtotal: string
+  createdAt?: string
+  updatedAt?: string
+  items: BackendOrderItem[]
+}
+
 export interface BackendOrder {
   id: number
   totalPrice: string // Decimal string
-  status: "PENDING" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED"
+  status: "PENDING" | "CONFIRMED" | "READY_FOR_ASSIGNMENT" | "ASSIGNED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
   createdAt: string
-  items: BackendOrderItem[]
+  updatedAt?: string
+  items?: BackendOrderItem[]
+  providerOrders?: BackendProviderOrder[]
   city?: BackendCity
 }
 

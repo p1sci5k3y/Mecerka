@@ -11,7 +11,7 @@ import { DeliveryStatus, Role } from '@prisma/client';
 
 @Injectable()
 export class RunnerService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Haversine formula to calculate distance in km
   private calculateDistance(
@@ -26,9 +26,9 @@ export class RunnerService {
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(this.deg2rad(lat1)) *
-      Math.cos(this.deg2rad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+        Math.cos(this.deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   }
@@ -91,11 +91,15 @@ export class RunnerService {
 
     if (!order) throw new NotFoundException('Order not found');
     if (order.status !== DeliveryStatus.READY_FOR_ASSIGNMENT) {
-      throw new BadRequestException('Order must be READY_FOR_ASSIGNMENT to assign a runner');
+      throw new BadRequestException(
+        'Order must be READY_FOR_ASSIGNMENT to assign a runner',
+      );
     }
 
     if (!roles.includes(Role.ADMIN) && order.clientId !== userId) {
-      throw new UnauthorizedException('Solo puedes asignar runners a tus propios pedidos');
+      throw new UnauthorizedException(
+        'Solo puedes asignar runners a tus propios pedidos',
+      );
     }
 
     const runner = await this.prisma.runnerProfile.findUnique({
@@ -126,7 +130,9 @@ export class RunnerService {
       });
 
       if (result.count === 0) {
-        throw new BadRequestException('The order is no longer available to be assigned.');
+        throw new BadRequestException(
+          'The order is no longer available to be assigned.',
+        );
       }
 
       return tx.order.findUnique({ where: { id: orderId } });

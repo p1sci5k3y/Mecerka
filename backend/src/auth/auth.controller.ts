@@ -23,7 +23,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) { }
+  ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
@@ -51,7 +51,6 @@ export class AuthController {
   async resendVerificationEmail(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email);
   }
-
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
