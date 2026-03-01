@@ -59,6 +59,7 @@ export interface Order {
   id: string
   userId: string // optional/unknown
   total: number
+  deliveryFee: number
   status: "PENDING" | "CONFIRMED" | "READY_FOR_ASSIGNMENT" | "ASSIGNED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
   createdAt: string
   updatedAt?: string
@@ -66,6 +67,8 @@ export interface Order {
   providerOrders: ProviderOrder[]
   city?: string // mapped from backend city object if needed
   deliveryAddress?: string
+  deliveryLat?: number
+  deliveryLng?: number
 }
 
 export interface CreateOrderPayload {
@@ -155,12 +158,15 @@ export interface BackendProviderOrder {
 export interface BackendOrder {
   id: number
   totalPrice: string // Decimal string
+  deliveryFee: string // Decimal string
   status: "PENDING" | "CONFIRMED" | "READY_FOR_ASSIGNMENT" | "ASSIGNED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
   createdAt: string
   updatedAt?: string
   items?: BackendOrderItem[]
   providerOrders?: BackendProviderOrder[]
   city?: BackendCity
+  deliveryLat?: number
+  deliveryLng?: number
 }
 
 export interface AdminMetrics {
