@@ -21,10 +21,14 @@ function transformOrder(bo: BackendOrder): Order {
     id: String(bo.id),
     userId: "Unknown",
     total: Number.parseFloat(bo.totalPrice),
+    deliveryFee: bo.deliveryFee ? Number.parseFloat(bo.deliveryFee) : 0,
     status: bo.status,
     createdAt: bo.createdAt,
     updatedAt: bo.updatedAt || bo.createdAt,
     city: bo.city?.name,
+    deliveryAddress: (bo as any).deliveryAddress, // Typings might need this if we don't map it everywhere
+    deliveryLat: bo.deliveryLat,
+    deliveryLng: bo.deliveryLng,
     items: flattenedItems,
     providerOrders: bo.providerOrders?.map(po => ({
       id: String(po.id),
@@ -104,6 +108,9 @@ export const ordersService = {
   },
   accept: async (id: string) => {
     return api.patch<BackendOrder>(`/orders/${id}/accept`)
+  },
+  markInTransit: async (id: string) => {
+    return api.patch<BackendOrder>(`/orders/${id}/in-transit`)
   },
   complete: async (id: string) => {
     return api.patch<BackendOrder>(`/orders/${id}/complete`)
