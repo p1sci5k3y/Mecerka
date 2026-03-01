@@ -5,7 +5,7 @@ import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exce
 import helmet from 'helmet';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // Validation
   app.useGlobalPipes(

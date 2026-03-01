@@ -13,6 +13,7 @@ import { AdminModule } from './admin/admin.module';
 import { EmailModule } from './email/email.module';
 import { RunnerModule } from './runner/runner.module';
 import { UsersModule } from './users/app-users.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
     imports: [
@@ -30,6 +31,7 @@ import { UsersModule } from './users/app-users.module';
             ttl: 60000,
             limit: 10,
         }]),
+        PaymentsModule,
     ],
     controllers: [AppController],
     providers: [
