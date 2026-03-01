@@ -14,9 +14,11 @@ import { EmailModule } from './email/email.module';
 import { RunnerModule } from './runner/runner.module';
 import { UsersModule } from './users/app-users.module';
 import { PaymentsModule } from './payments/payments.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
     imports: [
+        EventEmitterModule.forRoot(),
         PrismaModule,
         CitiesModule,
         CategoriesModule,
