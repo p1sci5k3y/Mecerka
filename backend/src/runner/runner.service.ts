@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { PreviewDeliveryDto } from './dto/preview-delivery.dto';
 import { SelectRunnerDto } from './dto/select-runner.dto';
-import { OrderStatus, Role } from '@prisma/client';
+import { DeliveryStatus, Role } from '@prisma/client';
 
 @Injectable()
 export class RunnerService {
@@ -90,8 +90,8 @@ export class RunnerService {
     });
 
     if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== OrderStatus.PENDING) {
-      throw new BadRequestException('Order must be PENDING to assign a runner');
+    if (order.status !== DeliveryStatus.READY_FOR_ASSIGNMENT) {
+      throw new BadRequestException('Order must be READY_FOR_ASSIGNMENT to assign a runner');
     }
 
     if (!roles.includes(Role.ADMIN) && order.clientId !== userId) {
@@ -112,10 +112,10 @@ export class RunnerService {
     return this.prisma.$transaction(async (tx) => {
       // Re-fetch order inside transaction with pessimistic lock if needed, but simple update condition is sufficient
       const result = await tx.order.updateMany({
-        where: { id: orderId, status: OrderStatus.PENDING },
+        where: { id: orderId, status: DeliveryStatus.READY_FOR_ASSIGNMENT },
         data: {
           runnerId: runner.userId,
-          status: OrderStatus.CONFIRMED,
+          status: DeliveryStatus.ASSIGNED,
           // Snapshot pricing & distance (Mock distance for now as order doesn't have lat/lng stored yet)
           // In real implementation, Order would have deliveryLat/Lng.
           // For this slice, we focus on the assignment mechanics.

@@ -14,7 +14,7 @@ import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { ProviderOrderStatus, Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 
 @Controller('orders')
@@ -71,6 +71,16 @@ export class OrdersController {
   @Roles(Role.PROVIDER)
   getProviderTopProducts(@Request() req: { user: UserFromJwt }) {
     return this.ordersService.getProviderTopProducts(req.user.userId);
+  }
+
+  @Patch('provider-order/:id/status')
+  @Roles(Role.PROVIDER)
+  updateProviderOrderStatus(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body('status') status: ProviderOrderStatus,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.ordersService.updateProviderOrderStatus(id, req.user.userId, status);
   }
 
   @Get()
