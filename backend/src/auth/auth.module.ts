@@ -13,7 +13,7 @@ import { MfaService } from './mfa.service';
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'secretKey', // Fallback for dev only
-      signOptions: { expiresIn: '60m' },
+      signOptions: { expiresIn: '15m' },
     }),
   ],
   controllers: [AuthController],
