@@ -41,6 +41,10 @@ export class OrdersService {
     }
 
     // 2. Validate City (Single city rule)
+    if (products.length === 0) {
+      throw new BadRequestException('Order must contain at least one product');
+    }
+
     const distinctCityIds = new Set(products.map((p) => p.cityId));
     if (distinctCityIds.size > 1) {
       throw new BadRequestException(
