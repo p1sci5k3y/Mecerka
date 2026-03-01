@@ -8,7 +8,7 @@ import {
   Param,
   UseGuards,
   Request,
-  ParseIntPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,7 +22,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   // --- Users ---
   @Get('users')
@@ -36,7 +36,7 @@ export class AdminController {
 
   @Patch('users/:id/role')
   updateUserRole(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
     @Request() req: { user: UserFromJwt },
   ) {
@@ -45,7 +45,7 @@ export class AdminController {
 
   @Patch('users/:id/activate')
   activateUser(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
     return this.adminService.activateUser(id, req.user.userId);
@@ -53,7 +53,7 @@ export class AdminController {
 
   @Patch('users/:id/block')
   blockUser(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
     return this.adminService.blockUser(id, req.user.userId);
@@ -72,14 +72,14 @@ export class AdminController {
 
   @Patch('cities/:id')
   updateCity(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { name?: string; slug?: string; active?: boolean },
   ) {
     return this.adminService.updateCity(id, body);
   }
 
   @Delete('cities/:id')
-  deleteCity(@Param('id', ParseIntPipe) id: number) {
+  deleteCity(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.deleteCity(id);
   }
 
@@ -98,14 +98,14 @@ export class AdminController {
 
   @Patch('categories/:id')
   updateCategory(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { name?: string; slug?: string; image_url?: string },
   ) {
     return this.adminService.updateCategory(id, body);
   }
 
   @Delete('categories/:id')
-  deleteCategory(@Param('id', ParseIntPipe) id: number) {
+  deleteCategory(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.deleteCategory(id);
   }
 

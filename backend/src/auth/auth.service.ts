@@ -128,7 +128,7 @@ export class AuthService {
     return { message: 'Cuenta verificada con éxito.' };
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     this.logger.log(`Finding user by ID: ${id}`);
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) this.logger.warn(`User ${id} not found`);

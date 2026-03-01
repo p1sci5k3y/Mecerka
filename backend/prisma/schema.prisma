@@ -27,7 +27,7 @@ enum OrderStatus {
 }
 
 model User {
-  id                         Int       @id @default(autoincrement())
+  id                         String    @id @default(uuid())
   email                      String    @unique
   password                   String
   pin                        String? // Hashed transaction PIN for purchases
@@ -60,7 +60,7 @@ model User {
 }
 
 model City {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   name      String   @unique
   slug      String   @unique
   active    Boolean  @default(true)
@@ -72,7 +72,7 @@ model City {
 }
 
 model Category {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   name      String   @unique
   slug      String   @unique
   image_url String?
@@ -83,7 +83,7 @@ model Category {
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(uuid())
   name        String
   description String?
   price       Decimal  @db.Decimal(10, 2)
@@ -93,9 +93,9 @@ model Product {
   updatedAt   DateTime @updatedAt
 
   // Foreign Keys
-  providerId Int
-  cityId     Int
-  categoryId Int
+  providerId String
+  cityId     String
+  categoryId String
 
   // Relations
   provider   User        @relation(fields: [providerId], references: [id])
@@ -105,15 +105,15 @@ model Product {
 }
 
 model Order {
-  id         Int         @id @default(autoincrement())
+  id         String      @id @default(uuid())
   totalPrice Decimal     @db.Decimal(10, 2)
   status     OrderStatus @default(PENDING)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 
   // Foreign Keys
-  clientId Int
-  cityId   Int
+  clientId String
+  cityId   String
 
   // Relations
   client User        @relation(fields: [clientId], references: [id])
@@ -126,7 +126,7 @@ model Order {
   deliveryLng     Float?
 
   // Runner Matching
-  runnerId           Int?
+  runnerId           String?
   deliveryDistanceKm Decimal? @db.Decimal(10, 2)
   runnerBaseFee      Decimal? @db.Decimal(10, 2)
   runnerPerKmFee     Decimal? @db.Decimal(10, 2)
@@ -134,13 +134,13 @@ model Order {
 }
 
 model OrderItem {
-  id              Int     @id @default(autoincrement())
+  id              String  @id @default(uuid())
   quantity        Int
   priceAtPurchase Decimal @db.Decimal(10, 2)
 
   // Foreign Keys
-  orderId   Int
-  productId Int
+  orderId   String
+  productId String
 
   // Relations
   order   Order   @relation(fields: [orderId], references: [id])
@@ -148,8 +148,8 @@ model OrderItem {
 }
 
 model RunnerProfile {
-  id     Int @id @default(autoincrement())
-  userId Int @unique
+  id     String @id @default(uuid())
+  userId String @unique
 
   // Location
   baseLat       Float?
