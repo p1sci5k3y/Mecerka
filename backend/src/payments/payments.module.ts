@@ -4,6 +4,6 @@ import { OrdersModule } from '../orders/orders.module';
 
 @Module({
   imports: [OrdersModule],
-  controllers: [WebhooksController]
+  controllers: [WebhooksController],
 })
-export class PaymentsModule { }
+export class PaymentsModule {}

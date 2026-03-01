@@ -87,7 +87,10 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith('ord_123', 'pi_123');
+    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
+      'ord_123',
+      'pi_123',
+    );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -123,12 +126,19 @@ describe('WebhooksController', () => {
     });
 
     // Simulate DB failure or concurrency panic
-    (ordersServiceMock.confirmPayment as jest.Mock).mockRejectedValueOnce(new Error('DB Timeout'));
+    (ordersServiceMock.confirmPayment as jest.Mock).mockRejectedValueOnce(
+      new Error('DB Timeout'),
+    );
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith('ord_123', 'pi_123');
+    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
+      'ord_123',
+      'pi_123',
+    );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
-    expect(res.send).toHaveBeenCalledWith('Error processing payment confirmation');
+    expect(res.send).toHaveBeenCalledWith(
+      'Error processing payment confirmation',
+    );
   });
 });
