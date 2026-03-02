@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsNotEmpty } from 'class-validator';
+import { IsEmail, IsNotEmpty, Length, Matches } from 'class-validator';
 
 export class MagicLinkDto {
   @IsEmail()
@@ -7,7 +7,8 @@ export class MagicLinkDto {
 }
 
 export class VerifyMagicLinkDto {
-  @IsString()
   @IsNotEmpty()
+  @Length(64, 64)
+  @Matches(/^[a-fA-F0-9]{64}$/, { message: 'Formato de token no válido' })
   token: string;
 }

@@ -2,6 +2,7 @@ import { ProviderOrder, Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Store, Package } from "lucide-react"
+import { useState } from "react"
 
 interface Props {
     order: Order
@@ -20,10 +21,14 @@ const actionMap: Record<string, { label: string | null; nextStatus: string | nul
 }
 
 export function ProviderOrderCard({ order, providerOrderId, now, onStatusChange, onReject }: Props) {
-    const po = order.providerOrders.find((p) => p.id === providerOrderId)
-    if (!po) return null
+    const po = order.providerOrders?.find((p) => p.id === providerOrderId)
+    if (!po) {
+        console.warn(`ProviderOrder ${providerOrderId} not found in order ${order.id}`);
+        return null;
+    }
+    const [loading, setLoading] = useState(false);
 
-    const isMultiStore = order.providerOrders.length > 1
+    const isMultiStore = (order.providerOrders?.length || 0) > 1
 
     // Timer: Diferencia entre ahora y el último update (o create)
     const refTime = po.updatedAt || po.createdAt || order.createdAt
@@ -85,7 +90,15 @@ export function ProviderOrderCard({ order, providerOrderId, now, onStatusChange,
                     <Button
                         size="sm"
                         variant="destructive"
-                        onClick={() => onReject(po.id)}
+                        disabled={loading}
+                        onClick={async () => {
+                            setLoading(true);
+                            try {
+                                await onReject(po.id);
+                            } finally {
+                                setLoading(false);
+                            }
+                        }}
                     >
                         Rechazar
                     </Button>
@@ -95,7 +108,15 @@ export function ProviderOrderCard({ order, providerOrderId, now, onStatusChange,
                     <Button
                         size="sm"
                         variant={action.variant}
-                        onClick={() => onStatusChange(po.id, po.status, action.nextStatus!)}
+                        disabled={loading}
+                        onClick={async () => {
+                            setLoading(true);
+                            try {
+                                await onStatusChange(po.id, po.status, action.nextStatus!);
+                            } finally {
+                                setLoading(false);
+                            }
+                        }}
                     >
                         {action.label}
                     </Button>

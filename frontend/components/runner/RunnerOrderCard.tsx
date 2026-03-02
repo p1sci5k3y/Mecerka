@@ -10,8 +10,8 @@ interface Props {
 }
 
 export function RunnerOrderCard({ order, onAccept, disabled }: Props) {
-    const isMultiStop = order.providerOrders.length > 1
-    const storeCount = order.providerOrders.length
+    const isMultiStop = (order.providerOrders || []).length > 1
+    const storeCount = (order.providerOrders || []).length
 
     // Dummy estimations calculated from sub-params (avoiding real API calls for now)
     const estDistanceMs = order.id.charCodeAt(0) % 5 + 1.5 // e.g. 2.5 km

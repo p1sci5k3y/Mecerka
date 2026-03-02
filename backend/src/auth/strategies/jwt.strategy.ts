@@ -23,16 +23,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         try {
           jwt.verify(rawJwtToken, currentSecret);
           return done(null, currentSecret);
-        } catch (err) {
+        } catch (firstErr) {
           if (previousSecret) {
             try {
               jwt.verify(rawJwtToken, previousSecret);
               return done(null, previousSecret);
-            } catch {
-              return done(err, currentSecret);
+            } catch (fallbackError) {
+              return done(firstErr, previousSecret);
             }
           }
-          return done(err, currentSecret);
+          return done(firstErr, currentSecret);
         }
       },
     });

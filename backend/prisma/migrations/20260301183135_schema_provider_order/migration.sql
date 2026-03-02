@@ -29,15 +29,17 @@ ALTER TABLE "Category" ALTER COLUMN "id" DROP DEFAULT;
 -- AlterTable
 ALTER TABLE "City" ALTER COLUMN "id" DROP DEFAULT;
 
--- AlterTable
-ALTER TABLE "Order" DROP COLUMN "status",
-ADD COLUMN     "status" "DeliveryStatus" NOT NULL DEFAULT 'PENDING',
-ALTER COLUMN "id" DROP DEFAULT;
+-- AlterTable Order status gracefully
+ALTER TABLE "Order" ADD COLUMN "new_status" "DeliveryStatus" NOT NULL DEFAULT 'PENDING';
 
--- AlterTable
-ALTER TABLE "OrderItem" DROP COLUMN "orderId",
-ADD COLUMN     "providerOrderId" UUID NOT NULL,
-ALTER COLUMN "id" DROP DEFAULT;
+-- Map statuses before dropping the old column
+UPDATE "Order" SET "new_status" = "status"::text::"DeliveryStatus" WHERE "status" IS NOT NULL;
+
+ALTER TABLE "Order" DROP COLUMN "status";
+ALTER TABLE "Order" RENAME COLUMN "new_status" TO "status";
+ALTER TABLE "Order" ALTER COLUMN "id" DROP DEFAULT;
+
+-- (OrderItem alterations moved below ProviderOrder creation to allow safe backfilling)
 
 -- AlterTable
 ALTER TABLE "Product" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true,
@@ -64,6 +66,32 @@ CREATE TABLE "ProviderOrder" (
 
     CONSTRAINT "ProviderOrder_pkey" PRIMARY KEY ("id")
 );
+
+-- Safely Migrate Data from OrderItem to ProviderOrder
+ALTER TABLE "OrderItem" ADD COLUMN "providerOrderId" UUID;
+ALTER TABLE "OrderItem" ALTER COLUMN "id" DROP DEFAULT;
+
+-- Insert ProviderOrder mapping records
+INSERT INTO "ProviderOrder" ("id", "orderId", "providerId", "subtotal", "updatedAt")
+SELECT gen_random_uuid(), oi."orderId", p."providerId", SUM(oi.quantity * oi."priceAtPurchase"), CURRENT_TIMESTAMP
+FROM "OrderItem" oi
+JOIN "Product" p ON p."id" = oi."productId"
+GROUP BY oi."orderId", p."providerId";
+
+-- Link OrderItems to newly created ProviderOrders
+UPDATE "OrderItem" oi
+SET "providerOrderId" = po."id"
+FROM "ProviderOrder" po, "Product" p
+WHERE p."id" = oi."productId"
+  AND po."orderId" = oi."orderId"
+  AND po."providerId" = p."providerId";
+
+-- Drop unlinked orphans from OrderItem (should be 0 if db is normalized)
+DELETE FROM "OrderItem" WHERE "providerOrderId" IS NULL;
+
+-- Enforce constraints
+ALTER TABLE "OrderItem" ALTER COLUMN "providerOrderId" SET NOT NULL;
+ALTER TABLE "OrderItem" DROP COLUMN "orderId";
 
 -- CreateIndex
 CREATE INDEX "ProviderOrder_orderId_idx" ON "ProviderOrder"("orderId");
