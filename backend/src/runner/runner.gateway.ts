@@ -26,7 +26,7 @@ interface SocketWithUser extends Socket {
 @WebSocketGateway({
   namespace: 'tracking',
   cors: {
-    origin: '*', // Allow all for now, in prod restrict to frontend URL
+    origin: process.env.WS_CORS_ORIGIN || 'http://localhost:3000',
   },
 })
 export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -48,6 +48,7 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
       '';
     if (!this.jwtSecret) {
       this.logger.error('JWT_SECRET configuration is missing');
+      throw new Error('JWT_SECRET configuration is missing');
     }
   }
 
@@ -84,10 +85,14 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
         }
       }
 
+      if (!payload.sub || typeof payload.sub !== 'string') {
+        throw new Error('Invalid JWT: missing subject');
+      }
+
       // Associate user identity aggressively inside the socket object
       (client as SocketWithUser).data = {
         userId: payload.sub,
-        roles: payload.roles || [],
+        roles: Array.isArray(payload.roles) ? payload.roles : [],
       };
 
       this.logger.log(
@@ -208,7 +213,13 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (
       typeof data.lat !== 'number' ||
       typeof data.lng !== 'number' ||
-      typeof data.orderId !== 'string'
+      typeof data.orderId !== 'string' ||
+      data.lat < -90 ||
+      data.lat > 90 ||
+      data.lng < -180 ||
+      data.lng > 180 ||
+      !Number.isFinite(data.lat) ||
+      !Number.isFinite(data.lng)
     ) {
       throw new WsException('Invalid location payload');
     }

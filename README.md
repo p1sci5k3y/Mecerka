@@ -58,7 +58,7 @@ npx prisma db seed
 npm run start:dev
 ```
 
-El backend estará auditando en http://localhost:3000.
+El backend estará escuchando en http://localhost:3000.
 
 ### 3. Configurar el Frontend
 

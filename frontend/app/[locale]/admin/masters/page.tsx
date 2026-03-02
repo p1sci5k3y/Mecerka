@@ -255,7 +255,8 @@ function CategoriesManager() {
                 toast({ title: "Categoría creada" })
             }
             setIsOpen(false)
-            fetchCategories()
+            const data = await adminService.getCategories()
+            setCategories(data)
         } catch {
             toast({ title: "Error al guardar", variant: "destructive" })
         }
@@ -266,7 +267,8 @@ function CategoriesManager() {
         try {
             await adminService.deleteCategory(id)
             toast({ title: "Categoría eliminada" })
-            fetchCategories()
+            const data = await adminService.getCategories()
+            setCategories(data)
         } catch {
             toast({ title: "Error al eliminar", variant: "destructive" })
         }
