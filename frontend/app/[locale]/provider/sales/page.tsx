@@ -90,7 +90,7 @@ function ProviderKanbanContent() {
     const todayStr = new Date().toISOString().split('T')[0]
 
     orders.forEach(o => {
-      const po = o.providerOrders.find(p => p.providerId === String(user.userId))
+      const po = o.providerOrders?.find(p => p.providerId === String(user.userId))
       if (!po) return
 
       // Es de hoy?
@@ -167,7 +167,7 @@ function ProviderKanbanContent() {
             title="Nuevos"
             icon={<Inbox className="h-5 w-5" />}
             orders={orders}
-            providerId={String(user?.userId)}
+            providerId={user?.userId ? String(user.userId) : "unknown"}
             validStatuses={["PENDING"]}
             now={now}
             onStatusChange={handleStatusChange}
@@ -177,7 +177,7 @@ function ProviderKanbanContent() {
             title="En Preparación"
             icon={<PlayCircle className="h-5 w-5" />}
             orders={orders}
-            providerId={String(user?.userId)}
+            providerId={user?.userId ? String(user.userId) : "unknown"}
             validStatuses={["ACCEPTED", "PREPARING"]}
             now={now}
             onStatusChange={handleStatusChange}
@@ -187,7 +187,7 @@ function ProviderKanbanContent() {
             title="Listos"
             icon={<CheckCircle className="h-5 w-5" />}
             orders={orders}
-            providerId={String(user?.userId)}
+            providerId={user?.userId ? String(user.userId) : "unknown"}
             validStatuses={["READY_FOR_PICKUP"]}
             now={now}
             onStatusChange={handleStatusChange}

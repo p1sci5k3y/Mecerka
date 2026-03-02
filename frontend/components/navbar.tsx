@@ -54,7 +54,6 @@ export function Navbar() {
 
   const handleLanguageChange = (newLocale: string) => {
     startTransition(() => {
-      // @ts-expect-error -- known issue with next-intl type inference on quick switch
       router.replace(pathname, { locale: newLocale })
     })
   }

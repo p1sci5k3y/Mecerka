@@ -22,6 +22,7 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
+  verifyMagicLink: (token: string) => Promise<void>
   logout: () => void
 }
 
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Backend returns 'userId', not 'id'
       const uiUser: User = {
         ...user,
-        userId: user.userId || user.id || 0,
+        userId: user.userId || (user as any).id || 0,
         name: user.name || `User ${user.userId}`,
         email: user.email || `user${user.userId}@mecerka.local`
       }
@@ -84,6 +85,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const verifyMagicLink = async (token: string) => {
+    const response: any = await authService.verifyMagicLink(token)
+    if (response.access_token) {
+      localStorage.setItem('token', response.access_token)
+      setToken(response.access_token)
+      await hydrateUser()
+    }
+  }
+
   const logout = () => {
     localStorage.removeItem('token')
     setToken(null)
@@ -91,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider value={{ ...state, login, register, verifyMagicLink, logout }}>
       {children}
     </AuthContext.Provider>
   )

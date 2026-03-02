@@ -9,6 +9,7 @@ export interface User {
   name?: string
   createdAt?: string
   mfaEnabled?: boolean
+  hasPin?: boolean
 }
 
 export interface AuthTokens {
@@ -42,6 +43,7 @@ export interface OrderItem {
   productId: string
   quantity: number
   unitPrice: number
+  priceAtPurchase?: number | string
   product?: Product
 }
 
@@ -64,7 +66,7 @@ export interface Order {
   createdAt: string
   updatedAt?: string
   items: OrderItem[]
-  providerOrders: ProviderOrder[]
+  providerOrders?: ProviderOrder[]
   city?: string // mapped from backend city object if needed
   deliveryAddress?: string
   deliveryLat?: number

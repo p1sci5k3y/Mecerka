@@ -26,7 +26,7 @@ export function OrderKanbanColumn({
     // Filtra los pedidos globales para dejar solo aquellos cuyo providerOrder (de este proveedor)
     // coincida con un estado válido para esta columna.
     const columnOrders = orders.filter((order) => {
-        const providerOrder = order.providerOrders.find((po) => po.providerId === providerId)
+        const providerOrder = order.providerOrders?.find((po) => po.providerId === providerId)
         if (!providerOrder) return false
         return validStatuses.includes(providerOrder.status)
     })
@@ -51,7 +51,7 @@ export function OrderKanbanColumn({
                     </div>
                 ) : (
                     columnOrders.map((order) => {
-                        const po = order.providerOrders.find((po) => po.providerId === providerId)
+                        const po = order.providerOrders?.find((po) => po.providerId === providerId)
                         return (
                             <div
                                 key={po!.id}

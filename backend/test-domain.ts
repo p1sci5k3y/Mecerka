@@ -11,6 +11,11 @@ async function main() {
     const cities = await prisma.city.findMany();
     const products = await prisma.product.findMany();
 
+    if (!clients.length || !providers.length || !cities.length || !products.length) {
+        console.log('Skipping domain tests; required reference data is not present in DB.');
+        return;
+    }
+
     const clientId = clients[0].id;
     const cityId = cities[0].id;
     const providerId = providers[0].id;

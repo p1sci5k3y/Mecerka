@@ -31,7 +31,7 @@ function getPickupStatusLabel(poStatus: string) {
 
 export function RunnerActiveOrderView({ order, onInTransit, onComplete, disabled }: Props) {
     // Derive lists and states purely from Backend Source of Truth
-    const activeProviderOrders = order.providerOrders.filter(
+    const activeProviderOrders = (order.providerOrders || []).filter(
         (po) => po.status !== "CANCELLED" && po.status !== "REJECTED_BY_STORE"
     )
 
@@ -92,7 +92,7 @@ export function RunnerActiveOrderView({ order, onInTransit, onComplete, disabled
                                     <div className="flex items-center gap-3">
                                         <Store className="h-5 w-5 text-muted-foreground" />
                                         <div>
-                                            <p className="font-semibold text-foreground">{storeName}</p>
+                                            <p className="font-semibold text-foreground">{po.items[0]?.product?.provider?.name || storeName}</p>
                                             <p className="text-xs text-muted-foreground font-mono">{po.id.slice(0, 8)}</p>
                                         </div>
                                     </div>

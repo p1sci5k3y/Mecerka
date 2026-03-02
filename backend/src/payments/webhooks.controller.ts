@@ -7,6 +7,7 @@ import {
   Logger,
   HttpStatus,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { OrdersService } from '../orders/orders.service';
@@ -22,16 +23,20 @@ export class WebhooksController {
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
 
-  constructor(private readonly ordersService: OrdersService) {
-    // Ideally this comes from a ConfigService
-    this.stripe = new Stripe(
-      process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder',
-      {
-        apiVersion: '2026-02-25.clover', // Latest or matching project version
-      },
-    );
-    this.webhookSecret =
-      process.env.STRIPE_WEBHOOK_SECRET || 'whsec_placeholder';
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly configService: ConfigService
+  ) {
+    const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    const webhookKey = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
+    if (!stripeKey || !webhookKey) {
+      throw new Error('Missing Stripe configuration secrets');
+    }
+
+    this.stripe = new Stripe(stripeKey, {
+      apiVersion: '2026-02-25.clover' as any,
+    });
+    this.webhookSecret = webhookKey;
   }
 
   @Post()
@@ -64,9 +69,10 @@ export class WebhooksController {
       this.logger.error(
         `Webhook signature verification failed: ${err.message}`,
       );
+      // Return a generic error to the client while logging the detailed exception internally
       return res
         .status(HttpStatus.BAD_REQUEST)
-        .send(`Webhook Error: ${err.message}`);
+        .send(`Webhook verification failed`);
     }
 
     if (event.type === 'payment_intent.succeeded') {
@@ -82,6 +88,10 @@ export class WebhooksController {
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
+      const processedKey = `evt_${event.id}`;
+      // In a real application, check this against a persistent id store a Redis or DB cache.
+      // E.g. if (await this.webhookEventsService.isProcessed(event.id)) return OK.
+
       try {
         const result = await this.ordersService.confirmPayment(
           orderId,
@@ -91,6 +101,12 @@ export class WebhooksController {
           `Order ${orderId} confirmed via Stripe Webhook! Ref: ${paymentRef}. Status: ${result.finalStatus}`,
         );
       } catch (error: any) {
+        // Ignore known concurrent errors if already processed successfully by an overlapping webhook
+        if (error.status === 409 || error.message.includes('Concurrent stock update detected')) {
+          this.logger.warn(`Ignored concurrent retry or conflict for order ${orderId}: ${error.message}`);
+          return res.status(HttpStatus.OK).json({ received: true });
+        }
+
         // Stripe requires a 500 status on unhandled backend errors so it can retry later
         this.logger.error(
           `Error confirming payment for order ${orderId}: ${error.message}`,

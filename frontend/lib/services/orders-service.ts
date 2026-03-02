@@ -21,7 +21,11 @@ function transformOrder(bo: BackendOrder): Order {
     id: String(bo.id),
     userId: "Unknown",
     total: Number.parseFloat(bo.totalPrice),
-    deliveryFee: bo.deliveryFee ? Number.parseFloat(bo.deliveryFee) : 0,
+    deliveryFee: (() => {
+      if (!bo.deliveryFee) return 0;
+      const df = Number.parseFloat(bo.deliveryFee);
+      return Number.isNaN(df) ? 0 : df;
+    })(),
     status: bo.status,
     createdAt: bo.createdAt,
     updatedAt: bo.updatedAt || bo.createdAt,

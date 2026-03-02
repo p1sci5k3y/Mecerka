@@ -9,7 +9,7 @@ import { Link } from "@/lib/navigation"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
 
 export default function LoginPage() {
-  const { login, mutate } = useAuth()
+  const { login } = useAuth()
   const router = useRouter()
 
   const [email, setEmail] = useState("")
@@ -65,9 +65,8 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await api.post('/auth/mfa/verify', { token })
-      await mutate?.() // Refresca el usuario en el contexto
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     } catch (error: any) {
       toast.error("Código incorrecto.")
     } finally {

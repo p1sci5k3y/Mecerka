@@ -39,6 +39,13 @@ const mockAccessHistory = [
   { date: "8 Feb 2026, 20:00", action: "Cambio de contraseña", ip: "192.168.1.***" },
 ]
 
+const roleLabel: Record<string, string> = {
+  ADMIN: "Admin",
+  CLIENT: "Cliente",
+  PROVIDER: "Proveedor",
+  RUNNER: "Repartidor"
+}
+
 export default function ProfilePage() {
   return (
     <ProtectedRoute>

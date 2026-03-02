@@ -9,7 +9,7 @@ import type { Order } from '@/lib/types';
 const statusConfig: Record<string, { label: string; icon: React.ElementType }> = {
     PENDING: { label: "Recibido", icon: CheckCircle2 },
     CONFIRMED: { label: "Preparando", icon: Package },
-    SHIPPED: { label: "En Camino", icon: Truck },
+    IN_TRANSIT: { label: "En Camino", icon: Truck },
     DELIVERED: { label: "Entregado", icon: Receipt },
     CANCELLED: { label: "Cancelado", icon: XCircle }
 };
@@ -52,7 +52,7 @@ export function ClientDashboard() {
     }, 0);
 
     // In a real query we'd group by providerId, here we'll mock based on orders
-    const artisansSupported = new Set(orders.flatMap(o => o.items.map(i => i.product.providerId))).size;
+    const artisansSupported = new Set(orders.flatMap(o => o.items.map(i => i.product?.providerId).filter(Boolean))).size;
 
     return (
         <div className="animate-in fade-in zoom-in duration-500">
@@ -137,13 +137,13 @@ export function ClientDashboard() {
                                                     <div className="mb-8 relative pt-2">
                                                         <div className="absolute top-[15px] left-0 w-full h-0.5 bg-slate-100 dark:bg-slate-800 -z-10"></div>
                                                         <div className="absolute top-[15px] left-0 h-0.5 bg-[#df795d] -z-10 transition-all duration-1000"
-                                                            style={{ width: order.status === 'DELIVERED' ? '100%' : order.status === 'SHIPPED' ? '66%' : order.status === 'CONFIRMED' ? '33%' : '5%' }}></div>
+                                                            style={{ width: order.status === 'DELIVERED' ? '100%' : order.status === 'IN_TRANSIT' ? '66%' : order.status === 'CONFIRMED' ? '33%' : '5%' }}></div>
 
                                                         <div className="flex justify-between">
                                                             {['Recibido', 'Taller', 'En Camino', 'Entregado'].map((step, idx) => {
                                                                 const isActive =
                                                                     (order.status === 'DELIVERED') ||
-                                                                    (order.status === 'SHIPPED' && idx <= 2) ||
+                                                                    (order.status === 'IN_TRANSIT' && idx <= 2) ||
                                                                     (order.status === 'CONFIRMED' && idx <= 1) ||
                                                                     (idx === 0);
 
