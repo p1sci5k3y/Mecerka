@@ -184,7 +184,7 @@ function RunnerContent() {
                                             </div>
                                             <div className="text-right">
                                                 <p className="font-bold text-muted-foreground">{order.deliveryFee.toFixed(2)} €</p>
-                                                <p className="text-xs text-muted-foreground mt-0.5">{order.createdAt.split('T')[0]}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5">{order.createdAt?.split('T')[0] || ''}</p>
                                             </div>
                                         </div>
                                     ))

@@ -78,7 +78,8 @@ export default function UsersPage() {
                 await adminService.activateUser(userId)
                 toast({ title: "Usuario activado" })
             }
-            fetchUsers()
+            const data = await adminService.getUsers()
+            setUsers(data)
         } catch (error) {
             toast({
                 title: "Error",

@@ -23,7 +23,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) { }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
     const { items, deliveryAddress, pin, deliveryLat, deliveryLng } =
@@ -224,7 +224,7 @@ export class OrdersService {
         },
       });
 
-      if (!order) throw new Error('Order not found');
+      if (!order) throw new NotFoundException('Order not found');
 
       // Idempotency: if not PENDING, return current state
       if (order.status !== DeliveryStatus.PENDING) {
@@ -295,7 +295,7 @@ export class OrdersService {
         }
 
         if (!providerOk) {
-          throw new Error(
+          throw new ConflictException(
             'Concurrent stock update detected; retry payment confirmation',
           );
         }
@@ -330,18 +330,16 @@ export class OrdersService {
           },
         });
 
-        this.eventEmitter.emit('order.stateChanged', {
-          orderId: updated.id,
-          status: updated.status,
-        });
-
         return {
           orderId: updated.id,
           finalStatus: updated.status,
           rejectedProviderOrderIds,
           confirmedProviderOrderIds,
+          events: [{ name: 'order.stateChanged', data: { orderId: updated.id, status: updated.status } }]
         };
       }
+
+      // Rest of the normal payment flow...
 
       if (!canTransitionOrder(order.status, DeliveryStatus.CONFIRMED)) {
         throw new Error(
@@ -397,12 +395,8 @@ export class OrdersService {
           data: { status: DeliveryStatus.READY_FOR_ASSIGNMENT },
         });
 
-        // Event emitted outside tx? Here we await it inside tx flow to ensure logic fires next inline,
-        // although technically eventEmitter fires synchronously within the execution thread.
-        this.eventEmitter.emit('order.stateChanged', {
-          orderId,
-          status: DeliveryStatus.READY_FOR_ASSIGNMENT,
-        });
+        // Event returned instead of emitted inside the transaction to prevent inconsistency
+        return { event: 'order.stateChanged', data: { orderId, status: DeliveryStatus.READY_FOR_ASSIGNMENT } };
       }
     });
   }
@@ -580,7 +574,7 @@ export class OrdersService {
     const isAdmin = roles.includes(Role.ADMIN);
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { providerOrders: true },
+      include: { providerOrders: { include: { items: true } } },
     });
 
     if (!order) throw new NotFoundException('Order not found');
@@ -608,6 +602,20 @@ export class OrdersService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       if (providerOrderUpdateIds.length > 0) {
+        // Restore inventory if we had confirmed the payment earlier
+        if (order.status === DeliveryStatus.CONFIRMED || order.status === DeliveryStatus.READY_FOR_ASSIGNMENT || order.status === DeliveryStatus.ASSIGNED) {
+          for (const po of order.providerOrders) {
+            if (providerOrderUpdateIds.includes(po.id)) {
+              for (const item of po.items) {
+                await tx.product.update({
+                  where: { id: item.productId },
+                  data: { stock: { increment: item.quantity } },
+                });
+              }
+            }
+          }
+        }
+
         await tx.providerOrder.updateMany({
           where: { id: { in: providerOrderUpdateIds } },
           data: { status: ProviderOrderStatus.CANCELLED },
@@ -617,7 +625,7 @@ export class OrdersService {
       return tx.order.update({
         where: { id },
         data: { status: DeliveryStatus.CANCELLED },
-        include: { providerOrders: true },
+        include: { providerOrders: { include: { items: true } } },
       });
     });
 

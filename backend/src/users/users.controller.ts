@@ -23,7 +23,7 @@ export class UsersController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   @Post('pin')
   async setTransactionPin(@Request() req: any, @Body() dto: SetPinDto) {
@@ -39,31 +39,28 @@ export class UsersController {
   }
 
   @Post('roles/provider')
-  @Roles(Role.ADMIN)
   async becomeProvider(@Request() req: any) {
-    console.log('Becoming provider for user:', req.user);
     const userId = req.user.userId;
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    console.log('User found:', user);
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
 
-    if (user.roles.includes(Role.PROVIDER)) {
-      throw new ConflictException('User is already a provider');
-    }
+      if (user.roles.includes(Role.PROVIDER)) {
+        throw new ConflictException('User is already a provider');
+      }
 
-    console.log('Updating user roles...');
-    const updatedUser = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        roles: {
-          push: Role.PROVIDER,
+      return tx.user.update({
+        where: { id: userId },
+        data: {
+          roles: {
+            push: Role.PROVIDER,
+          },
         },
-      },
+      });
     });
-    console.log('User updated:', updatedUser);
 
     // Generate fresh token with updated roles
     const payload = {
@@ -81,7 +78,6 @@ export class UsersController {
   }
 
   @Post('roles/runner')
-  @Roles(Role.ADMIN)
   async becomeRunner(@Request() req: any) {
     const userId = req.user.userId;
 
