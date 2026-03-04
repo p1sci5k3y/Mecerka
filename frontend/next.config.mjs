@@ -1,8 +1,6 @@
 import createNextIntlPlugin from 'next-intl/plugin';
 
-const withNextIntl = createNextIntlPlugin(
-  './src/i18n.ts'
-);
+const withNextIntl = createNextIntlPlugin();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -14,7 +12,7 @@ const nextConfig = {
   },
   output: "standalone",
   outputFileTracingIncludes: {
-    "/*": ["./messages/**/*"]
+    "/*": ["./messages/**/*", "./i18n/**/*"]
   }
 };
 

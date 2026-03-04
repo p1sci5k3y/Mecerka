@@ -6,8 +6,10 @@ import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { Link } from "@/lib/navigation"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, User as UserIcon, CheckCircle2, ShieldCheck } from "lucide-react"
+import { useTranslations } from 'next-intl'
 
 export default function RegisterPage() {
+  const t = useTranslations('Auth')
   const { register } = useAuth()
   const router = useRouter()
 
@@ -70,15 +72,15 @@ export default function RegisterPage() {
           {!isSuccess ? (
             <>
               <div className="mb-10 text-center lg:text-left">
-                <h2 className="font-serif text-4xl lg:text-5xl mb-4 italic">Create an Account</h2>
+                <h2 className="font-serif text-4xl lg:text-5xl mb-4 italic">{t('registerTitle')}</h2>
                 <p className="text-slate-600 dark:text-slate-400 font-light leading-relaxed">
-                  Discover premium artisanal treasures curated from around the world.
+                  {t('registerSubtitle')}
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2 mb-4">
-                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">¿Cómo deseas unirte a Mecerka?</label>
+                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">{t('joinAs')}</label>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     {['CLIENT', 'PROVIDER', 'RUNNER'].map((r) => (
                       <button
@@ -90,14 +92,14 @@ export default function RegisterPage() {
                           : "border-[#e07d61]/20 bg-white dark:bg-[#201512]/50 text-slate-600 dark:text-slate-400 hover:border-[#e07d61]/50"
                           }`}
                       >
-                        {r === 'CLIENT' ? 'Soy Cliente' : r === 'PROVIDER' ? 'Soy Artesano' : 'Repartidor'}
+                        {r === 'CLIENT' ? t('roleClient') : r === 'PROVIDER' ? t('roleProvider') : t('roleRunner')}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">Full Name</label>
+                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">{t('fullNameLabel')}</label>
                   <div className="relative">
                     <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 lg:hidden" />
                     <input
@@ -112,7 +114,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">Email Address</label>
+                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">{t('emailLabel')}</label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 lg:hidden" />
                     <input
@@ -127,7 +129,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">Password (Min 12 Chars)</label>
+                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">{t('passwordMinLabel')}</label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 lg:hidden" />
                     <input
@@ -150,7 +152,7 @@ export default function RegisterPage() {
 
                 <div className="space-y-2 pt-2 border-t border-border/50">
                   <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#e07d61]" /> Confirmación de Seguridad (CAPTCHA)
+                    <ShieldCheck className="w-4 h-4 text-[#e07d61]" /> {t('captchaLabel')}
                   </label>
                   <div className="flex items-center gap-3">
                     <div className="h-14 px-4 bg-muted/50 border border-border rounded-lg flex items-center justify-center font-bold text-lg text-slate-700 dark:text-slate-300 pointer-events-none select-none">
@@ -170,7 +172,7 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-2 py-2">
                   <input type="checkbox" id="terms" required className="rounded border-[#e07d61]/30 text-[#e07d61] focus:ring-[#e07d61]" />
                   <label htmlFor="terms" className="text-sm text-slate-600 dark:text-slate-400">
-                    I agree to the <Link href="#" className="text-[#e07d61] hover:underline">Terms of Service</Link> and <Link href="#" className="text-[#e07d61] hover:underline">Privacy Policy</Link>
+                    {t('agreeTerms')} <Link href="#" className="text-[#e07d61] hover:underline">{t('termsLink')}</Link> {t('and')} <Link href="#" className="text-[#e07d61] hover:underline">{t('privacyLink')}</Link>
                   </label>
                 </div>
 
@@ -179,7 +181,7 @@ export default function RegisterPage() {
                   disabled={loading}
                   className="w-full h-14 bg-[#e07d61] hover:bg-[#e07d61]/90 text-white font-bold rounded-lg shadow-lg shadow-[#e07d61]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  {loading ? "Registrando..." : "Create Account"}
+                  {loading ? t('registeringButton') : t('registerButton')}
                   {!loading && <ArrowRight className="w-5 h-5" />}
                 </button>
               </form>
@@ -189,18 +191,18 @@ export default function RegisterPage() {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                 <CheckCircle2 className="w-10 h-10 text-green-600" />
               </div>
-              <h2 className="font-serif text-3xl font-bold mb-4 text-slate-900 dark:text-white">¡Revisa tu bandeja de entrada!</h2>
+              <h2 className="font-serif text-3xl font-bold mb-4 text-slate-900 dark:text-white">{t('successTitle')}</h2>
               <p className="text-slate-600 dark:text-slate-400 mb-8 max-w-[280px] mx-auto leading-relaxed">
-                Hemos enviado un correo a <span className="font-medium text-slate-900 dark:text-white">{email}</span> con un enlace para confirmar tu identidad.
+                {t('successSubtitle')} <span className="font-medium text-slate-900 dark:text-white">{email}</span> {t('successText1')}
               </p>
               <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg mb-8 text-sm text-orange-800">
-                Debes validar tu correo para poder iniciar sesión en Mecerka.
+                {t('successText2')}
               </div>
               <Link
                 href="/login"
                 className="w-full h-14 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold rounded-lg hover:shadow-lg transition-all flex items-center justify-center"
               >
-                Ir a Iniciar Sesión
+                {t('goToLogin')}
               </Link>
             </div>
           )}
@@ -208,7 +210,7 @@ export default function RegisterPage() {
           {!isSuccess && (
             <div className="mt-8 pt-8 border-t border-[#e07d61]/10 flex flex-col gap-4 text-center">
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Already have an account? <Link href="/login" className="text-[#e07d61] font-bold hover:underline">Log In</Link>
+                {t('alreadyHaveAccount')} <Link href="/login" className="text-[#e07d61] font-bold hover:underline">{t('logInLink')}</Link>
               </p>
             </div>
           )}
