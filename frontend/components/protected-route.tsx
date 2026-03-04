@@ -33,7 +33,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return;
     }
 
-    if (!isLoading && isAuthenticated && user && !user.mfaEnabled) {
+    const requireMfa = process.env.NEXT_PUBLIC_REQUIRE_MFA !== 'false';
+    if (!isLoading && isAuthenticated && user && !user.mfaEnabled && requireMfa) {
       // Allow access to setup page if MFA not enabled
       if (pathname !== '/mfa/setup') {
         router.replace("/mfa/setup")

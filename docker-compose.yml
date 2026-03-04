@@ -21,6 +21,8 @@ services:
     environment:
       DATABASE_URL: postgresql://user:password@postgres:5432/marketplace
       JWT_SECRET: dev_secret_key_change_in_prod
+      STRIPE_SECRET_KEY: sk_test_dummy
+      STRIPE_WEBHOOK_SECRET: whsec_dummy
     depends_on:
       - postgres
     # volumes:
@@ -35,6 +37,7 @@ services:
       - "3000:3000"
     environment:
       INTERNAL_API_URL: http://backend:3000
+      NEXT_PUBLIC_REQUIRE_MFA: "false"
     depends_on:
       - backend
 
