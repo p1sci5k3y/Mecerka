@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { WebhooksController } from './webhooks.controller';
 import { OrdersModule } from '../orders/orders.module';
 
 @Module({
-  imports: [OrdersModule],
+  imports: [ConfigModule, OrdersModule],
   controllers: [WebhooksController],
 })
-export class PaymentsModule {}
+export class PaymentsModule { }
