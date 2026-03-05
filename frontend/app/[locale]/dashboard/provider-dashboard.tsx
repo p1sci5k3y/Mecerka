@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
 import { useAuth } from '@/contexts/auth-context';
-import {   ShoppingBag,  TrendingUp, TrendingDown, Calendar, Receipt } from 'lucide-react';
+import { ShoppingBag, TrendingUp, TrendingDown, Calendar, Receipt, Package, Loader2 } from 'lucide-react';
 
 export function ProviderDashboard() {
     const { user } = useAuth();
@@ -122,7 +122,7 @@ export function ProviderDashboard() {
                     {salesData.length > 0 ? salesData.map((data, index) => {
                         const height = Math.max((data.amount / (Math.max(...salesData.map(d => d.amount)) || 1)) * 100, 5);
                         return (
-                            <div key={index} className="w-full flex flex-col items-center justify-end gap-2 group">
+                            <div key={data.date || `chart-${index}`} className="w-full flex flex-col items-center justify-end gap-2 group">
                                 <div
                                     className="w-full bg-[#df795d]/20 hover:bg-[#df795d] transition-all rounded-t-sm relative"
                                     style={{ height: `${height}%` }}
@@ -156,20 +156,24 @@ export function ProviderDashboard() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#df795d]/5">
-                            {recentOrders.map((order) => (
-                                <tr key={order.id} className="hover:bg-[#df795d]/5 transition-colors">
-                                    <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#{order.id.slice(0, 8).toUpperCase()}</td>
-                                    <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{new Date(order.createdAt).toLocaleDateString("es-ES")}</td>
-                                    <td className="px-6 py-4">
-                                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${order.status === 'CONFIRMED' || order.status === 'DELIVERED'
-                                            ? 'bg-emerald-100 text-emerald-700'
-                                            : 'bg-amber-100 text-amber-700'
-                                            }`}>
-                                            {order.status === 'CONFIRMED' ? 'Confirmado' : order.status === 'DELIVERED' ? 'Entregado' : 'Pendiente'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
+                            {recentOrders.map((order) => {
+                                const isSuccess = order.status === 'CONFIRMED' || order.status === 'DELIVERED';
+                                let statusLabel = 'Pendiente';
+                                if (order.status === 'CONFIRMED') statusLabel = 'Confirmado';
+                                else if (order.status === 'DELIVERED') statusLabel = 'Entregado';
+                                const statusClasses = isSuccess ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+                                return (
+                                    <tr key={order.id} className="hover:bg-[#df795d]/5 transition-colors">
+                                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">#{order.id.slice(0, 8).toUpperCase()}</td>
+                                        <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{new Date(order.createdAt).toLocaleDateString("es-ES")}</td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${statusClasses}`}>
+                                                {statusLabel}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {recentOrders.length === 0 && (
                                 <tr>
                                     <td colSpan={3} className="px-6 py-12 text-center text-slate-500">

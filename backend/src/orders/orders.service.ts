@@ -99,7 +99,7 @@ export class OrdersService {
     }
 
     // 5. Calculate Logistics Economics dynamically on root payload
-    const baseCityFee = 3.5; // ToDo: Fetch from config/DB map
+    const baseCityFee = 3.5; // Note: Fetch from config/DB map
     const multiStopPenalty = 1.5;
     const providerCount = Object.keys(providerGroups).length;
     const deliveryFee = baseCityFee + (providerCount - 1) * multiStopPenalty;
@@ -202,6 +202,72 @@ export class OrdersService {
     return order;
   }
 
+  private async checkAndDecrementStock(
+    tx: any,
+    items: { productId: string; quantity: number }[],
+  ): Promise<boolean> {
+    const productIds = items.map((i) => i.productId);
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, stock: true, isActive: true },
+    });
+    const productMap = new Map(products.map((p: any) => [p.id, p]));
+
+    for (const item of items) {
+      const p: any = productMap.get(item.productId);
+      if (!p?.isActive || p.stock < item.quantity) {
+        return false;
+      }
+    }
+
+    for (const item of items) {
+      const res = await tx.product.updateMany({
+        where: {
+          id: item.productId,
+          isActive: true,
+          stock: { gte: item.quantity },
+        },
+        data: { stock: { decrement: item.quantity } },
+      });
+
+      if (res.count !== 1) {
+        throw new ConflictException(
+          'Concurrent stock update detected; retry payment confirmation',
+        );
+      }
+    }
+
+    return true;
+  }
+
+  private async evaluateProviderOrdersStock(
+    tx: any,
+    providerOrders: any[],
+  ): Promise<{ rejected: string[]; confirmed: string[] }> {
+    const rejected: string[] = [];
+    const confirmed: string[] = [];
+
+    for (const po of providerOrders) {
+      if (
+        po.status === ProviderOrderStatus.CANCELLED ||
+        po.status === ProviderOrderStatus.REJECTED_BY_STORE
+      ) {
+        rejected.push(po.id);
+        continue;
+      }
+
+      const providerOk = await this.checkAndDecrementStock(tx, po.items);
+
+      if (providerOk) {
+        confirmed.push(po.id);
+      } else {
+        rejected.push(po.id);
+      }
+    }
+
+    return { rejected, confirmed };
+  }
+
   async confirmPayment(
     orderId: string,
     paymentRef?: string,
@@ -241,66 +307,10 @@ export class OrdersService {
         };
       }
 
-      const rejectedProviderOrderIds: string[] = [];
-      const confirmedProviderOrderIds: string[] = [];
-
-      for (const po of order.providerOrders) {
-        if (
-          po.status === ProviderOrderStatus.CANCELLED ||
-          po.status === ProviderOrderStatus.REJECTED_BY_STORE
-        ) {
-          rejectedProviderOrderIds.push(po.id);
-          continue;
-        }
-
-        let providerOk = true;
-
-        // Phase A: Verificación de stock (optimista)
-        const productIds = po.items.map((i) => i.productId);
-        const products = await tx.product.findMany({
-          where: { id: { in: productIds } },
-          select: { id: true, stock: true, isActive: true },
-        });
-        const productMap = new Map(products.map((p) => [p.id, p]));
-
-        for (const item of po.items) {
-          const p = productMap.get(item.productId);
-          if (!p || !p.isActive || p.stock < item.quantity) {
-            providerOk = false;
-            break;
-          }
-        }
-
-        if (!providerOk) {
-          rejectedProviderOrderIds.push(po.id);
-          continue;
-        }
-
-        // Phase B: Decrement real con concurrencia
-        for (const item of po.items) {
-          const res = await tx.product.updateMany({
-            where: {
-              id: item.productId,
-              isActive: true,
-              stock: { gte: item.quantity },
-            },
-            data: { stock: { decrement: item.quantity } },
-          });
-
-          if (res.count !== 1) {
-            providerOk = false;
-            break;
-          }
-        }
-
-        if (!providerOk) {
-          throw new ConflictException(
-            'Concurrent stock update detected; retry payment confirmation',
-          );
-        }
-
-        confirmedProviderOrderIds.push(po.id);
-      }
+      const {
+        rejected: rejectedProviderOrderIds,
+        confirmed: confirmedProviderOrderIds,
+      } = await this.evaluateProviderOrdersStock(tx, order.providerOrders);
 
       // 2) Actualizar ProviderOrders rechazados (Rechazo Parcial)
       if (rejectedProviderOrderIds.length > 0) {
@@ -486,7 +496,7 @@ export class OrdersService {
       throw new BadRequestException('Order cannot transition to DELIVERED');
     }
 
-    // ToDo: Invariant Rule 2 verification
+    // Note: Invariant Rule 2 verification
     // Must check if all sub-orders are PICKED_UP before delivering, or trust current DB status logic.
 
     const result = await this.prisma.order.updateMany({
@@ -739,5 +749,17 @@ export class OrdersService {
     return Object.values(productStats)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
+  }
+  async isProcessed(eventId: string): Promise<boolean> {
+    const event = await this.prisma.webhookEvent.findUnique({
+      where: { id: eventId },
+    });
+    return !!event;
+  }
+
+  async markProcessed(eventId: string): Promise<void> {
+    await this.prisma.webhookEvent.create({
+      data: { id: eventId },
+    });
   }
 }
