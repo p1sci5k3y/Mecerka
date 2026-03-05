@@ -52,14 +52,15 @@ export function OrderKanbanColumn({
                 ) : (
                     columnOrders.map((order) => {
                         const po = order.providerOrders?.find((po) => po.providerId === providerId)
+                        if (!po) return null; // Safe guard against undefined provider order
                         return (
                             <div
-                                key={po!.id}
+                                key={po.id}
                                 className="transition-all animate-in slide-in-from-bottom-2 fade-in"
                             >
                                 <ProviderOrderCard
                                     order={order}
-                                    providerOrderId={po!.id}
+                                    providerOrderId={po.id}
                                     now={now}
                                     onStatusChange={onStatusChange}
                                     onReject={onReject}

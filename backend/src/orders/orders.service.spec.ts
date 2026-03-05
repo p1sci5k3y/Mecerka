@@ -4,9 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
 import {
-  NotFoundException,
   ConflictException,
-  ForbiddenException,
 } from '@nestjs/common';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {

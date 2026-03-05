@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Edit, Trash2, Package, Loader2, MapPin, Tag } from "lucide-react"
-import { Link, useRouter } from "@/lib/navigation"
+import { Plus, Edit, Trash2, MapPin, Tag } from "lucide-react"
+import { Link } from "@/lib/navigation"
 
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"

@@ -1,4 +1,4 @@
-import { ProviderOrder, Order } from "@/lib/types"
+import { Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Store, Package } from "lucide-react"

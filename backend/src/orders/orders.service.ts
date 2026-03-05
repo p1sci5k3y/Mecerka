@@ -9,7 +9,6 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  Prisma,
   Role,
   DeliveryStatus,
   ProviderOrderStatus,

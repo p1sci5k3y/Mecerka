@@ -1,7 +1,7 @@
 import { Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Coins, Navigation, CheckCircle2, ChevronRight, Store, Box, Clock } from "lucide-react"
+import { MapPin, Navigation, CheckCircle2, ChevronRight, Store, Box, Clock } from "lucide-react"
 
 interface Props {
     order: Order
