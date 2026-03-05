@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   // 1. Get or create a Client
-  let client = await prisma.user.findFirst({ where: { roles: { has: Role.CLIENT } } });
+  let client = await prisma.user.findFirst({ where: { email: 'e2e_client@mecerka.com', roles: { has: Role.CLIENT } } });
   if (!client) {
     client = await prisma.user.create({
       data: {
@@ -21,7 +21,7 @@ async function main() {
   }
 
   // 2. Get or create a Provider
-  let provider = await prisma.user.findFirst({ where: { roles: { has: Role.PROVIDER } } });
+  let provider = await prisma.user.findFirst({ where: { email: 'e2e_provider@mecerka.com', roles: { has: Role.PROVIDER } } });
   if (!provider) {
     provider = await prisma.user.create({
       data: {
