@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { useRouter } from "@/lib/navigation"
+
 import { authService } from "@/lib/services/auth-service"
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Link } from "@/lib/navigation"
 export default function VerifyEmailPage() {
     const searchParams = useSearchParams()
     const token = searchParams.get("token")
-    
+
 
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
     const [message, setMessage] = useState("Verificando tu cuenta...")

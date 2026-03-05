@@ -7,7 +7,7 @@ import { Link } from "@/lib/navigation"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route" // Import ProtectedRoute
-import { useAuth } from "@/contexts/auth-context" // Import useAuth
+
 import { productsService } from "@/lib/services/products-service"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"

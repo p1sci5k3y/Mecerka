@@ -7,11 +7,11 @@ import { SectionHeader } from "@/components/ui/section-header"
 import { SealBadge } from "@/components/ui/seal-badge"
 import { TagChip } from "@/components/ui/tag-chip"
 
-import { useTranslations } from 'next-intl';
+
 import { Link } from '@/lib/navigation';
 
 export default function Home() {
-  
+
 
   // Mocks for Editorial layout (Etapa 2)
   const highlightedProducts = [
