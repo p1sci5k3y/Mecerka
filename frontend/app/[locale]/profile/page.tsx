@@ -2,17 +2,19 @@
 
 import React, { useState } from "react"
 import {
-  
+
   Mail,
   Shield,
-  
+
   Clock,
   Monitor,
   Smartphone,
   Info,
-  
+
   CheckCircle2,
   Fingerprint,
+  User,
+  Loader2
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
@@ -73,7 +75,7 @@ function ProfileContent() {
 
       // Update local storage / user context state lazily if possible, 
       // but reloading is a quick way to refresh the 'hasPin' state from login.
-      setTimeout(() => window.location.reload(), 1500)
+      setTimeout(() => globalThis.location.reload(), 1500)
     } catch (error: any) {
       toast.error(error.message || "Error al configurar el PIN.")
     } finally {
@@ -181,14 +183,17 @@ function ProfileContent() {
                     placeholder="Ej. 1234"
                     className="h-12 rounded-xl text-center font-mono tracking-widest text-lg"
                     value={pinValue}
-                    onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => setPinValue(e.target.value.replaceAll(/\D/g, ""))}
                     required
                   />
                 </div>
                 <Button type="submit" className="w-full font-bold h-12 rounded-xl shadow-sm mt-2" disabled={settingPin}>
                   {settingPin ? (
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  ) : (user?.hasPin ? "Actualizar PIN" : "Guardar PIN")}
+                  ) : (() => {
+                    const buttonText = user?.hasPin ? "Actualizar PIN" : "Guardar PIN";
+                    return buttonText;
+                  })()}
                 </Button>
               </form>
             </div>
@@ -206,8 +211,9 @@ function ProfileContent() {
                         const res = await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/provider")
                         if (res.access_token) localStorage.setItem("token", res.access_token)
                         toast.success("¡Bienvenido al Gremio de Talleres!", { icon: "🔨" })
-                        window.location.reload()
+                        globalThis.location.reload()
                       } catch (error) {
+                        console.error(error)
                         toast.error("Error al inscribir tu taller")
                       }
                     }}
@@ -224,8 +230,9 @@ function ProfileContent() {
                         const res = await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/runner")
                         if (res.access_token) localStorage.setItem("token", res.access_token)
                         toast.success("¡Licencia de Reparto aprobada!", { icon: "🚲" })
-                        window.location.reload()
+                        globalThis.location.reload()
                       } catch (error) {
+                        console.error(error)
                         toast.error("Error al emitir licencia")
                       }
                     }}
@@ -283,7 +290,7 @@ function ProfileContent() {
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-border/60">
                     {mockAccessHistory.map((entry, idx) => (
-                      <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                      <tr key={`${entry.date}-${idx}`} className="hover:bg-muted/20 transition-colors">
                         <td className="py-3 px-4 font-medium text-foreground">{entry.action}</td>
                         <td className="py-3 px-4 text-muted-foreground text-right font-mono text-xs">{entry.date.split(",")[0]}</td>
                       </tr>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Plus, Edit, Trash2, MapPin, Tag } from "lucide-react"
+import { Plus, Edit, Trash2, MapPin, Tag, Package, Loader2 } from "lucide-react"
 import { Link } from "@/lib/navigation"
 
 import { Navbar } from "@/components/navbar"
@@ -37,6 +37,7 @@ function ProductsContent() {
             const data = await productsService.getMyProducts()
             setProducts(data)
         } catch (error) {
+            console.error(error);
             toast({
                 title: "Error",
                 description: "No se pudieron cargar los productos",
@@ -58,6 +59,7 @@ function ProductsContent() {
             })
             loadProducts()
         } catch (error) {
+            console.error(error);
             toast({
                 title: "Error",
                 description: "No se pudo eliminar el producto",

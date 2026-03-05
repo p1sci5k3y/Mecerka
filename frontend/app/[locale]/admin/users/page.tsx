@@ -6,6 +6,7 @@ import {
     UserCheck,
     UserX,
 } from "lucide-react"
+import { BackendAdminUser } from "@/lib/types"
 import { adminService } from "@/lib/services/admin-service"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,7 @@ export default function UsersPage() {
                 const data = await adminService.getUsers()
                 setUsers(data)
             } catch (error) {
+                console.error("Error cargando usuarios:", error);
                 toast({
                     title: "Error",
                     description: "No se pudieron cargar los usuarios",
@@ -62,6 +64,7 @@ export default function UsersPage() {
             const data = await adminService.getUsers()
             setUsers(data)
         } catch (error) {
+            console.error(error);
             toast({
                 title: "Error",
                 description: "No se pudo cambiar el estado",
@@ -94,7 +97,7 @@ export default function UsersPage() {
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
-                                        {(user.roles || []).map(role => (
+                                        {(user.roles || []).map((role: string) => (
                                             <Badge key={role} variant={role === "ADMIN" ? "default" : "secondary"}>
                                                 {role}
                                             </Badge>
