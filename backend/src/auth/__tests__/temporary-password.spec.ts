@@ -3,7 +3,7 @@ import { AuthService } from '../auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../../email/email.service';
-import { Role } from '@prisma/client';
+
 
 // Mock implementations
 const mockPrismaService = {

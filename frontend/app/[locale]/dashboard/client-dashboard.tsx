@@ -115,7 +115,6 @@ export function ClientDashboard() {
                             </div>
                         ) : (
                             (activeOrders.length > 0 ? activeOrders : pastOrders).slice(0, 1).map((order) => {
-                                const config = statusConfig[order.status] || statusConfig.PENDING;
                                 return (
                                     <div key={order.id} className="relative overflow-hidden rounded-xl bg-white dark:bg-[#201512]/50 shadow-sm border border-[#df795d]/20">
                                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#df795d]/80 to-[#81A16C]/80"></div>

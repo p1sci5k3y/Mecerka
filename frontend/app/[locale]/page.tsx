@@ -11,7 +11,7 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/lib/navigation';
 
 export default function Home() {
-  const t = useTranslations('Landing');
+  
 
   // Mocks for Editorial layout (Etapa 2)
   const highlightedProducts = [

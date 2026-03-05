@@ -192,13 +192,6 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     const globalRoom = `order:${data.orderId}`;
     client.join(globalRoom);
-
-    let clientRoom = globalRoom;
-    if (roleSegment === 'client') {
-      clientRoom = `${globalRoom}:client`;
-      client.join(clientRoom);
-    }
-
     this.logger.log(
       `Client ${client.id} (User ${userId}) joined room ${globalRoom} [Role: ${roleSegment}]`,
     );

@@ -15,7 +15,7 @@ import { SetPinDto } from './dto/set-pin.dto';
 import * as argon2 from 'argon2';
 
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
