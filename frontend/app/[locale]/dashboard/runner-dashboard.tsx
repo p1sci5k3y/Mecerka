@@ -41,7 +41,7 @@ export function RunnerDashboard() {
 
     const activeStop = activeOrders.length > 0 ? activeOrders[0] : null;
 
-    const handleMarkDelivered = async () => {
+    const handleMarkDelivered = async (orderId: number) => {
         // In a real app we'd call an endpoint like completed
         // await ordersService.completeOrder(orderId);
         // Refresh
@@ -100,7 +100,7 @@ export function RunnerDashboard() {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                             </span>
-                            En Servicio
+                            {' '}En Servicio
                         </div>
                     </div>
 
@@ -159,7 +159,7 @@ export function RunnerDashboard() {
                                     </div>
                                 </div>
 
-                                <Button className="w-full h-14 bg-[#81A16C] hover:bg-[#6b8c56] text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm rounded-xl" onClick={() => handleMarkDelivered()}>
+                                <Button className="w-full h-14 bg-[#81A16C] hover:bg-[#6b8c56] text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm rounded-xl" onClick={() => handleMarkDelivered(activeStop.id)}>
                                     <CheckCircle2 className="w-5 h-5" /> Marcar Entregado
                                 </Button>
 

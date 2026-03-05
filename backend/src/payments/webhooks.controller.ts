@@ -76,7 +76,7 @@ export class WebhooksController {
     }
 
     if (event.type === 'payment_intent.succeeded') {
-      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+      const paymentIntent = event.data.object;
 
       const orderId = paymentIntent.metadata?.orderId;
       const paymentRef = paymentIntent.id;
@@ -88,15 +88,19 @@ export class WebhooksController {
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
-
-      // In a real application, check this against a persistent id store a Redis or DB cache.
-      // E.g. if (await this.webhookEventsService.isProcessed(event.id)) return OK.
+      // Idempotency check: short-circuit duplicate events
+      if (await this.ordersService.isProcessed(event.id)) {
+        this.logger.debug(`Webhook event ${event.id} already processed.`);
+        return res.status(HttpStatus.OK).json({ received: true });
+      }
 
       try {
         const result = await this.ordersService.confirmPayment(
           orderId,
           paymentRef,
         );
+        // Persist the event to avoid future duplicates
+        await this.ordersService.markProcessed(event.id);
         this.logger.log(
           `Order ${orderId} confirmed via Stripe Webhook! Ref: ${paymentRef}. Status: ${result.finalStatus}`,
         );
