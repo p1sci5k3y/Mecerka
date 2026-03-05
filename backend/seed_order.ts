@@ -1,0 +1,113 @@
+import { PrismaClient, DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
+import * as argon2 from 'argon2';
+
+const prisma = new PrismaClient();
+
+async function main() {
+  // 1. Get or create a Client
+  let client = await prisma.user.findFirst({ where: { roles: { has: Role.CLIENT } } });
+  if (!client) {
+    client = await prisma.user.create({
+      data: {
+        email: 'e2e_client@mecerka.com',
+        name: 'E2E Client',
+        passwordHash: await argon2.hash('Password123!'),
+        roles: [Role.CLIENT],
+        emailVerified: true,
+        mfaEnabled: false,
+        pin: await argon2.hash('1234')
+      }
+    });
+  }
+
+  // 2. Get or create a Provider
+  let provider = await prisma.user.findFirst({ where: { roles: { has: Role.PROVIDER } } });
+  if (!provider) {
+    provider = await prisma.user.create({
+      data: {
+        email: 'e2e_provider@mecerka.com',
+        name: 'E2E Provider',
+        passwordHash: await argon2.hash('Password123!'),
+        roles: [Role.PROVIDER],
+        emailVerified: true,
+        mfaEnabled: false,
+      }
+    });
+  }
+
+  // 3. Get or create a City
+  let city = await prisma.city.findFirst();
+  if (!city) {
+    city = await prisma.city.create({
+      data: {
+        name: 'Madrid',
+        country: 'ES',
+        lat: 40.4168,
+        lng: -3.7038,
+      }
+    });
+  }
+
+
+
+  // 5. Get or create a Product
+  let product = await prisma.product.findFirst({ where: { providerId: provider.id } });
+  if (!product) {
+    product = await prisma.product.create({
+      data: {
+        providerId: provider.id,
+        cityId: city.id,
+        name: 'E2E Validation Product',
+        description: 'Product used for E2E testing',
+        price: 15.50,
+        stock: 100,
+        isActive: true,
+      }
+    });
+  }
+
+  // 6. Create an order that is READY_FOR_ASSIGNMENT
+  const order = await prisma.order.create({
+    data: {
+      clientId: client.id,
+      cityId: city.id,
+      status: DeliveryStatus.READY_FOR_ASSIGNMENT,
+      totalPrice: 15.50,
+      deliveryFee: 3.50,
+      deliveryAddress: 'Calle Princesa 12, Madrid',
+      deliveryLat: 40.4250,
+      deliveryLng: -3.7150,
+      paymentRef: `pi_dummy_e2e_${Date.now()}`,
+      confirmedAt: new Date(),
+      providerOrders: {
+        create: [
+          {
+            providerId: provider.id,
+            status: ProviderOrderStatus.READY_FOR_PICKUP,
+            subtotal: 15.50,
+            items: {
+              create: [
+                {
+                  productId: product.id,
+                  quantity: 1,
+                  priceAtPurchase: 15.50
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  console.log(`Successfully seeded Order ID: ${order.id}`);
+}
+
+main()
+  .catch(e => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
