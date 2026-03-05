@@ -20,13 +20,8 @@ async function bootstrap() {
   const { httpAdapter } = app.get(HttpAdapterHost);
   app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapter as any));
 
-  // Content Security Policy is disabled temporarily to permit integration with externally hosted frontend scripts and assets during MVP phase.
-  // XSS risks are mitigated via strict generic Helmet configurations and React frontend sanitization.
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-    }),
-  );
+  // Content Security Policy is enabled with default safe directives to mitigate XSS
+  app.use(helmet());
   app.enableCors();
   await app.listen(process.env.PORT ?? 3000);
 }
