@@ -8,7 +8,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Request, Response } from 'express';
+import type { Request } from 'express';
 import Stripe from 'stripe';
 import { OrdersService } from '../orders/orders.service';
 
@@ -88,7 +88,7 @@ export class WebhooksController {
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
-      const processedKey = `evt_${event.id}`;
+
       // In a real application, check this against a persistent id store a Redis or DB cache.
       // E.g. if (await this.webhookEventsService.isProcessed(event.id)) return OK.
 

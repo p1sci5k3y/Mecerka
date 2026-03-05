@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Package, ShoppingBag, Box, TrendingUp, TrendingDown, Calendar, Receipt } from 'lucide-react';
+import {   ShoppingBag,  TrendingUp, TrendingDown, Calendar, Receipt } from 'lucide-react';
 
 export function ProviderDashboard() {
     const { user } = useAuth();

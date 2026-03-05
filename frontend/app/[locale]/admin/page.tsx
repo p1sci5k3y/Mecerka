@@ -5,7 +5,7 @@ import {
   Users,
   ShoppingBag,
   DollarSign,
-  Package,
+  
 } from "lucide-react"
 import { adminService } from "@/lib/services/admin-service"
 import { AdminMetrics } from "@/lib/types"

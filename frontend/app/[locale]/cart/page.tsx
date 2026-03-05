@@ -7,11 +7,11 @@ import {
   Minus,
   Plus,
   ArrowRight,
-  Loader2,
+  
   Inbox,
   MapPin,
   Truck,
-  Store,
+  
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"

@@ -2,15 +2,15 @@
 
 import React, { useState } from "react"
 import {
-  User,
+  
   Mail,
   Shield,
-  Key,
+  
   Clock,
   Monitor,
   Smartphone,
   Info,
-  Loader2,
+  
   CheckCircle2,
   Fingerprint,
 } from "lucide-react"

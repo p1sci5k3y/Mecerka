@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { authService } from "@/lib/services/auth-service"
-import { ArrowLeft, Loader2, CheckCircle2, Copy, ShieldCheck } from "lucide-react"
+import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react"
 
 export default function MfaSetupPage() {
     const { user, logout, isLoading } = useAuth()
