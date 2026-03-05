@@ -225,3 +225,7 @@ model RunnerProfile {
   // Relations
   user User @relation(fields: [userId], references: [id])
 }
+model WebhookEvent {
+  id        String   @id
+  createdAt DateTime @default(now())
+}

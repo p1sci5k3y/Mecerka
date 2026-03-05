@@ -44,10 +44,12 @@ const ChartContainer = React.forwardRef<
   }
 >(({ id, className, children, config, ...props }, ref) => {
   const uniqueId = React.useId()
-  const chartId = `chart-${id || uniqueId.replace(/:/g, '')}`
+  const chartId = `chart-${id || uniqueId.replaceAll(':', '')}`
+
+  const contextValue = React.useMemo(() => ({ config }), [config])
 
   return (
-    <ChartContext.Provider value={{ config }}>
+    <ChartContext.Provider value={contextValue}>
       <div
         data-chart={chartId}
         ref={ref}
@@ -90,10 +92,12 @@ ${colorConfig
                     itemConfig.color
                   return color ? `  --color-${key}: ${color};` : null
                 })
+                .filter(Boolean)
                 .join('\n')}
 }
 `,
           )
+          .filter(Boolean)
           .join('\n'),
       }}
     />
@@ -143,7 +147,7 @@ const ChartTooltipContent = React.forwardRef<
       const itemConfig = getPayloadConfigFromPayload(config, item, key)
       const value =
         !labelKey && typeof label === 'string'
-          ? config[label as keyof typeof config]?.label || label
+          ? config[label]?.label || label
           : itemConfig?.label
 
       if (labelFormatter) {
@@ -183,7 +187,7 @@ const ChartTooltipContent = React.forwardRef<
           className,
         )}
       >
-        {!nestLabel ? tooltipLabel : null}
+        {nestLabel ? null : tooltipLabel}
         <div className="grid gap-1.5">
           {payload.map((item, index) => {
             if (!item) return null
@@ -199,7 +203,7 @@ const ChartTooltipContent = React.forwardRef<
                   indicator === 'dot' && 'items-center',
                 )}
               >
-                {formatter && item && item.value !== undefined && item.name ? (
+                {formatter && item?.value !== undefined && item?.name ? (
                   formatter(item.value, item.name, item, index, item.payload)
                 ) : (
                   <>
@@ -353,7 +357,7 @@ function getPayloadConfigFromPayload(
 
   return configLabelKey in config
     ? config[configLabelKey]
-    : config[key as keyof typeof config]
+    : config[key]
 }
 
 export {
