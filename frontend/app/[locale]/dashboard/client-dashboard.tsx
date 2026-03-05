@@ -6,14 +6,6 @@ import { Link } from '@/lib/navigation';
 import { Button } from '@/components/ui/button';
 import type { Order } from '@/lib/types';
 
-const statusConfig: Record<string, { label: string; icon: React.ElementType }> = {
-    PENDING: { label: "Recibido", icon: CheckCircle2 },
-    CONFIRMED: { label: "Preparando", icon: Package },
-    IN_TRANSIT: { label: "En Camino", icon: Truck },
-    DELIVERED: { label: "Entregado", icon: Receipt },
-    CANCELLED: { label: "Cancelado", icon: XCircle }
-};
-
 export function ClientDashboard() {
     const { user } = useAuth();
     const [orders, setOrders] = useState<Order[]>([]);

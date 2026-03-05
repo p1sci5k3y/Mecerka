@@ -3,13 +3,10 @@
 import { useEffect, useState } from "react"
 import {
     MoreHorizontal,
-    Shield,
-
     UserCheck,
     UserX,
 } from "lucide-react"
 import { adminService } from "@/lib/services/admin-service"
-import { BackendAdmin, Role } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -52,22 +49,6 @@ export default function UsersPage() {
         }
         fetchUsers()
     }, [toast])
-
-    const handleRoleChange = async (userId: number, newRole: Role) => {
-        try {
-            await adminService.updateUserRole(userId, newRole)
-            toast({ title: "Rol actualizado correctamente" })
-            // Re-fetch users after role change
-            const data = await adminService.getUsers()
-            setUsers(data)
-        } catch (error) {
-            toast({
-                title: "Error",
-                description: "No se pudo actualizar el rol",
-                variant: "destructive",
-            })
-        }
-    }
 
     const handleStatusChange = async (userId: number, currentStatus: boolean) => {
         try {
