@@ -11,7 +11,7 @@ import { Link } from "@/lib/navigation"
 export default function VerifyEmailPage() {
     const searchParams = useSearchParams()
     const token = searchParams.get("token")
-    const router = useRouter()
+    
 
     const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
     const [message, setMessage] = useState("Verificando tu cuenta...")

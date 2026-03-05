@@ -1,7 +1,7 @@
 "use client"
 
 import { Link } from "@/lib/navigation"
-import { MapPin, Inbox, Hammer } from "lucide-react"
+import { MapPin, Inbox } from "lucide-react"
 import type { Product } from "@/lib/types"
 import { useCart } from "@/contexts/cart-context"
 import { Button } from "@/components/ui/button"

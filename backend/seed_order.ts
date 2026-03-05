@@ -11,7 +11,7 @@ async function main() {
       data: {
         email: 'e2e_client@mecerka.com',
         name: 'E2E Client',
-        passwordHash: await argon2.hash('Password123!'),
+        password: await argon2.hash('Password123!'),
         roles: [Role.CLIENT],
         emailVerified: true,
         mfaEnabled: false,
@@ -27,7 +27,7 @@ async function main() {
       data: {
         email: 'e2e_provider@mecerka.com',
         name: 'E2E Provider',
-        passwordHash: await argon2.hash('Password123!'),
+        password: await argon2.hash('Password123!'),
         roles: [Role.PROVIDER],
         emailVerified: true,
         mfaEnabled: false,
@@ -41,14 +41,22 @@ async function main() {
     city = await prisma.city.create({
       data: {
         name: 'Madrid',
-        country: 'ES',
-        lat: 40.4168,
-        lng: -3.7038,
+        slug: 'madrid',
+        active: true,
       }
     });
   }
 
-
+  // 4. Get or create a Category
+  let category = await prisma.category.findFirst();
+  if (!category) {
+    category = await prisma.category.create({
+      data: {
+        name: 'E2E Validation Category',
+        slug: 'e2e-validation-category',
+      }
+    });
+  }
 
   // 5. Get or create a Product
   let product = await prisma.product.findFirst({ where: { providerId: provider.id } });
@@ -57,6 +65,7 @@ async function main() {
       data: {
         providerId: provider.id,
         cityId: city.id,
+        categoryId: category.id,
         name: 'E2E Validation Product',
         description: 'Product used for E2E testing',
         price: 15.50,

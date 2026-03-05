@@ -4,12 +4,12 @@ import { useEffect, useState } from "react"
 import {
     MoreHorizontal,
     Shield,
-    ShieldAlert,
+
     UserCheck,
     UserX,
 } from "lucide-react"
 import { adminService } from "@/lib/services/admin-service"
-import { BackendAdminUser, Role } from "@/lib/types"
+import { BackendAdmin, Role } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
