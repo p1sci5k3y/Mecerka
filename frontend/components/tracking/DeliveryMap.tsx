@@ -6,8 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import io, { Socket } from 'socket.io-client';
 import { ordersService } from '@/lib/services/orders-service';
-import { Order } from '@/lib/types';
-import {  Play, Square, MapPin } from 'lucide-react';
+import { Play, Square, MapPin } from 'lucide-react';
 
 // Fix for default markers in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -197,9 +196,6 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
 
     if (!mounted) return null;
 
-    // Build visualization lines: Origin -> Current Runner -> Destination
-    const routeLines: [number, number][] = [];
-    if (position) routeLines.push([position.lat, position.lng]);
     if (destination) {
         // We might want to connect runner to dest visually to show remaining path
         // For simplicity, we just rely on RouteHistory and let markers show endpoints
