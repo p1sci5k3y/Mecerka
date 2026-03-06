@@ -57,6 +57,19 @@
         "goToLogin": "Go to Login",
         "alreadyHaveAccount": "Already have an account?",
         "logInLink": "Log In",
+        "forgotTitle": "Recover Password",
+        "forgotSubtitle": "Enter your email to receive a recovery link.",
+        "forgotButton": "Send Link",
+        "sendingButton": "Sending...",
+        "forgotSuccessTitle": "Check your email!",
+        "forgotSuccessSubtitle": "If the email is registered, you will receive a link to reset your password.",
+        "backToLogin": "Back to login",
+        "resetTitle": "New Password",
+        "resetSubtitle": "Enter your new password below.",
+        "resetPasswordLabel": "New Password",
+        "resetPasswordPlaceholder": "••••••••",
+        "resetButton": "Reset Password",
+        "resettingButton": "Resetting...",
         "footerText": "© {year} Mecerka Artisanal Shop. All rights reserved."
     }
 }

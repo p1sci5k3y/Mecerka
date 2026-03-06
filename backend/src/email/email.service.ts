@@ -36,6 +36,22 @@ export class EmailService {
     return this.sendMailAsync(to, subject, html);
   }
 
+  async sendPasswordResetEmail(to: string, token: string) {
+    const defaultUrl = 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || defaultUrl;
+    const resetLink = `${frontendUrl}/es/reset-password?token=${token}`;
+
+    const subject = 'Restablecimiento de contraseña - Mecerka';
+    const html = `
+      <h1>Restablecer Contraseña</h1>
+      <p>Has solicitado restablecer tu contraseña. Haz clic en el siguiente enlace para crear una nueva:</p>
+      <a href="${resetLink}">Restablecer Contraseña</a>
+      <p>Si no solicitaste esto, puedes ignorar este correo.</p>
+      <p>Si el enlace no funciona, copia y pega esta URL en tu navegador: ${resetLink}</p>
+    `;
+    return this.sendMailAsync(to, subject, html);
+  }
+
   private async sendMailAsync(to: string, subject: string, html: string) {
     const from = process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);

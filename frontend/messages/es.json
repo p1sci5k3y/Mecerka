@@ -57,6 +57,19 @@
         "goToLogin": "Ir a Iniciar Sesión",
         "alreadyHaveAccount": "¿Ya tienes una cuenta?",
         "logInLink": "Iniciar Sesión",
+        "forgotTitle": "Recuperar Contraseña",
+        "forgotSubtitle": "Ingresa tu correo para recibir un enlace de recuperación.",
+        "forgotButton": "Enviar Enlace",
+        "sendingButton": "Enviando...",
+        "forgotSuccessTitle": "¡Revisa tu correo!",
+        "forgotSuccessSubtitle": "Si el correo está registrado, recibirás un enlace para restablecer tu contraseña.",
+        "backToLogin": "Volver al inicio de sesión",
+        "resetTitle": "Nueva Contraseña",
+        "resetSubtitle": "Ingresa tu nueva contraseña a continuación.",
+        "resetPasswordLabel": "Nueva Contraseña",
+        "resetPasswordPlaceholder": "••••••••",
+        "resetButton": "Restablecer Contraseña",
+        "resettingButton": "Restableciendo...",
         "footerText": "© {year} Mecerka. Todos los derechos reservados."
     }
 }
