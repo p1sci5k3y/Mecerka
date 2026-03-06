@@ -1,13 +1,14 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtPayload, UserFromJwt } from '../interfaces/auth.interfaces';
+import { PrismaService } from '../../prisma/prisma.service';
 import * as jwt from 'jsonwebtoken';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -38,7 +39,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload): UserFromJwt {
+  async validate(payload: JwtPayload): Promise<UserFromJwt> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { passwordChangedAt: true },
+    });
+
+    if (user?.passwordChangedAt && payload.iat) {
+      // payload.iat is in seconds, passwordChangedAt is in ms
+      if (payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+        throw new UnauthorizedException('Token expired due to password change');
+      }
+    }
+
     let roles: Role[] = [];
     if (Array.isArray(payload.roles)) {
       roles = payload.roles;

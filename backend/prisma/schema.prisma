@@ -51,12 +51,15 @@ model User {
   verificationToken          String?   @unique
   verificationTokenExpiresAt DateTime?
   mfaSecret                  String? // Stores the TOTP secret
+  mfaSetupToken              String? // Stores the temporary Email OTP to access QR
+  mfaSetupExpiresAt          DateTime?
   mfaEnabled                 Boolean   @default(false)
   mfaFailedAttempts          Int       @default(0)
   mfaLockUntil               DateTime?
   active                     Boolean   @default(true)
-  resetPasswordToken         String?   @unique
+  resetPasswordTokenHash     String?   @unique
   resetPasswordExpiresAt     DateTime?
+  passwordChangedAt          DateTime?
 
   // Geolocation
   address   String?

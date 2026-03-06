@@ -8,6 +8,8 @@ import { api } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { useTranslations } from 'next-intl'
 
+const OTP_IDS = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"]
+
 export default function LoginPage() {
   const t = useTranslations('Auth')
   const { login } = useAuth()
@@ -47,8 +49,13 @@ export default function LoginPage() {
     if (e) e.preventDefault()
     setLoading(true)
     try {
-      await login({ email, password })
-      setStep(2)
+      const response = await login({ email, password })
+      if (response?.user?.mfaEnabled) {
+        setStep(2)
+      } else {
+        toast.success("Bienvenido a Mecerka", { icon: "🌿" })
+        globalThis.location.href = "/dashboard"
+      }
     } catch (error: any) {
       toast.error(error.message || "Credenciales inválidas.")
     } finally {
@@ -165,9 +172,8 @@ export default function LoginPage() {
 
               <div className="flex gap-2 sm:gap-4 mb-8">
                 {otp.map((digit, index) => (
-                  // eslint-disable-next-line react/no-array-index-key
                   <input
-                    key={`otp-input-${index}`}
+                    key={OTP_IDS[index]}
                     ref={(el) => { otpRefs.current[index] = el }}
                     type="text"
                     inputMode="numeric"
