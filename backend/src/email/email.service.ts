@@ -24,7 +24,7 @@ export class EmailService {
   async sendVerificationEmail(to: string, token: string) {
     const defaultUrl = 'http://localhost:3000';
     const frontendUrl = process.env.FRONTEND_URL || defaultUrl;
-    const verificationLink = `${frontendUrl}/es/verify?token=${token}`;
+    const verificationLink = `${frontendUrl}/es/verify?token=${encodeURIComponent(token)}`;
 
     const subject = 'Verifica tu cuenta en Mecerka';
     const html = `
@@ -39,7 +39,7 @@ export class EmailService {
   async sendPasswordResetEmail(to: string, token: string) {
     const defaultUrl = 'http://localhost:3000';
     const frontendUrl = process.env.FRONTEND_URL || defaultUrl;
-    const resetLink = `${frontendUrl}/es/reset-password?token=${token}`;
+    const resetLink = `${frontendUrl}/es/reset-password?token=${encodeURIComponent(token)}`;
 
     const subject = 'Restablecimiento de contraseña - Mecerka';
     const html = `

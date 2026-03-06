@@ -70,6 +70,13 @@
         "resetPasswordPlaceholder": "••••••••",
         "resetButton": "Restablecer Contraseña",
         "resettingButton": "Restableciendo...",
+        "invalidResetLink": "Enlace de recuperación inválido o expirado.",
+        "resetError": "Error al restablecer la contraseña.",
+        "resetSuccess": "Contraseña restablecida correctamente",
+        "forgotErrorMessage": "Error al solicitar recuperación.",
+        "resetSuccessTitle": "¡Contraseña Actualizada!",
+        "resetSuccessDescription": "Ya puedes usar tu nueva contraseña para acceder a Mecerka.",
+        "verifyingToken": "Validando enlace...",
         "footerText": "© {year} Mecerka. Todos los derechos reservados."
     }
 }
