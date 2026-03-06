@@ -44,7 +44,7 @@ export default function ResetPasswordPage() {
 
     if (!token || verifying) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-[#FBF6EE] dark:bg-background-dark text-slate-900 dark:text-slate-100">
+            <div role="status" aria-live="polite" className="min-h-screen flex flex-col items-center justify-center bg-[#FBF6EE] dark:bg-background-dark text-slate-900 dark:text-slate-100">
                 <Loader2 className="w-12 h-12 text-[#e07b61] animate-spin mb-4" />
                 <p className="font-medium text-slate-600 dark:text-slate-400">{t('verifyingToken')}</p>
             </div>
@@ -119,6 +119,7 @@ export default function ResetPasswordPage() {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
                                             className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#e07b61] transition-colors"
                                         >
                                             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
