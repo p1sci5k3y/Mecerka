@@ -72,7 +72,7 @@
         "resettingButton": "Resetting...",
         "invalidResetLink": "Invalid or expired recovery link.",
         "resetError": "Error resetting password.",
-        "resetSuccess": "Password successfully reset",
+        "resetSuccess": "Password successfully reset.",
         "forgotErrorMessage": "Error requesting recovery.",
         "resetSuccessTitle": "Password Updated!",
         "resetSuccessDescription": "You can now use your new password to access Mecerka.",
