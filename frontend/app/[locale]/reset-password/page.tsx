@@ -29,12 +29,13 @@ export default function ResetPasswordPage() {
 
         const verifyToken = async () => {
             try {
-                await api.get(`/auth/verify-reset-token?token=${token}`)
-                setVerifying(false)
+                await api.get(`/auth/verify-reset-token?token=${encodeURIComponent(token)}`)
             } catch (error: unknown) {
                 const message = error instanceof Error ? error.message : t('invalidResetLink')
                 toast.error(message)
                 router.push('/login')
+            } finally {
+                setVerifying(false)
             }
         }
 
