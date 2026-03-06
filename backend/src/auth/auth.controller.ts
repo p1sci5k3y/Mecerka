@@ -12,6 +12,8 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ConfirmResetPasswordDto } from './dto/confirm-reset-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -23,7 +25,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) {}
+  ) { }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
@@ -50,6 +52,18 @@ export class AuthController {
   @Post('resend-verification')
   async resendVerificationEmail(@Body() dto: ResendVerificationDto) {
     return this.authService.resendVerificationEmail(dto.email);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ConfirmResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 
   @Get('me')

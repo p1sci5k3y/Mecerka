@@ -97,7 +97,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "overrides": {
-    "multer": "1.4.5-lts.1",
+    "multer": "^2.1.1",
     "serialize-javascript": "^6.0.2",
     "ajv": "^8.17.1"
   }
