@@ -70,6 +70,13 @@
         "resetPasswordPlaceholder": "••••••••",
         "resetButton": "Reset Password",
         "resettingButton": "Resetting...",
+        "invalidResetLink": "Invalid or expired recovery link.",
+        "resetError": "Error resetting password.",
+        "resetSuccess": "Password successfully reset",
+        "forgotErrorMessage": "Error requesting recovery.",
+        "resetSuccessTitle": "Password Updated!",
+        "resetSuccessDescription": "You can now use your new password to access Mecerka.",
+        "verifyingToken": "Validating link...",
         "footerText": "© {year} Mecerka Artisanal Shop. All rights reserved."
     }
 }
