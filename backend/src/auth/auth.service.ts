@@ -256,4 +256,59 @@ export class AuthService {
         'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
     };
   }
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Prevent email enumeration
+      return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
+    }
+
+    const resetToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordToken: resetToken,
+        resetPasswordExpiresAt: expiresAt,
+      } as any,
+    });
+
+    try {
+      await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    } catch (e) {
+      this.logger.error(`Failed to send password reset email to ${user.email}:`, e);
+      throw new BadRequestException('No se pudo enviar el correo de recuperación. Inténtalo de nuevo.');
+    }
+
+    return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user: any = await this.prisma.user.findUnique({
+      where: { resetPasswordToken: token } as any,
+    });
+
+    if (user?.resetPasswordExpiresAt) {
+      const expiresAt = user.resetPasswordExpiresAt as any as Date;
+      if (expiresAt < new Date()) {
+        throw new BadRequestException('El token de restablecimiento ha expirado.');
+      }
+    } else {
+      throw new BadRequestException('El token de restablecimiento es inválido.');
+    }
+
+    const hashedPassword = await argon2.hash(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpiresAt: null,
+      } as any,
+    });
+
+    return { message: 'Tu contraseña ha sido restablecida con éxito.' };
+  }
 }
