@@ -186,15 +186,15 @@ COMMIT;
 -- =========================================================================
 
 -- Generate B-Tree Performance Indices concurrently to avoid read/write blocking
-CREATE INDEX IF NOT EXISTS "idx_order_clientId" ON "Order"("clientId");
-CREATE INDEX IF NOT EXISTS "idx_order_cityId" ON "Order"("cityId");
-CREATE INDEX IF NOT EXISTS "idx_order_runnerId" ON "Order"("runnerId");
-CREATE INDEX IF NOT EXISTS "idx_product_providerId" ON "Product"("providerId");
-CREATE INDEX IF NOT EXISTS "idx_orderitem_orderId" ON "OrderItem"("orderId");
-CREATE INDEX IF NOT EXISTS "idx_orderitem_productId" ON "OrderItem"("productId");
-CREATE INDEX IF NOT EXISTS "idx_runnerprofile_userId" ON "RunnerProfile"("userId");
-CREATE INDEX IF NOT EXISTS "idx_product_cityId" ON "Product"("cityId");
-CREATE INDEX IF NOT EXISTS "idx_product_categoryId" ON "Product"("categoryId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_order_clientId" ON "Order"("clientId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_order_cityId" ON "Order"("cityId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_order_runnerId" ON "Order"("runnerId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_product_providerId" ON "Product"("providerId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_orderitem_orderId" ON "OrderItem"("orderId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_orderitem_productId" ON "OrderItem"("productId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_runnerprofile_userId" ON "RunnerProfile"("userId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_product_cityId" ON "Product"("cityId");
+CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_product_categoryId" ON "Product"("categoryId");
 
 -- Validate the Foreign Key Constraints without holding long locks during creation
 ALTER TABLE "Product" VALIDATE CONSTRAINT "Product_providerId_fkey";

@@ -61,6 +61,17 @@ export class AuthController {
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Get('verify-reset-token')
+  async verifyResetTokenEndpoint(@Query('token') token: string) {
+    if (!token) {
+      throw new BadRequestException('Token is required');
+    }
+    await this.authService.verifyResetToken(token);
+    // Explicitly hide the user object returned by verifyResetToken internally
+    return { valid: true };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('reset-password')
   async resetPassword(@Body() dto: ConfirmResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.newPassword);

@@ -22,8 +22,9 @@ export default function ForgotPasswordPage() {
             await api.post('/auth/forgot-password', { email })
             setSuccess(true)
             toast.success(t('forgotSuccessTitle'))
-        } catch (error: any) {
-            toast.error(error.message || "Error al solicitar recuperación.")
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : t('forgotErrorMessage')
+            toast.error(message)
         } finally {
             setLoading(false)
         }
