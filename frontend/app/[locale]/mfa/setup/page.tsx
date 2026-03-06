@@ -15,6 +15,8 @@ export default function MfaSetupPage() {
     const router = useRouter()
     const [qrCode, setQrCode] = useState<string>("")
     const [token, setToken] = useState("")
+    const [emailOtp, setEmailOtp] = useState("")
+    const [step, setStep] = useState<1 | 2>(1)
     const [loading, setLoading] = useState(false)
 
     useEffect(() => {
@@ -30,25 +32,29 @@ export default function MfaSetupPage() {
             return
         }
 
-        // Fetch QR Code
-        // We need an endpoint to get the secret/QR. 
-        // The current authService.setupMfa() calls POST /auth/mfa/setup
-        authService.setupMfa().then((res: any) => {
-            // Assuming res contains { secret, qrCode } or similar
-            // Adjust based on actual backend response format from MfaService
-            // Looking at backend/src/auth/mfa.service.ts would be good if unsure
-            // For now assuming it returns the otpauth URL or a QR code image data
+        authService.generateMfaEmailOtp().then(() => {
+            toast.success("Código enviado a tu correo")
+        }).catch(() => {
+            toast.error("Error al enviar el código a tu correo")
+        })
+    }, [user, router, isLoading])
+
+    const handleVerifyEmail = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setLoading(true)
+        try {
+            const res: any = await authService.setupMfa(emailOtp)
             if (res.qrCode) {
                 setQrCode(res.qrCode)
-            } else if (res.secret) {
-                // If only secret is returned, we might need to generate QR on client
-                // or just show secret. Let's assume backend returns a QR image data url or we show nothing.
-                // Wait, let's check MfaService.generateMfaSecret return type.
+                setStep(2)
+                toast.success("Código verificado")
             }
-        }).catch(err => {
-            toast.error("Error al iniciar configuración MFA")
-        })
-    }, [user, router])
+        } catch {
+            toast.error("Código incorrecto o expirado")
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -85,44 +91,75 @@ export default function MfaSetupPage() {
                     </div>
                     <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">Protege tu cuenta</h1>
                     <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-                        Tu seguridad es tan valiosa como las piezas que creamos. Escanea el código con tu app de autenticación (Google Authenticator, Authy) para añadir esta capa extra.
+                        {step === 1 ? "Hemos enviado un código de 6 dígitos a tu correo electrónico para confirmar tu identidad." : "Escanea el código con tu app de autenticación (Google Authenticator, Authy) para añadir esta capa extra."}
                     </p>
                 </div>
 
-                <div className="flex justify-center rounded-xl border border-border bg-white p-6 shadow-inner relative z-10 w-fit mx-auto">
-                    {/* Display QR code or Secret */}
-                    {qrCode ? (
-                        <img src={qrCode} alt="QR Code" className="h-44 w-44" />
-                    ) : (
-                        <div className="h-44 w-44 animate-pulse bg-muted rounded-md" />
-                    )}
-                </div>
+                {step === 1 && (
+                    <form onSubmit={handleVerifyEmail} className="space-y-6 relative z-10 mt-6">
+                        <div className="space-y-3">
+                            <Label htmlFor="emailOtp" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider text-center block">
+                                Código de Correo
+                            </Label>
+                            <Input
+                                id="emailOtp"
+                                placeholder="000 000"
+                                value={emailOtp}
+                                onChange={(e) => setEmailOtp(e.target.value)}
+                                className="h-14 text-center text-2xl font-mono tracking-[0.5em] rounded-xl border-2 focus-visible:ring-primary shadow-sm"
+                                maxLength={6}
+                                required
+                            />
+                        </div>
 
-                <form onSubmit={handleVerify} className="space-y-6 relative z-10 mt-6">
-                    <div className="space-y-3">
-                        <Label htmlFor="token" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider text-center block">
-                            Código temporal
-                        </Label>
-                        <Input
-                            id="token"
-                            placeholder="000 000"
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            className="h-14 text-center text-2xl font-mono tracking-[0.5em] rounded-xl border-2 focus-visible:ring-primary shadow-sm"
-                            maxLength={6}
-                            required
-                        />
-                    </div>
+                        <Button type="submit" size="lg" className="h-12 w-full font-bold shadow-sm rounded-xl" disabled={loading}>
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    Verificando...
+                                </>
+                            ) : "Continuar"}
+                        </Button>
+                    </form>
+                )}
 
-                    <Button type="submit" size="lg" className="h-12 w-full font-bold shadow-sm rounded-xl" disabled={loading}>
-                        {loading ? (
-                            <>
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                Vinculando...
-                            </>
-                        ) : "Confirmar Seguridad"}
-                    </Button>
-                </form>
+                {step === 2 && (
+                    <>
+                        <div className="flex justify-center rounded-xl border border-border bg-white p-6 shadow-inner relative z-10 w-fit mx-auto mt-6">
+                            {qrCode ? (
+                                <img src={qrCode} alt="QR Code" className="h-44 w-44" />
+                            ) : (
+                                <div className="h-44 w-44 animate-pulse bg-muted rounded-md" />
+                            )}
+                        </div>
+
+                        <form onSubmit={handleVerify} className="space-y-6 relative z-10 mt-6">
+                            <div className="space-y-3">
+                                <Label htmlFor="token" className="text-sm font-semibold text-muted-foreground uppercase tracking-wider text-center block">
+                                    Código de Authenticator
+                                </Label>
+                                <Input
+                                    id="token"
+                                    placeholder="000 000"
+                                    value={token}
+                                    onChange={(e) => setToken(e.target.value)}
+                                    className="h-14 text-center text-2xl font-mono tracking-[0.5em] rounded-xl border-2 focus-visible:ring-primary shadow-sm"
+                                    maxLength={6}
+                                    required
+                                />
+                            </div>
+
+                            <Button type="submit" size="lg" className="h-12 w-full font-bold shadow-sm rounded-xl" disabled={loading}>
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                        Vinculando...
+                                    </>
+                                ) : "Confirmar Seguridad"}
+                            </Button>
+                        </form>
+                    </>
+                )}
 
                 <div className="text-center relative z-10 pt-4 border-t border-border/50">
                     <button onClick={logout} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">

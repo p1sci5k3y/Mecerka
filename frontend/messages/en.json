@@ -67,7 +67,7 @@
         "resetTitle": "New Password",
         "resetSubtitle": "Enter your new password below.",
         "resetPasswordLabel": "New Password",
-        "resetPasswordPlaceholder": "••••••••",
+        "resetPasswordPlaceholder": "••••••••••••",
         "resetButton": "Reset Password",
         "resettingButton": "Resetting...",
         "invalidResetLink": "Invalid or expired recovery link.",

@@ -148,6 +148,37 @@ function ProfileContent() {
             </div>
           </section>
 
+          {/* MFA Management */}
+          <section>
+            <SectionHeader title="Autenticación de Dos Pasos (MFA)" subtitle="Añade una capa extra de seguridad a tu cuenta usando una aplicación Authenticator." />
+            <div className="mt-6 rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm max-w-md">
+              {user?.mfaEnabled ? (
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-primary/5 border border-primary/20 mb-6">
+                  <CheckCircle2 className="h-6 w-6 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">MFA Activado</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Tu cuenta está protegida con la autenticación de doble factor en cada dispositivo nuevo.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  <div className="flex items-start gap-4 p-4 rounded-xl bg-accent text-accent-foreground mb-2">
+                    <Shield className="h-6 w-6 shrink-0 mt-0.5" />
+                    <div>
+                      <h3 className="text-sm font-bold">Seguridad Recomendada</h3>
+                      <p className="text-xs mt-1">Protege tu cuenta de accesos no autorizados añadiendo la verificación en dos pasos mediante una app autenticadora como Google Authenticator o Authy.</p>
+                    </div>
+                  </div>
+                  <Button asChild variant="outline" className="w-full h-12 rounded-xl font-bold border-2 max-w-xs transition-colors hover:bg-primary/5 hover:text-primary hover:border-primary/20">
+                    <Link href="/mfa/setup" className="w-full">
+                      Configurar Authenticator
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Transaction PIN */}
           <section>
             <SectionHeader title="Firma de Transacciones" subtitle="Configura tu PIN (4-6 dígitos) para autorizar tus compras de forma segura." />
