@@ -27,8 +27,12 @@ export const authService = {
   },
 
   // MFA methods preserved
-  async setupMfa() {
-    return api.post('/auth/mfa/setup', {}); // Body required?
+  async generateMfaEmailOtp() {
+    return api.post('/auth/mfa/generate-email-otp');
+  },
+
+  async setupMfa(otpCode: string) {
+    return api.post('/auth/mfa/setup', { otpCode });
   },
 
   async verifyMfa(token: string) {

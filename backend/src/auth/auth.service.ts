@@ -11,7 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as argon2 from 'argon2';
-import { Role } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import * as crypto from 'node:crypto';
 
 @Injectable()
@@ -118,7 +118,7 @@ export class AuthService {
 
     if (!user.emailVerified) {
       this.logger.warn(`Login failed: Email not verified for user ${user.id}`);
-      throw new UnauthorizedException('Credenciales inválidas');
+      throw new UnauthorizedException('Por favor, verifica tu correo electrónico antes de iniciar sesión');
     }
 
     const isPasswordValid = await argon2.verify(user.password, password);
@@ -174,6 +174,36 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) this.logger.warn(`User ${id} not found`);
     return user;
+  }
+
+  async generateMfaSetupOtp(user: User): Promise<void> {
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        mfaSetupToken: otpCode,
+        mfaSetupExpiresAt: expiresAt,
+      },
+    });
+
+    try {
+      await this.emailService.sendMfaSetupEmail(user.email, otpCode);
+    } catch (error) {
+      await this.clearMfaSetupOtp(user.id);
+      throw new BadRequestException('Error sending email OTP. Please try again.');
+    }
+  }
+
+  async clearMfaSetupOtp(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaSetupToken: null,
+        mfaSetupExpiresAt: null,
+      },
+    });
   }
 
   async resendVerificationEmail(email: string) {
@@ -266,14 +296,6 @@ export class AuthService {
     const resetToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetPasswordToken: resetToken,
-        resetPasswordExpiresAt: expiresAt,
-      } as any,
-    });
-
     try {
       await this.emailService.sendPasswordResetEmail(user.email, resetToken);
     } catch (e) {
@@ -283,12 +305,23 @@ export class AuthService {
       throw new BadRequestException('No se pudo enviar el correo de recuperación. Inténtalo de nuevo.');
     }
 
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordTokenHash: hashedToken,
+        resetPasswordExpiresAt: expiresAt,
+      },
+    });
+
     return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
   }
 
   async verifyResetToken(token: string) {
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     const user = await this.prisma.user.findUnique({
-      where: { resetPasswordToken: token },
+      where: { resetPasswordTokenHash: hashedToken },
     });
 
     if (user?.resetPasswordExpiresAt) {
@@ -311,9 +344,10 @@ export class AuthService {
       where: { id: user.id },
       data: {
         password: hashedPassword,
-        resetPasswordToken: null,
+        resetPasswordTokenHash: null,
         resetPasswordExpiresAt: null,
-      } as any,
+        passwordChangedAt: new Date(),
+      },
     });
 
     return { message: 'Tu contraseña ha sido restablecida con éxito.' };

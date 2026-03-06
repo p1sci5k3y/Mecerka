@@ -6,6 +6,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react"
 import { setToken } from "@/lib/api"
@@ -20,15 +21,15 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (payload: LoginPayload) => Promise<void>
-  register: (payload: RegisterPayload) => Promise<void>
+  login: (payload: LoginPayload) => Promise<any>
+  register: (payload: RegisterPayload) => Promise<any>
   verifyMagicLink: (token: string) => Promise<void>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [state, setState] = useState<AuthState>({
     user: null,
     token: null,
@@ -66,42 +67,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hydrateUser()
   }, [hydrateUser])
 
-  const login = async (payload: LoginPayload) => {
+  const login = useCallback(async (payload: LoginPayload) => {
     const response: any = await authService.login(payload)
-    // Set token immediately after login directly to local storage
     if (response.access_token) {
       localStorage.setItem('token', response.access_token)
       setToken(response.access_token)
       await hydrateUser()
     }
-  }
+    return response
+  }, [hydrateUser])
 
-  const register = async (payload: RegisterPayload) => {
+  const register = useCallback(async (payload: RegisterPayload) => {
     const response: any = await authService.register(payload)
     if (response.access_token) {
       localStorage.setItem('token', response.access_token)
       setToken(response.access_token)
       await hydrateUser()
     }
-  }
+    return response
+  }, [hydrateUser])
 
-  const verifyMagicLink = async (token: string) => {
+  const verifyMagicLink = useCallback(async (token: string) => {
     const response: any = await authService.verifyMagicLink(token)
     if (response.access_token) {
       localStorage.setItem('token', response.access_token)
       setToken(response.access_token)
       await hydrateUser()
     }
-  }
+  }, [hydrateUser])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('token')
     setToken(null)
     setState({ user: null, token: null, isLoading: false, isAuthenticated: false })
-  }
+  }, [])
+
+  const contextValue = useMemo(() => ({
+    ...state,
+    login,
+    register,
+    verifyMagicLink,
+    logout
+  }), [state, login, register, verifyMagicLink, logout])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, verifyMagicLink, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

@@ -52,6 +52,23 @@ export class EmailService {
     return this.sendMailAsync(to, subject, html);
   }
 
+  async sendMfaSetupEmail(to: string, code: string) {
+    if (!/^\d{6}$/.test(code)) {
+      throw new Error('Invalid MFA code format');
+    }
+    const subject = 'Código de Configuración de MFA';
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #4A90E2;">Configuración de Seguridad en Mecerka</h2>
+        <p>Has solicitado vincular tu cuenta con una aplicación Authenticator (2FA).</p>
+        <p>Usa este código de verificación temporal de 6 dígitos para desbloquear tu Código QR:</p>
+        <h1 style="letter-spacing: 0.2em; text-align: center; border: 2px dashed #ececec; padding: 15px; border-radius: 8px;">${code}</h1>
+        <p><em>Este código expirará en 10 minutos. Si no has solicitado esto, puedes ignorar este correo.</em></p>
+      </div>
+    `;
+    return this.sendMailAsync(to, subject, html);
+  }
+
   private async sendMailAsync(to: string, subject: string, html: string) {
     const from = process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);

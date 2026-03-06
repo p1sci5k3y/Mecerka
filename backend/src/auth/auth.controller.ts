@@ -91,21 +91,32 @@ export class AuthController {
     };
   }
 
-  @Post('mfa/setup')
+  @Post('mfa/generate-email-otp')
   @UseGuards(JwtAuthGuard)
-  async setupMfa(@Request() req: { user: UserFromJwt }) {
-    // We need email, but UserFromJwt only has userId and role.
-    // We should fetch user email or update JWT strategy/interface.
-    // For now, let's fetch user from service or Prisma.
-    // Check if authService has a method to get user by ID.
-    // Or just let mfaService fetch it.
-    // Wait, MfaService.generateMfaSecret takes (userId, email).
-    // Let's modify MfaService to look up email if only userId is passed?
-    // Or just fetch it here.
+  async generateMfaEmailOtp(@Request() req: { user: UserFromJwt }) {
     const user = await this.authService.findById(req.user.userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
+    await this.authService.generateMfaSetupOtp(user);
+    return { success: true, message: 'OTP sent to email' };
+  }
+
+  @Post('mfa/setup')
+  @UseGuards(JwtAuthGuard)
+  async setupMfa(@Request() req: { user: UserFromJwt }, @Body('otpCode') otpCode: string) {
+    const user = await this.authService.findById(req.user.userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!otpCode || user.mfaSetupToken !== otpCode || !user.mfaSetupExpiresAt || user.mfaSetupExpiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired OTP code.');
+    }
+
+    // Clear the OTP token now that it is consumed successfully
+    await this.authService.clearMfaSetupOtp(user.id);
+
     return this.mfaService.generateMfaSecret(req.user.userId, user.email);
   }
 
