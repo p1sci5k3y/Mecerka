@@ -1,11 +1,10 @@
 "use client"
 
 import React, { useState, useRef } from "react"
-import { useRouter } from "@/lib/navigation"
+import { useRouter, Link } from "@/lib/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
-import { Link } from "@/lib/navigation"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { useTranslations } from 'next-intl'
 
@@ -68,8 +67,9 @@ export default function LoginPage() {
     try {
       await api.post('/auth/mfa/verify', { token })
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-      window.location.href = "/dashboard"
+      globalThis.location.href = "/dashboard"
     } catch (error: any) {
+      console.error(error)
       toast.error("Código incorrecto.")
     } finally {
       setLoading(false)
@@ -119,7 +119,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <label className="text-xs uppercase tracking-widest font-semibold text-slate-500" htmlFor="password">{t('passwordLabel')}</label>
-                  <Link href="#" className="text-xs uppercase tracking-widest font-semibold text-[#e07b61] hover:opacity-80 transition-opacity">{t('forgotPassword')}</Link>
+                  <Link href="/forgot-password" className="text-xs uppercase tracking-widest font-semibold text-[#e07b61] hover:opacity-80 transition-opacity">{t('forgotPassword')}</Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-0 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 lg:hidden" />
@@ -165,8 +165,9 @@ export default function LoginPage() {
 
               <div className="flex gap-2 sm:gap-4 mb-8">
                 {otp.map((digit, index) => (
+                  // eslint-disable-next-line react/no-array-index-key
                   <input
-                    key={`otp-${index}`}
+                    key={`otp-input-${index}`}
                     ref={(el) => { otpRefs.current[index] = el }}
                     type="text"
                     inputMode="numeric"

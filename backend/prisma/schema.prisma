@@ -55,6 +55,8 @@ model User {
   mfaFailedAttempts          Int       @default(0)
   mfaLockUntil               DateTime?
   active                     Boolean   @default(true)
+  resetPasswordToken         String?   @unique
+  resetPasswordExpiresAt     DateTime?
 
   // Geolocation
   address   String?
