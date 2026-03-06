@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react"
 import { useRouter, Link } from "@/lib/navigation"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock } from "lucide-react"
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Loader2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { useSearchParams } from 'next/navigation'
 
@@ -18,13 +18,37 @@ export default function ResetPasswordPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
+    const [verifying, setVerifying] = useState(true)
 
     useEffect(() => {
         if (!token) {
-            toast.error("Enlace de recuperación inválido o expirado.")
+            toast.error(t('invalidResetLink'))
             router.push('/login')
+            return
         }
-    }, [token, router])
+
+        const verifyToken = async () => {
+            try {
+                await api.get(`/auth/verify-reset-token?token=${token}`)
+                setVerifying(false)
+            } catch (error: unknown) {
+                const message = error instanceof Error ? error.message : t('invalidResetLink')
+                toast.error(message)
+                router.push('/login')
+            }
+        }
+
+        verifyToken()
+    }, [token, router, t])
+
+    if (!token || verifying) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[#FBF6EE] dark:bg-background-dark text-slate-900 dark:text-slate-100">
+                <Loader2 className="w-12 h-12 text-[#e07b61] animate-spin mb-4" />
+                <p className="font-medium text-slate-600 dark:text-slate-400">{t('verifyingToken')}</p>
+            </div>
+        )
+    }
 
     const handleResetSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -34,9 +58,10 @@ export default function ResetPasswordPage() {
         try {
             await api.post('/auth/reset-password', { token, newPassword: password })
             setSuccess(true)
-            toast.success("Contraseña restablecida correctamente")
-        } catch (error: any) {
-            toast.error(error.message || "Error al restablecer la contraseña.")
+            toast.success(t('resetSuccess'))
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : t('resetError')
+            toast.error(message)
         } finally {
             setLoading(false)
         }
@@ -62,9 +87,9 @@ export default function ResetPasswordPage() {
                             <div className="w-16 h-16 bg-[#e07b61]/10 rounded-full flex items-center justify-center mb-6">
                                 <Lock className="w-8 h-8 text-[#e07b61]" />
                             </div>
-                            <h3 className="font-serif text-2xl font-bold text-center mb-2">¡Contraseña Actualizada!</h3>
+                            <h3 className="font-serif text-2xl font-bold text-center mb-2">{t('resetSuccessTitle')}</h3>
                             <p className="text-center text-slate-600 dark:text-slate-400 mb-8 max-w-[280px]">
-                                Ya puedes usar tu nueva contraseña para acceder a Mecerka.
+                                {t('resetSuccessDescription')}
                             </p>
                         </div>
                     ) : (

@@ -277,26 +277,33 @@ export class AuthService {
     try {
       await this.emailService.sendPasswordResetEmail(user.email, resetToken);
     } catch (e) {
-      this.logger.error(`Failed to send password reset email to ${user.email}:`, e);
+      // Create a deterministic hash of the email to avoid PII leak in logs
+      const emailHash = crypto.createHash('sha256').update(user.email).digest('hex').substring(0, 16);
+      this.logger.error(`Failed to send password reset email to user [${emailHash}]:`, e);
       throw new BadRequestException('No se pudo enviar el correo de recuperación. Inténtalo de nuevo.');
     }
 
     return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
   }
 
-  async resetPassword(token: string, newPassword: string) {
-    const user: any = await this.prisma.user.findUnique({
-      where: { resetPasswordToken: token } as any,
+  async verifyResetToken(token: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { resetPasswordToken: token },
     });
 
     if (user?.resetPasswordExpiresAt) {
-      const expiresAt = user.resetPasswordExpiresAt as any as Date;
+      const expiresAt = user.resetPasswordExpiresAt;
       if (expiresAt < new Date()) {
         throw new BadRequestException('El token de restablecimiento ha expirado.');
       }
+      return user;
     } else {
       throw new BadRequestException('El token de restablecimiento es inválido.');
     }
+  }
+
+  async resetPassword(token: string, newPassword: string) {
+    const user = await this.verifyResetToken(token);
 
     const hashedPassword = await argon2.hash(newPassword);
 
