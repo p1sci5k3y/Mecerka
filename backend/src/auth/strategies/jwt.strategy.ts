@@ -42,20 +42,37 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<UserFromJwt> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { passwordChangedAt: true },
+      select: {
+        active: true,
+        emailVerified: true,
+        roles: true,
+        mfaEnabled: true,
+        passwordChangedAt: true,
+      },
     });
 
-    if (user?.passwordChangedAt && payload.iat) {
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.active) {
+      throw new UnauthorizedException('User account is suspended');
+    }
+
+    if (user.passwordChangedAt && payload.iat) {
       // payload.iat is in seconds, passwordChangedAt is in ms
       if (payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
         throw new UnauthorizedException('Token expired due to password change');
       }
     }
 
-    let roles: Role[] = [];
-    if (Array.isArray(payload.roles)) {
-      roles = payload.roles;
-    }
-    return { userId: payload.sub, roles };
+    const mfaAuthenticated = payload.mfaAuthenticated ?? (user.mfaEnabled ? false : true);
+
+    return {
+      userId: payload.sub,
+      roles: user.roles,
+      mfaEnabled: user.mfaEnabled,
+      mfaAuthenticated,
+    };
   }
 }

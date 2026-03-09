@@ -15,10 +15,11 @@ import { SetPinDto } from './dto/set-pin.dto';
 import * as argon2 from 'argon2';
 
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 export class UsersController {
   constructor(
     private readonly prisma: PrismaService,
@@ -36,97 +37,5 @@ export class UsersController {
     });
 
     return { message: 'PIN transaccional configurado correctamente' };
-  }
-
-  @Post('roles/provider')
-  async becomeProvider(@Request() req: any) {
-    const userId = req.user.userId;
-
-    const updatedUser = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      if (user.roles.includes(Role.PROVIDER)) {
-        throw new ConflictException('User is already a provider');
-      }
-
-      return tx.user.update({
-        where: { id: userId },
-        data: {
-          roles: {
-            push: Role.PROVIDER,
-          },
-        },
-      });
-    });
-
-    // Generate fresh token with updated roles
-    const payload = {
-      sub: updatedUser.id,
-      email: updatedUser.email,
-      roles: updatedUser.roles,
-    };
-    const accessToken = this.jwtService.sign(payload);
-
-    return {
-      message: 'Provider role added',
-      roles: updatedUser.roles,
-      access_token: accessToken,
-    };
-  }
-
-  @Post('roles/runner')
-  async becomeRunner(@Request() req: any) {
-    const userId = req.user.userId;
-
-    const updatedUser = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-      if (user.roles.includes(Role.RUNNER)) {
-        throw new ConflictException('User is already a runner (role exists)');
-      }
-
-      const runnerProfile = await tx.runnerProfile.findUnique({
-        where: { userId },
-      });
-
-      if (!runnerProfile) {
-        // Create default runner profile
-        await tx.runnerProfile.create({
-          data: {
-            userId,
-            baseLat: null, // Should be updated by user later
-            baseLng: null,
-          },
-        });
-      }
-
-      return tx.user.update({
-        where: { id: userId },
-        data: {
-          roles: {
-            push: Role.RUNNER,
-          },
-        },
-      });
-    });
-
-    // Generate fresh token with updated roles
-    const payload = {
-      sub: updatedUser.id,
-      email: updatedUser.email,
-      roles: updatedUser.roles,
-    };
-    const accessToken = this.jwtService.sign(payload);
-
-    return {
-      message: 'Runner role added',
-      roles: updatedUser.roles,
-      access_token: accessToken,
-    };
   }
 }
