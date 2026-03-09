@@ -649,7 +649,14 @@ export class OrdersService {
     const providerOrders = await this.prisma.providerOrder.findMany({
       where: {
         providerId,
-        status: { not: ProviderOrderStatus.CANCELLED },
+        status: {
+          in: [
+            ProviderOrderStatus.ACCEPTED,
+            ProviderOrderStatus.PREPARING,
+            ProviderOrderStatus.READY_FOR_PICKUP,
+            ProviderOrderStatus.PICKED_UP,
+          ],
+        },
       },
       include: {
         items: true,
@@ -687,7 +694,14 @@ export class OrdersService {
       where: {
         providerId,
         createdAt: { gte: thirtyDaysAgo },
-        status: { not: ProviderOrderStatus.CANCELLED },
+        status: {
+          in: [
+            ProviderOrderStatus.ACCEPTED,
+            ProviderOrderStatus.PREPARING,
+            ProviderOrderStatus.READY_FOR_PICKUP,
+            ProviderOrderStatus.PICKED_UP,
+          ],
+        },
       },
       include: {
         items: true,
@@ -716,7 +730,14 @@ export class OrdersService {
     const providerOrders = await this.prisma.providerOrder.findMany({
       where: {
         providerId,
-        status: { not: ProviderOrderStatus.CANCELLED },
+        status: {
+          in: [
+            ProviderOrderStatus.ACCEPTED,
+            ProviderOrderStatus.PREPARING,
+            ProviderOrderStatus.READY_FOR_PICKUP,
+            ProviderOrderStatus.PICKED_UP,
+          ],
+        },
       },
       include: {
         items: { include: { product: true } },
@@ -831,10 +852,7 @@ export class OrdersService {
 
         if (providerHasStock) {
           confirmedProviderOrders.push(po.id);
-          await tx.providerOrder.update({
-            where: { id: po.id },
-            data: { status: ProviderOrderStatus.ACCEPTED },
-          });
+          // ProviderOrder remains PENDING until the store manually accepts it
         } else {
           rejectedProviderOrders.push(po.id);
           await tx.providerOrder.update({
