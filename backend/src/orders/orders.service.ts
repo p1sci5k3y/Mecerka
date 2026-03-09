@@ -40,46 +40,78 @@ export class OrdersService {
     if (!isPinValid)
       throw new UnauthorizedException('PIN de compra incorrecto.');
 
-    // 1. Fetch products & validate active
-    const productIds = items.map((item) => item.productId);
-    const products = await this.prisma.product.findMany({
-      where: { id: { in: productIds }, isActive: true },
+    // 1. Consolidate Duplicate Items in Memory
+    const aggregatedItems: { productId: string; quantity: number }[] = [];
+    const quantityMap = new Map<string, number>();
+
+    for (const item of items) {
+      quantityMap.set(
+        item.productId,
+        (quantityMap.get(item.productId) || 0) + item.quantity,
+      );
+    }
+    quantityMap.forEach((qty, productId) => {
+      aggregatedItems.push({ productId, quantity: qty });
     });
 
+    // 2. Fetch products (Single Query without filtering active yet)
+    const productIds = aggregatedItems.map((i) => i.productId);
+    const products = await this.prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: {
+        id: true,
+        name: true,
+        stock: true,
+        isActive: true,
+        cityId: true,
+        price: true,
+        providerId: true,
+      },
+    });
+
+    // 3. Validation: Existence
     if (products.length !== productIds.length) {
+      const foundIds = new Set(products.map((p) => p.id));
+      const missingIds = productIds.filter((id) => !foundIds.has(id));
       throw new NotFoundException(
-        'Some products were not found or are no longer active',
+        `Algunos productos no existen: ${missingIds.join(', ')}`,
       );
     }
-    if (products.length === 0) {
-      throw new BadRequestException('Order must contain at least one product');
-    }
 
-    // 2. Validate single City boundary
-    const distinctCityIds = new Set(products.map((p) => p.cityId));
-    if (distinctCityIds.size > 1) {
-      throw new BadRequestException(
-        'All products must belong to the same city',
-      );
-    }
-    const cityId = distinctCityIds.values().next().value as string;
-
-    // 3. Optimistic Stock Check
-    for (const item of items) {
-      const product = products.find((p) => p.id === item.productId)!;
-      if (product.stock < item.quantity) {
+    // 4. Validation: Active Status
+    for (const product of products) {
+      if (!product.isActive) {
         throw new BadRequestException(
-          `Insufficient stock for product ${product.name}`,
+          `El producto '${product.name}' ya no está disponible (inactivo)`,
         );
       }
     }
 
-    // 4. Group by Provider payload
+    // 5. Validation: Single City
+    const distinctCityIds = new Set(products.map((p) => p.cityId));
+    if (distinctCityIds.size > 1) {
+      throw new BadRequestException(
+        'No se puede mezclar productos de distintas ciudades en un mismo pedido',
+      );
+    }
+    const cityId = distinctCityIds.values().next().value as string;
+
+    // 6. Validation: Optimistic Stock Check
+    for (const item of aggregatedItems) {
+      const product = products.find((p) => p.id === item.productId)!;
+      if (product.stock < item.quantity) {
+        throw new BadRequestException(
+          `Stock insuficiente para el producto '${product.name}' (Solicitado: ${item.quantity}, Disponible: ${product.stock})`,
+        );
+      }
+    }
+
+    // 7. Group by Provider payload using aggregated items
     const providerGroups: Record<string, { items: any[]; subtotal: number }> =
       {};
     let orderTotalPrice = 0;
 
-    for (const item of items) {
+    for (const item of aggregatedItems) {
       const product = products.find((p) => p.id === item.productId)!;
       const providerId = product.providerId;
       const itemTotal = Number(product.price) * item.quantity;

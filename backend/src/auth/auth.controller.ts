@@ -133,6 +133,6 @@ export class AuthController {
     if (!isValid) {
       throw new BadRequestException('MFA Code Invalid');
     }
-    return { success: true };
+    return this.authService.generateMfaCompleteToken(req.user.userId);
   }
 }

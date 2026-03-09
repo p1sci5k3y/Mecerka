@@ -9,7 +9,7 @@ import { Role } from '@prisma/client';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // --- User Management ---
   async getAllUsers() {
@@ -57,6 +57,52 @@ export class AdminService {
       where: { id },
       data: { active: false },
       select: { id: true, active: true },
+    });
+  }
+
+  async grantProvider(userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new BadRequestException('User not found');
+      if (user.roles.includes(Role.PROVIDER)) {
+        throw new ConflictException('User is already a provider');
+      }
+
+      return tx.user.update({
+        where: { id: userId },
+        data: { roles: { push: Role.PROVIDER } },
+        select: { id: true, roles: true },
+      });
+    });
+  }
+
+  async grantRunner(userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) throw new BadRequestException('User not found');
+      if (user.roles.includes(Role.RUNNER)) {
+        throw new ConflictException('User is already a runner');
+      }
+
+      const runnerProfile = await tx.runnerProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!runnerProfile) {
+        await tx.runnerProfile.create({
+          data: {
+            userId,
+            baseLat: null,
+            baseLng: null,
+          },
+        });
+      }
+
+      return tx.user.update({
+        where: { id: userId },
+        data: { roles: { push: Role.RUNNER } },
+        select: { id: true, roles: true },
+      });
     });
   }
 

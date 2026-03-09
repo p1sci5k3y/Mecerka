@@ -17,12 +17,13 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(private readonly adminService: AdminService) { }
 
   // --- Users ---
   @Get('users')
@@ -57,6 +58,16 @@ export class AdminController {
     @Request() req: { user: UserFromJwt },
   ) {
     return this.adminService.blockUser(id, req.user.userId);
+  }
+
+  @Post('users/:id/grant/provider')
+  grantProvider(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.grantProvider(id);
+  }
+
+  @Post('users/:id/grant/runner')
+  grantRunner(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.grantRunner(id);
   }
 
   // --- Cities ---
