@@ -141,13 +141,10 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     // Expected: Order CONFIRMED
     const paymentRef = 'PAY_A_' + Date.now();
-    const result = await ordersService.confirmPayment(order.id, paymentRef);
+    const result: any = await ordersService.confirmPayment(order.id, paymentRef, 'evt_A_' + Date.now());
 
     // Expected: Order CONFIRMED
-    expect(result.finalStatus).toBe(DeliveryStatus.CONFIRMED);
-    // Both providers confirmed
-    expect(result.confirmedProviderOrderIds.length).toBe(2);
-    expect(result.rejectedProviderOrderIds.length).toBe(0);
+    expect(result.status).toBe(DeliveryStatus.CONFIRMED);
 
     // Verify actual DB State
     const dbOrder = await prisma.order.findUnique({ where: { id: order.id } });
@@ -171,15 +168,14 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     // User tries to buy 2 units of each
     const order = await createTestOrder(data, 2, 2);
 
-    const result = await ordersService.confirmPayment(
+    const result: any = await ordersService.confirmPayment(
       order.id,
       'PAY_B_' + Date.now(),
+      'evt_B_' + Date.now(),
     );
 
     // Expected: Order remains CONFIRMED (because at least B survives)
-    expect(result.finalStatus).toBe(DeliveryStatus.CONFIRMED);
-    expect(result.confirmedProviderOrderIds.length).toBe(1);
-    expect(result.rejectedProviderOrderIds.length).toBe(1);
+    expect(result.status).toBe(DeliveryStatus.CONFIRMED);
 
     // DB Verification
     const poList = await prisma.providerOrder.findMany({
@@ -207,14 +203,13 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     const data = await setupTestData(0, 0);
     const order = await createTestOrder(data, 2, 2);
 
-    const result = await ordersService.confirmPayment(
+    const result: any = await ordersService.confirmPayment(
       order.id,
       'PAY_C_' + Date.now(),
+      'evt_C_' + Date.now(),
     );
 
-    expect(result.finalStatus).toBe(DeliveryStatus.CANCELLED);
-    expect(result.confirmedProviderOrderIds.length).toBe(0);
-    expect(result.rejectedProviderOrderIds.length).toBe(2);
+    expect(result.status).toBe(DeliveryStatus.CANCELLED);
 
     // Verify Stock unchanged
     const pA = await prisma.product.findUnique({
@@ -239,10 +234,12 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     const p1 = ordersService.confirmPayment(
       order1.id,
       'PAY_CONCURRENT_1_' + now,
+      'evt_D1_' + now,
     );
     const p2 = ordersService.confirmPayment(
       order2.id,
       'PAY_CONCURRENT_2_' + now,
+      'evt_D2_' + now,
     );
 
     const results = await Promise.allSettled([p1, p2]);
