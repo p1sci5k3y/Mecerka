@@ -133,11 +133,13 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       roles: user.roles,
+      mfaAuthenticated: !user.mfaEnabled,
     };
     const accessToken = this.jwtService.sign(sessionPayload);
 
     return {
       access_token: accessToken,
+      mfaRequired: user.mfaEnabled,
       user: {
         id: user.id,
         email: user.email,
@@ -145,6 +147,27 @@ export class AuthService {
         mfaEnabled: user.mfaEnabled,
         hasPin: !!user.pin,
       },
+    };
+  }
+
+  async generateMfaCompleteToken(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, roles: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('Usuario no encontrado');
+    }
+    const sessionPayload = {
+      sub: userId,
+      email: user.email,
+      roles: user.roles,
+      mfaAuthenticated: true,
+    };
+    return {
+      success: true,
+      access_token: this.jwtService.sign(sessionPayload),
+      mfaAuthenticated: true,
     };
   }
 
@@ -191,6 +214,7 @@ export class AuthService {
     try {
       await this.emailService.sendMfaSetupEmail(user.email, otpCode);
     } catch (error) {
+      this.logger.error(`Failed to send MFA email to ${user.email}`, error instanceof Error ? error.stack : error);
       await this.clearMfaSetupOtp(user.id);
       throw new BadRequestException('Error sending email OTP. Please try again.');
     }
