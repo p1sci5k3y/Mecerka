@@ -27,14 +27,59 @@ export class AdminService {
     });
   }
 
-  async updateUserRole(id: string, role: Role, currentAdminId: string) {
-    if (id === currentAdminId) {
-      throw new ForbiddenException('Cannot change your own role');
+  async grantRole(id: string, role: Role, currentAdminId: string) {
+    if (id === currentAdminId && role === Role.ADMIN) {
+      // It's technically safe to grant admin to yourself if you already are, but we'll allow it or skip.
+      // The real danger is removing your own admin role.
     }
-    return this.prisma.user.update({
-      where: { id },
-      data: { roles: [role] }, // Replaces existing roles with the new single role
-      select: { id: true, roles: true },
+
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id } });
+      if (!user) throw new BadRequestException('User not found');
+
+      const rolesSet = new Set(user.roles);
+      if (rolesSet.has(role)) {
+        return user; // Already has role
+      }
+
+      rolesSet.add(role);
+
+      // If expanding logic later: Create Provider Profile
+      // For now, we just add the role.
+
+      return tx.user.update({
+        where: { id },
+        data: { roles: Array.from(rolesSet) },
+        select: { id: true, roles: true },
+      });
+    });
+  }
+
+  async revokeRole(id: string, role: Role, currentAdminId: string) {
+    if (id === currentAdminId && role === Role.ADMIN) {
+      throw new ForbiddenException('Cannot revoke your own ADMIN role');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { id } });
+      if (!user) throw new BadRequestException('User not found');
+
+      const rolesSet = new Set(user.roles);
+      if (!rolesSet.has(role)) {
+        return user; // Doesn't have role
+      }
+
+      rolesSet.delete(role);
+
+      if (rolesSet.size === 0) {
+        throw new BadRequestException('User must have at least one role');
+      }
+
+      return tx.user.update({
+        where: { id },
+        data: { roles: Array.from(rolesSet) },
+        select: { id: true, roles: true },
+      });
     });
   }
 
@@ -195,6 +240,7 @@ export class AdminService {
   }
 
   // --- Metrics ---
+  // --- Metrics ---
   async getMetrics() {
     const [
       totalUsers,
@@ -209,7 +255,17 @@ export class AdminService {
       this.prisma.order.count(),
       this.prisma.order.aggregate({
         _sum: { totalPrice: true },
-        where: { status: 'CONFIRMED' }, // Only count revenue from confirmed orders
+        where: {
+          status: {
+            in: [
+              'CONFIRMED',
+              'READY_FOR_ASSIGNMENT',
+              'ASSIGNED',
+              'IN_TRANSIT',
+              'DELIVERED',
+            ],
+          },
+        },
       }),
     ]);
 
