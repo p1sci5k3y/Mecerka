@@ -35,13 +35,22 @@ export class AdminController {
 
   // ...
 
-  @Patch('users/:id/role')
-  updateUserRole(
+  @Post('users/:id/grant')
+  grantRole(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.adminService.updateUserRole(id, dto.role, req.user.userId);
+    return this.adminService.grantRole(id, dto.role, req.user.userId);
+  }
+
+  @Post('users/:id/revoke')
+  revokeRole(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRoleDto,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.adminService.revokeRole(id, dto.role, req.user.userId);
   }
 
   @Patch('users/:id/activate')

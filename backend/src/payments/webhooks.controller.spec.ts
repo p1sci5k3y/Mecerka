@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
 import { OrdersService } from '../orders/orders.service';
 import { HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 
 jest.mock('stripe');
@@ -23,11 +24,15 @@ describe('WebhooksController', () => {
 
     ordersServiceMock = {
       confirmPayment: jest.fn().mockResolvedValue({ finalStatus: 'CONFIRMED' }),
+      isProcessed: jest.fn().mockResolvedValue(false),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WebhooksController],
-      providers: [{ provide: OrdersService, useValue: ordersServiceMock }],
+      providers: [
+        { provide: OrdersService, useValue: ordersServiceMock },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('dummy_secret') } },
+      ],
     }).compile();
 
     controller = module.get<WebhooksController>(WebhooksController);
@@ -68,7 +73,7 @@ describe('WebhooksController', () => {
     await controller.handleStripeWebhook(req, res, 'bad-sig');
 
     expect(res.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
-    expect(res.send).toHaveBeenCalledWith('Webhook Error: Invalid signature');
+    expect(res.send).toHaveBeenCalledWith('Webhook verification failed');
   });
 
   it('4. Processes valid signature + payment_intent.succeeded calling confirmPayment', async () => {
@@ -76,6 +81,7 @@ describe('WebhooksController', () => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as any;
 
     mockConstructEvent.mockReturnValue({
+      id: 'evt_123',
       type: 'payment_intent.succeeded',
       data: {
         object: {
@@ -90,6 +96,7 @@ describe('WebhooksController', () => {
     expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
       'ord_123',
       'pi_123',
+      'evt_123',
     );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
@@ -116,6 +123,7 @@ describe('WebhooksController', () => {
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
 
     mockConstructEvent.mockReturnValue({
+      id: 'evt_123',
       type: 'payment_intent.succeeded',
       data: {
         object: {
@@ -135,6 +143,7 @@ describe('WebhooksController', () => {
     expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
       'ord_123',
       'pi_123',
+      'evt_123',
     );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.send).toHaveBeenCalledWith(
