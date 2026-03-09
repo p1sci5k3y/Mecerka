@@ -95,14 +95,13 @@ export class WebhooksController {
       }
 
       try {
-        const result = await this.ordersService.confirmPayment(
+        const result: any = await this.ordersService.confirmPayment(
           orderId,
           paymentRef,
+          event.id,
         );
-        // Persist the event to avoid future duplicates
-        await this.ordersService.markProcessed(event.id);
         this.logger.log(
-          `Order ${orderId} confirmed via Stripe Webhook! Ref: ${paymentRef}. Status: ${result.finalStatus}`,
+          `Order ${orderId} confirmed via Webhook! Ref: ${paymentRef}. Status: ${result.status}`,
         );
       } catch (error: any) {
         // Ignore known concurrent errors if already processed successfully by an overlapping webhook

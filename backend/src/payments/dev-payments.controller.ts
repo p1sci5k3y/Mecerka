@@ -32,6 +32,6 @@ export class DevPaymentsController {
     }
 
     const paymentRef = 'fake_' + Date.now();
-    return this.ordersService.confirmPayment(orderId, paymentRef);
+    return this.ordersService.confirmPayment(orderId, paymentRef, 'dev_evt_' + Date.now());
   }
 }

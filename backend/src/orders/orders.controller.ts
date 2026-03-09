@@ -93,7 +93,7 @@ export class OrdersController {
   }
 
   @Patch('provider-order/:id/status')
-  @Roles(Role.PROVIDER)
+  @Roles(Role.PROVIDER, Role.RUNNER, Role.ADMIN)
   updateProviderOrderStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: ProviderOrderStatus,
@@ -102,6 +102,7 @@ export class OrdersController {
     return this.ordersService.updateProviderOrderStatus(
       id,
       req.user.userId,
+      req.user.roles,
       status,
     );
   }
