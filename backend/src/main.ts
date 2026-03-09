@@ -22,7 +22,26 @@ async function bootstrap() {
 
   // Content Security Policy is enabled with default safe directives to mitigate XSS
   app.use(helmet());
-  app.enableCors();
+
+  const isDev = process.env.NODE_ENV !== 'production';
+  const frontendUrl = process.env.FRONTEND_URL;
+
+  const allowlist = new Set<string>();
+  if (isDev) allowlist.add('http://localhost:3000');
+  if (frontendUrl) allowlist.add(frontendUrl);
+
+  app.enableCors({
+    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+      // origin can be undefined in server-to-server calls or curl
+      if (!origin) return cb(null, true);
+
+      if (allowlist.has(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-dev-payment-secret'],
+  });
   await app.listen(process.env.PORT ?? 3000);
 }
 // eslint-disable-next-line unicorn/prefer-top-level-await

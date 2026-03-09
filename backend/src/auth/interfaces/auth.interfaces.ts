@@ -7,11 +7,15 @@ export interface JwtPayload {
   sub: string;
   roles: Role[];
   iat?: number;
+  exp?: number;
+  mfaAuthenticated?: boolean;
 }
 
 export interface UserFromJwt {
   userId: string;
   roles: Role[];
+  mfaEnabled: boolean;
+  mfaAuthenticated: boolean;
 }
 
 export interface AuthenticatedRequest extends Request {

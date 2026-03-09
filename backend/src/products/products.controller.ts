@@ -18,13 +18,14 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
+import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
   create(
     @Body() createProductDto: CreateProductDto,
@@ -34,7 +35,7 @@ export class ProductsController {
   }
 
   @Get('my-products')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
   findMyProducts(@Request() req: { user: UserFromJwt }) {
     return this.productsService.findMyProducts(req.user.userId);
@@ -51,7 +52,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -62,7 +63,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
   remove(
     @Param('id', ParseUUIDPipe) id: string,

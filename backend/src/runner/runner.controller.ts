@@ -14,12 +14,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 
-@Controller('orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('runner')
+@UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 export class RunnerController {
-  constructor(private readonly runnerService: RunnerService) {}
+  constructor(private readonly runnerService: RunnerService) { }
 
   @Post('preview-delivery')
   @Roles(Role.CLIENT, Role.ADMIN)

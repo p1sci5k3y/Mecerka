@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   create(createProductDto: CreateProductDto, providerId: string) {
     return this.prisma.product.create({
@@ -22,11 +22,12 @@ export class ProductsService {
 
   findAll() {
     return this.prisma.product.findMany({
+      where: { isActive: true },
       include: {
         city: true,
         category: true,
         provider: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true }, // email excluded for privacy
         },
       },
     });
@@ -46,18 +47,18 @@ export class ProductsService {
   }
 
   async findOne(id: string) {
-    const product = await this.prisma.product.findUnique({
-      where: { id },
+    const product = await this.prisma.product.findFirst({
+      where: { id, isActive: true },
       include: {
         city: true,
         category: true,
         provider: {
-          select: { id: true, name: true, email: true },
+          select: { id: true, name: true }, // email excluded for privacy
         },
       },
     });
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new NotFoundException(`Product with ID ${id} not found or inactive`);
     }
     return product;
   }
