@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
-import { OrdersService } from '../orders/orders.service';
+import { PaymentsService } from './payments.service';
 import { HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
@@ -9,7 +9,7 @@ jest.mock('stripe');
 
 describe('WebhooksController', () => {
   let controller: WebhooksController;
-  let ordersServiceMock: Partial<OrdersService>;
+  let paymentsServiceMock: Partial<PaymentsService>;
   let mockConstructEvent: jest.Mock;
 
   beforeEach(async () => {
@@ -22,7 +22,7 @@ describe('WebhooksController', () => {
       },
     }));
 
-    ordersServiceMock = {
+    paymentsServiceMock = {
       confirmPayment: jest.fn().mockResolvedValue({ finalStatus: 'CONFIRMED' }),
       isProcessed: jest.fn().mockResolvedValue(false),
     };
@@ -30,7 +30,7 @@ describe('WebhooksController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [WebhooksController],
       providers: [
-        { provide: OrdersService, useValue: ordersServiceMock },
+        { provide: PaymentsService, useValue: paymentsServiceMock },
         { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('dummy_secret') } },
       ],
     }).compile();
@@ -93,7 +93,7 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
+    expect(paymentsServiceMock.confirmPayment).toHaveBeenCalledWith(
       'ord_123',
       'pi_123',
       'evt_123',
@@ -113,7 +113,7 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(ordersServiceMock.confirmPayment).not.toHaveBeenCalled();
+    expect(paymentsServiceMock.confirmPayment).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -134,13 +134,13 @@ describe('WebhooksController', () => {
     });
 
     // Simulate DB failure or concurrency panic
-    (ordersServiceMock.confirmPayment as jest.Mock).mockRejectedValueOnce(
+    (paymentsServiceMock.confirmPayment as jest.Mock).mockRejectedValueOnce(
       new Error('DB Timeout'),
     );
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(ordersServiceMock.confirmPayment).toHaveBeenCalledWith(
+    expect(paymentsServiceMock.confirmPayment).toHaveBeenCalledWith(
       'ord_123',
       'pi_123',
       'evt_123',

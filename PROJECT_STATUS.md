@@ -7,47 +7,51 @@
 - **Fase 3 (Gobernanza, Administración y Comunicación)**: Finalizada ✅
 - **Fase 4 (Tiempo Real & Seguridad Funcional)**: Finalizada ✅
 - **Fase 5 (Dominio Zero-Trust & Bastionado Avanzado)**: Finalizada ✅
+- **Fase 6 (Governance & Metrics)**: Finalizada ✅
+- **Fase 7 (Deploy, Security & Documentation)**: Finalizada ✅
 
-## Hitos Completados (Milestones)
+## Hitos Completados (Milestones & Fases Socráticas)
 
-### Fase 1: Base de Datos y API
+### Fase 1: MVP Identity & Basics
+- **Propósito:** Base de datos relacional y autenticación estructural (JWT).
+- **Flujos:** Registro, Login, ABM de Ciudades y Categorías.
+- **Invariantes:** Contraseñas hasheadas (Argon2).
 
-- [x] Modelado de base de datos (Prisma Schema).
-- [x] API CRUD para Cities y Categories.
-- [x] Seed inicial de datos.
+### Fase 2: Public Catalog & Privacy
+- **Propósito:** Catálogo público purgando PII (Personally Identifiable Information).
+- **Flujos:** Explorador de productos por categoría y ciudad para clientes no autenticados.
+- **Invariantes:** Solo productos con `isActive: true` son visibles; sin exponer correos de proveedores.
 
-### Fase 2: Autenticación y Frontend Base
+### Fase 3: Order Integrity
+- **Propósito:** Integridad en la creación de pedidos consolidados.
+- **Flujos:** Conversión de carrito local a Order en BD.
+- **Invariantes:** Tolerancia cero al stock negativo, sin cruce de ciudades (`crossing-cities`), consolidación matemática (Map) anti-duplicados.
 
-- [x] Sistema de Registro y Login (JWT).
-- [x] Protección de rutas (Guards/Middleware).
-- [x] Frontend base con Next.js y Tailwind.
-- [x] Catálogo de productos público.
-- [x] Carrito de compras funcional (Local Storage).
-- [x] Checkout básico (Creación de pedidos).
+### Fase 4: State Machines (Real-Time & Role Security)
+- **Propósito:** Trazabilidad estricta y delegación de estado de sub-pedidos.
+- **Flujos:** ProviderOrder state machine (`PENDING` -> `ACCEPTED` -> `PREPARING` -> `READY_FOR_PICKUP` -> `PICKED_UP`).
+- **Invariantes:** Transición atómica optimista; Cancelación parcial frena la distribución logística global (DeliveryStatus estancado).
 
-### Fase 3: Gobernanza, Administración y Comunicación
+### Fase 5: Payment, Webhook, & Atomic Idempotency
+- **Propósito:** Motor financiero de cero pérdidas y cero overselling.
+- **Flujos:** Recepción nativa de Webhook Stripe (`payment_intent.succeeded`) -> Confirmación de Pedido.
+- **Invariantes:** Idempotencia garantizada por BD (`WebhookEvent`). Descuento de stock en concurrencia estricta (`updateMany { stock: { gte: cantidad } }`).
 
-- [x] **Rol ADMIN**: Implementado en DB y Auth Guards.
-- [x] **Panel de Admin**: Dashboard, Gestión de Usuarios, ABM de Ciudades/Categorías.
-- [x] **Email System**: Integración con Mailpit (SMTP Local) y envíos asíncronos.
-- [x] **MFA**: Activación de doble factor (TOTP) con QR.
-- [x] **Docker**: Optimización de contenedores y orquestación con Mailpit.
-- [x] **Calidad**: Linter (ESLint v8) y Build checks pasados sin errores.
+### Fase 6: Governance, Metrics, & Admin Consistency
+- **Propósito:** Estadísticas puras y jerarquías sin pérdida accidental.
+- **Flujos:** Dashboard de ingresos y gestión de usuarios por Admin.
+- **Invariantes:** Granting aditivo usando `Set`. Métricas procesan exclusivamente estados económicamente vigentes.
 
-### Fase 4: Tiempo Real & Seguridad Funcional
-
-- [x] **Autenticación "Passwordless"**: Migración a enlaces mágicos / OTP.
-- [x] **MFA Mandatorio**: Imposición de factores de autenticación en perfiles.
-- [x] **WebSockets (Runners)**: Tracking en tiempo real autenticado.
-- [x] **Módulo Proveedor Avanzado**: Analítica interactiva y aislamiento lógico de productos.
-
-### Fase 5: Dominio Zero-Trust & Bastionado Avanzado
-
-- [x] **Dominio y Saga Lite**: Separación arquitectónica estricta (Order vs ProviderOrder) con decrecimiento atómico en BD.
-- [x] **Webhook Idempotente**: Resiliencia pasarela de pagos vía bloqueos de `paymentRef`.
-- [x] **Seguridad Contextual**: Inyección transparente de JWT Socket.io y rotación _Zero-Downtime_ de dobles secretos.
-- [x] **Bastionado de Red**: Aplicados parámetros NIS2 (Helmet, CORS, Headers).
-- [x] **Privilegios API**: Decoradores RBAC granulares y defensas contra escaladas de IDOR.
+### Fase 7: Despliegue, Seguridad y Documentación Fiel (Actual/Finalizada ✅)
+- **Propósito:** Erradicar la deuda técnica antes de la puesta en producción asegurando una cobertura robusta de CI/CD, fortaleciendo la seguridad perimetral contra vulnerabilidades web (OWASP) y documentando fielmente la arquitectura socrática.
+- **Flujos:** 
+  - **CI/CD Integrado:** El pipeline de *GitHub Actions* asegura la ejecución automática de la suite `npm run test`, bloqueando explícitamente cualquier PR que rompa las pruebas.
+  - **Ciclo Completo Integrado (E2E Tests):** Se desarrollaron flujos simulados a través de `orders.e2e-spec.ts` probando desde el registro del cliente hasta la liberación del producto y la asignación al Runner con Stripe _mockeado_.
+  - **Revocación Concurrente:** Creación de un endpoint `POST /auth/logout` que incrementa un estado interno en Prisma, forzando un rechazo instantáneo en las estrategias locales.
+- **Invariantes:** 
+  - **Rate Limiting Estricto:** Objeto `ThrottlerModule` corregido bajo los estándares de NestJS v10+ previniendo denegación de servicio (DoS).
+  - **Autenticación Inmutable:** Inyección de `tokenVersion` en BD; todo JWT capturado cuyo número de versión sea inferior al registrado será inmediatamente revocado sin esperas de expiración.
+  - **Tipado Seguro:** Interfaz `RequestWithUser` sustituyendo la ambigüedad nativa de `any` en los controladores y refactorización del core de transacciones a `PaymentsService`, para asilar la complejidad financiera.
 
 ## Próximos Pasos (Deploy & Producto)
 

@@ -16,7 +16,7 @@ import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ProviderOrderStatus, Role } from '@prisma/client';
-import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
+import type { RequestWithUser } from '../auth/interfaces/auth.interfaces';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
@@ -27,7 +27,7 @@ export class OrdersController {
   @Roles(Role.CLIENT)
   create(
     @Body() createOrderDto: CreateOrderDto,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.create(createOrderDto, req.user.userId);
   }
@@ -42,7 +42,7 @@ export class OrdersController {
   @Roles(Role.RUNNER)
   acceptOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.acceptOrder(id, req.user.userId);
   }
@@ -51,7 +51,7 @@ export class OrdersController {
   @Roles(Role.RUNNER)
   completeOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.completeOrder(id, req.user.userId);
   }
@@ -60,7 +60,7 @@ export class OrdersController {
   @Roles(Role.RUNNER)
   markInTransit(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.markInTransit(id, req.user.userId);
   }
@@ -69,26 +69,26 @@ export class OrdersController {
   @Roles(Role.CLIENT, Role.ADMIN)
   cancelOrder(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.cancelOrder(id, req.user.userId, req.user.roles);
   }
 
   @Get('provider/stats')
   @Roles(Role.PROVIDER)
-  getProviderStats(@Request() req: { user: UserFromJwt }) {
+  getProviderStats(@Request() req: RequestWithUser) {
     return this.ordersService.getProviderStats(req.user.userId);
   }
 
   @Get('provider/chart')
   @Roles(Role.PROVIDER)
-  getProviderSalesChart(@Request() req: { user: UserFromJwt }) {
+  getProviderSalesChart(@Request() req: RequestWithUser) {
     return this.ordersService.getProviderSalesChart(req.user.userId);
   }
 
   @Get('provider/top-products')
   @Roles(Role.PROVIDER)
-  getProviderTopProducts(@Request() req: { user: UserFromJwt }) {
+  getProviderTopProducts(@Request() req: RequestWithUser) {
     return this.ordersService.getProviderTopProducts(req.user.userId);
   }
 
@@ -97,7 +97,7 @@ export class OrdersController {
   updateProviderOrderStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body('status') status: ProviderOrderStatus,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.updateProviderOrderStatus(
       id,
@@ -109,7 +109,7 @@ export class OrdersController {
 
   @Get()
   @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER)
-  findAll(@Request() req: { user: UserFromJwt }) {
+  findAll(@Request() req: RequestWithUser) {
     return this.ordersService.findAll(req.user.userId, req.user.roles);
   }
 
@@ -117,7 +117,7 @@ export class OrdersController {
   @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER, Role.ADMIN)
   findOne(
     @Param('id', ParseUUIDPipe) id: string,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
   ) {
     return this.ordersService.findOne(id, req.user.userId, req.user.roles);
   }
