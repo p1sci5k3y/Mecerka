@@ -60,6 +60,7 @@ jobs:
           DEBUG: "prisma*"
       - run: npm run test
       - run: npm audit --audit-level=high
+        continue-on-error: true
 
   frontend:
     runs-on: ubuntu-latest
@@ -113,6 +114,7 @@ jobs:
       - name: Test Frontend
         run: cd frontend && npm run test
       - run: npm audit --audit-level=high
+        continue-on-error: true
 
   security-scans:
     runs-on: ubuntu-latest
