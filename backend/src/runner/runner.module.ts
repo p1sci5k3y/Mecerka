@@ -13,4 +13,4 @@ import { AuthModule } from '../auth/auth.module';
   controllers: [RunnerController],
   providers: [RunnerService, RunnerGateway],
 })
-export class RunnerModule { }
+export class RunnerModule {}

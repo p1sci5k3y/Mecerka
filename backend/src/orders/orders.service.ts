@@ -8,13 +8,12 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  Role,
-  DeliveryStatus,
-  ProviderOrderStatus,
-} from '@prisma/client';
+import { Role, DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
-import { canTransitionOrder, canTransitionProviderOrder } from './utils/state-machine';
+import {
+  canTransitionOrder,
+  canTransitionProviderOrder,
+} from './utils/state-machine';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
@@ -22,7 +21,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-  ) { }
+  ) {}
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
     const { items, deliveryAddress, pin, deliveryLat, deliveryLng } =
@@ -30,11 +29,17 @@ export class OrdersService {
 
     // 0. Verify Transactional PIN (if provided)
     if (pin) {
-      const user = await this.prisma.user.findUnique({ where: { id: clientId } });
+      const user = await this.prisma.user.findUnique({
+        where: { id: clientId },
+      });
       if (!user) throw new NotFoundException('Usuario no encontrado');
-      if (!user.pin) throw new BadRequestException('Debes configurar un PIN de compra en tu perfil.');
+      if (!user.pin)
+        throw new BadRequestException(
+          'Debes configurar un PIN de compra en tu perfil.',
+        );
       const isPinValid = await argon2.verify(user.pin, pin);
-      if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
+      if (!isPinValid)
+        throw new UnauthorizedException('PIN de compra incorrecto.');
     }
 
     // 1. Consolidate Duplicate Items in Memory
@@ -303,7 +308,6 @@ export class OrdersService {
     return { rejected, confirmed };
   }
 
-
   async evaluateReadyForAssignment(orderId: string) {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -314,18 +318,22 @@ export class OrdersService {
       if (order.status !== DeliveryStatus.CONFIRMED) return;
 
       const hasPendingOrPreparing = order.providerOrders.some((po) =>
-        ([
-          ProviderOrderStatus.PENDING,
-          ProviderOrderStatus.ACCEPTED,
-          ProviderOrderStatus.PREPARING,
-        ] as ProviderOrderStatus[]).includes(po.status),
+        (
+          [
+            ProviderOrderStatus.PENDING,
+            ProviderOrderStatus.ACCEPTED,
+            ProviderOrderStatus.PREPARING,
+          ] as ProviderOrderStatus[]
+        ).includes(po.status),
       );
 
       const hasCancelledOrRejected = order.providerOrders.some((po) =>
-        ([
-          ProviderOrderStatus.REJECTED_BY_STORE,
-          ProviderOrderStatus.CANCELLED,
-        ] as ProviderOrderStatus[]).includes(po.status),
+        (
+          [
+            ProviderOrderStatus.REJECTED_BY_STORE,
+            ProviderOrderStatus.CANCELLED,
+          ] as ProviderOrderStatus[]
+        ).includes(po.status),
       );
 
       if (hasPendingOrPreparing) {
@@ -342,7 +350,9 @@ export class OrdersService {
       }
 
       // If all are READY_FOR_PICKUP (or PICKED_UP)
-      if (!canTransitionOrder(order.status, DeliveryStatus.READY_FOR_ASSIGNMENT)) {
+      if (
+        !canTransitionOrder(order.status, DeliveryStatus.READY_FOR_ASSIGNMENT)
+      ) {
         return; // Suppress and silently bypass illegal assignments
       }
 
@@ -374,11 +384,15 @@ export class OrdersService {
     const actingRole = this.getActingRole(po, userId, roles);
 
     if (!actingRole) {
-      throw new ForbiddenException('You do not have permission to update this provider order');
+      throw new ForbiddenException(
+        'You do not have permission to update this provider order',
+      );
     }
 
     if (!canTransitionProviderOrder(po.status, status, actingRole)) {
-      throw new BadRequestException(`Illegal state transition from ${po.status} to ${status} for role ${actingRole}`);
+      throw new BadRequestException(
+        `Illegal state transition from ${po.status} to ${status} for role ${actingRole}`,
+      );
     }
 
     // Optimistic Concurrency Update
@@ -388,26 +402,46 @@ export class OrdersService {
     });
 
     if (updated.count === 0) {
-      throw new ConflictException('The order state has changed. Please refresh and try again.');
+      throw new ConflictException(
+        'The order state has changed. Please refresh and try again.',
+      );
     }
 
     // Propagate state upwards
-    if (status === ProviderOrderStatus.READY_FOR_PICKUP || status === ProviderOrderStatus.REJECTED_BY_STORE || status === ProviderOrderStatus.CANCELLED) {
+    if (
+      status === ProviderOrderStatus.READY_FOR_PICKUP ||
+      status === ProviderOrderStatus.REJECTED_BY_STORE ||
+      status === ProviderOrderStatus.CANCELLED
+    ) {
       await this.evaluateReadyForAssignment(po.orderId);
     } else if (status === ProviderOrderStatus.PICKED_UP) {
       // Logic for all items picked up is already in `markInTransit` for the runner, but we should evaluate it
       // We can create a unified method later or check it here
-      const order = await this.prisma.order.findUnique({ where: { id: po.orderId }, include: { providerOrders: true } });
+      const order = await this.prisma.order.findUnique({
+        where: { id: po.orderId },
+        include: { providerOrders: true },
+      });
       if (order?.status === DeliveryStatus.ASSIGNED) {
-        const activeOrders = order.providerOrders.filter(o => o.status !== ProviderOrderStatus.REJECTED_BY_STORE && o.status !== ProviderOrderStatus.CANCELLED);
-        const allPickedUp = activeOrders.every(o => o.status === ProviderOrderStatus.PICKED_UP);
+        const activeOrders = order.providerOrders.filter(
+          (o) =>
+            o.status !== ProviderOrderStatus.REJECTED_BY_STORE &&
+            o.status !== ProviderOrderStatus.CANCELLED,
+        );
+        const allPickedUp = activeOrders.every(
+          (o) => o.status === ProviderOrderStatus.PICKED_UP,
+        );
         if (allPickedUp) {
-          await this.prisma.order.update({ where: { id: order.id }, data: { status: DeliveryStatus.IN_TRANSIT } });
+          await this.prisma.order.update({
+            where: { id: order.id },
+            data: { status: DeliveryStatus.IN_TRANSIT },
+          });
         }
       }
     }
 
-    return this.prisma.providerOrder.findUnique({ where: { id: providerOrderId } });
+    return this.prisma.providerOrder.findUnique({
+      where: { id: providerOrderId },
+    });
   }
 
   async getAvailableOrders() {
@@ -435,7 +469,9 @@ export class OrdersService {
       select: { stripeAccountId: true },
     });
     if (!runner?.stripeAccountId) {
-      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de aceptar pedidos.');
+      throw new ForbiddenException(
+        'Debes completar tu registro financiero en Stripe antes de aceptar pedidos.',
+      );
     }
 
     const order = await this.prisma.order.findUnique({ where: { id } });
@@ -575,12 +611,13 @@ export class OrdersService {
         throw new ForbiddenException('You are not the client of this order');
       }
 
-      const hasCancelledOrRejectedSubOrders = order.providerOrders.some(
-        (po) =>
-          ([
+      const hasCancelledOrRejectedSubOrders = order.providerOrders.some((po) =>
+        (
+          [
             ProviderOrderStatus.REJECTED_BY_STORE,
             ProviderOrderStatus.CANCELLED,
-          ] as ProviderOrderStatus[]).includes(po.status),
+          ] as ProviderOrderStatus[]
+        ).includes(po.status),
       );
 
       if (order.status !== DeliveryStatus.PENDING) {
@@ -612,7 +649,11 @@ export class OrdersService {
     const updated = await this.prisma.$transaction(async (tx) => {
       if (providerOrderUpdateIds.length > 0) {
         // Restore inventory if we had confirmed the payment earlier
-        if (order.status === DeliveryStatus.CONFIRMED || order.status === DeliveryStatus.READY_FOR_ASSIGNMENT || order.status === DeliveryStatus.ASSIGNED) {
+        if (
+          order.status === DeliveryStatus.CONFIRMED ||
+          order.status === DeliveryStatus.READY_FOR_ASSIGNMENT ||
+          order.status === DeliveryStatus.ASSIGNED
+        ) {
           for (const po of order.providerOrders) {
             if (providerOrderUpdateIds.includes(po.id)) {
               for (const item of po.items) {
@@ -772,12 +813,14 @@ export class OrdersService {
       .slice(0, 5);
   }
 
-
   private getActingRole(po: any, userId: string, roles: Role[]): Role | null {
     if (roles.includes(Role.ADMIN)) return Role.ADMIN;
-    if (po.order.runnerId === userId && roles.includes(Role.RUNNER)) return Role.RUNNER;
-    if (po.providerId === userId && roles.includes(Role.PROVIDER)) return Role.PROVIDER;
-    if (po.order.clientId === userId && roles.includes(Role.CLIENT)) return Role.CLIENT;
+    if (po.order.runnerId === userId && roles.includes(Role.RUNNER))
+      return Role.RUNNER;
+    if (po.providerId === userId && roles.includes(Role.PROVIDER))
+      return Role.PROVIDER;
+    if (po.order.clientId === userId && roles.includes(Role.CLIENT))
+      return Role.CLIENT;
     return null;
   }
 }

@@ -31,7 +31,10 @@ describe('WebhooksController', () => {
       controllers: [WebhooksController],
       providers: [
         { provide: PaymentsService, useValue: paymentsServiceMock },
-        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue('dummy_secret') } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('dummy_secret') },
+        },
       ],
     }).compile();
 

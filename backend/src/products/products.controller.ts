@@ -22,7 +22,7 @@ import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) { }
+  constructor(private readonly productsService: ProductsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)

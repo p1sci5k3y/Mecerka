@@ -10,7 +10,7 @@ import { PaymentsService } from './payments.service';
 
 @Controller('dev/pay')
 export class DevPaymentsController {
-  constructor(private readonly paymentsService: PaymentsService) { }
+  constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post(':orderId')
   async fakePay(
@@ -32,6 +32,10 @@ export class DevPaymentsController {
     }
 
     const paymentRef = 'fake_' + Date.now();
-    return this.paymentsService.confirmPayment(orderId, paymentRef, 'dev_evt_' + Date.now());
+    return this.paymentsService.confirmPayment(
+      orderId,
+      paymentRef,
+      'dev_evt_' + Date.now(),
+    );
   }
 }

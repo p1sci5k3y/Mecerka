@@ -9,7 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(createProductDto: CreateProductDto, providerId: string) {
     const user = await this.prisma.user.findUnique({
@@ -22,7 +22,9 @@ export class ProductsService {
     }
 
     if (!user.stripeAccountId) {
-      throw new ForbiddenException('Complete your Stripe financial registration before publishing products.');
+      throw new ForbiddenException(
+        'Complete your Stripe financial registration before publishing products.',
+      );
     }
 
     return this.prisma.product.create({
@@ -37,7 +39,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where: {
         isActive: true,
-        provider: { stripeAccountId: { not: null } }
+        provider: { stripeAccountId: { not: null } },
       },
       include: {
         city: true,
@@ -67,7 +69,7 @@ export class ProductsService {
       where: {
         id,
         isActive: true,
-        provider: { stripeAccountId: { not: null } }
+        provider: { stripeAccountId: { not: null } },
       },
       include: {
         city: true,
@@ -78,7 +80,9 @@ export class ProductsService {
       },
     });
     if (!product) {
-      throw new NotFoundException(`Product with ID ${id} not found or inactive`);
+      throw new NotFoundException(
+        `Product with ID ${id} not found or inactive`,
+      );
     }
     return product;
   }
@@ -98,7 +102,9 @@ export class ProductsService {
     }
 
     if (!user.stripeAccountId) {
-      throw new ForbiddenException('Complete your Stripe financial registration before managing your stock.');
+      throw new ForbiddenException(
+        'Complete your Stripe financial registration before managing your stock.',
+      );
     }
 
     const product = await this.prisma.product.findUnique({

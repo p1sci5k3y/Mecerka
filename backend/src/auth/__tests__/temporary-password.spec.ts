@@ -4,7 +4,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../../email/email.service';
 
-
 // Mock implementations
 const mockPrismaService = {
   user: {
