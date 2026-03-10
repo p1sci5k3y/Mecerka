@@ -83,9 +83,17 @@ Al arrancar con `db seed`, tendrás un entorno listo para operar. Recomendamos s
 
 ---
 
-## 🚧 Estado del Proyecto
+## 🚧 Estado del Proyecto (Fases Socráticas)
 
-Consultar [PROJECT_STATUS.md](./PROJECT_STATUS.md) para ver la fase actual, decisiones técnicas vigentes y deuda técnica asumida (ADRs).
+Mecerka se desarrolla iterativamente siguiendo una Arquitectura Socrática (Propósitos, Flujos e Invariantes claros por fase). Para mayor detalle ver [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
+- **Fase 1 (MVP Identity & Basics):** Propósito: Autenticación base, Catálogo (Publico/Privado) y BBDD.
+- **Fase 2 (Public Catalog & Privacy):** Propósito: Filtrado dinámico de inventario activo y omisión de PII.
+- **Fase 3 (Order Integrity):** Propósito: Consolidación de carritos y candados anti-crossing-cities.
+- **Fase 4 (State Machines):** Propósito: Robustez del flujo de ProviderOrder con Concurrencia Optimista.
+- **Fase 5 (Payment & Idempotency):** Propósito: Pagos atómicos, deducción de stock en tiempo real y webhooks 100% seguros (Zero-Trust).
+- **Fase 6 (Governance & Metrics):** Propósito: Consistencia en métricas analíticas exclusivas de flujos económicamente válidos y roles granulares seguros (Grant/Revoke).
+- **Fase 7 (Deploy, Security & Documentation):** Propósito: Asegurar la calidad para producción a través de CI/CD continuo (testeos unitarios y E2E), endurecer directrices de mitigación DoS mediante rate limiters, revocación inmediata asíncrona de JWT (`tokenVersion`) y consolidación arquitectónica de pagos en un proveedor aislado.
 
 ## 📋 Changelog
 

@@ -57,6 +57,7 @@ model User {
   mfaFailedAttempts          Int       @default(0)
   mfaLockUntil               DateTime?
   active                     Boolean   @default(true)
+  tokenVersion               Int       @default(1)
   resetPasswordTokenHash     String?   @unique
   resetPasswordExpiresAt     DateTime?
   passwordChangedAt          DateTime?
