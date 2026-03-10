@@ -82,6 +82,13 @@ function CartContent() {
       return
     }
 
+    const token = localStorage.getItem('token')
+    if (paymentMethod === "card" && !token) {
+      toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      router.push('/login');
+      return;
+    }
+
     setCheckingOut(true)
     try {
       const payload = {
@@ -96,12 +103,6 @@ function CartContent() {
       setPendingOrderId(createdOrder.id)
 
       if (paymentMethod === "card") {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
-          router.push('/login');
-          return;
-        }
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/intent/${createdOrder.id}`, {
           method: 'POST',
@@ -135,19 +136,20 @@ function CartContent() {
       return
     }
 
+    const token = localStorage.getItem('token')
+    if (!token) {
+      toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+      router.push('/login');
+      return;
+    }
+
+    if (!pendingOrderId) {
+      toast.error("No hay pedido pendiente por confirmar.");
+      return;
+    }
+
     setCheckingOut(true)
     try {
-      if (!pendingOrderId) {
-        toast.error("No hay pedido pendiente por confirmar.");
-        return;
-      }
-
-      const token = localStorage.getItem('token')
-      if (!token) {
-        toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
-        router.push('/login');
-        return;
-      }
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/cash/${pendingOrderId}`, {
         method: 'POST',
@@ -179,8 +181,12 @@ function CartContent() {
   }
 
   // Calculate simulated shipping cost based on items
-  const baseShipping = 4.50
+  const baseShipping = 4.5
   const activeShippingCost = shippingSplit === "split" ? baseShipping / 2 : baseShipping
+
+  const itemsMessage = totalItems === 0
+    ? "Aún no has seleccionado ninguna pieza."
+    : `Tienes ${totalItems} artículo${totalItems > 1 ? "s" : ""} esperando.`
 
   return (
     <div className="flex min-h-screen flex-col bg-background/50">
@@ -192,9 +198,7 @@ function CartContent() {
               Tu Cesta
             </h1>
             <p className="text-lg text-muted-foreground font-medium">
-              {totalItems === 0
-                ? "Aún no has seleccionado ninguna pieza."
-                : `Tienes ${totalItems} artículo${totalItems > 1 ? "s" : ""} esperando.`}
+              {itemsMessage}
             </p>
           </div>
 
@@ -488,7 +492,7 @@ function CartContent() {
             </DialogDescription>
           </DialogHeader>
 
-          {paymentMethod === 'card' && clientSecret && stripeAccountId ? (
+          {paymentMethod === 'card' && clientSecret && stripeAccountId && (
             <div className="py-4">
               <StripeCheckoutWrapper
                 clientSecret={clientSecret}
@@ -497,7 +501,9 @@ function CartContent() {
                 onPaymentSuccess={() => handleSuccessfulPayment(false)}
               />
             </div>
-          ) : paymentMethod === 'cash' ? (
+          )}
+
+          {paymentMethod === 'cash' && (
             <form onSubmit={submitOrderWithPin} className="flex flex-col gap-4 py-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="pin-input" className="sr-only">PIN de Compra</Label>
@@ -506,7 +512,7 @@ function CartContent() {
                   type="password"
                   maxLength={6}
                   value={pinValue}
-                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setPinValue(e.target.value.replaceAll(/\D/g, ""))}
                   placeholder="****"
                   className="text-center text-2xl tracking-widest font-mono h-14 rounded-xl"
                   autoFocus
@@ -527,23 +533,25 @@ function CartContent() {
                 </Button>
               </DialogFooter>
             </form>
-          ) : (
+          )}
+
+          {paymentMethod === 'card' && (!clientSecret || !stripeAccountId) && (
             <div className="py-8 flex flex-col items-center justify-center gap-4">
-              {(!clientSecret || !stripeAccountId) && paymentMethod === 'card' ? (
-                <>
-                  <p className="text-sm font-medium text-destructive text-center max-w-sm">
-                    No se pudo cargar la pasarela de pago.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={() => {
-                    setShowPinModal(false);
-                    toast.error("Vuelve a intentarlo desde la cesta.");
-                  }}>
-                    Volver y Reintentar
-                  </Button>
-                </>
-              ) : (
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              )}
+              <p className="text-sm font-medium text-destructive text-center max-w-sm">
+                No se pudo cargar la pasarela de pago.
+              </p>
+              <Button variant="outline" size="sm" onClick={() => {
+                setShowPinModal(false);
+                toast.error("Vuelve a intentarlo desde la cesta.");
+              }}>
+                Volver y Reintentar
+              </Button>
+            </div>
+          )}
+
+          {paymentMethod !== 'card' && paymentMethod !== 'cash' && (
+            <div className="py-8 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           )}
         </DialogContent>
