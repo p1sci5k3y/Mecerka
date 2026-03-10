@@ -21,3 +21,8 @@ variable "existing_instance_id" {
   type        = string
   default     = "i-07b8b2ff00c18d875"
 }
+variable "admin_cidr_blocks" {
+  description = "CIDR blocks allowed to access SSH"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
