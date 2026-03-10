@@ -10,6 +10,7 @@ export interface User {
   createdAt?: string
   mfaEnabled?: boolean
   hasPin?: boolean
+  stripeAccountId?: string | null // Stripe Connect Connected Account ID for providers/runners
 }
 
 export interface AuthTokens {
