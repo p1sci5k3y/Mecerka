@@ -31,7 +31,10 @@ async function bootstrap() {
   if (frontendUrl) allowlist.add(frontendUrl);
 
   app.enableCors({
-    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      origin: string | undefined,
+      cb: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // origin can be undefined in server-to-server calls or curl
       if (!origin) return cb(null, true);
 
@@ -44,5 +47,4 @@ async function bootstrap() {
   });
   await app.listen(process.env.PORT ?? 3000);
 }
-// eslint-disable-next-line unicorn/prefer-top-level-await
 void bootstrap();
