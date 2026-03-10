@@ -29,10 +29,10 @@ jobs:
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://mecerka:mecerka_test_pass@localhost:5432/mecerka_test?schema=public
+      DATABASE_URL: postgresql://mecerka:mecerka_test_pass@127.0.0.1:5432/mecerka_test?schema=public
 
     steps:
       - uses: actions/checkout@v4
