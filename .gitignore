@@ -8,3 +8,8 @@ backend/dist
 *.log
 coverage
 
+
+# Terraform
+infrastructure/.terraform*
+infrastructure/terraform.tfstate*
+infrastructure/*.tfvars
