@@ -118,7 +118,9 @@ export class AuthService {
 
     if (!user.emailVerified) {
       this.logger.warn(`Login failed: Email not verified for user ${user.id}`);
-      throw new UnauthorizedException('Por favor, verifica tu correo electrónico antes de iniciar sesión');
+      throw new UnauthorizedException(
+        'Por favor, verifica tu correo electrónico antes de iniciar sesión',
+      );
     }
 
     const isPasswordValid = await argon2.verify(user.password, password);
@@ -216,9 +218,14 @@ export class AuthService {
     try {
       await this.emailService.sendMfaSetupEmail(user.email, otpCode);
     } catch (error) {
-      this.logger.error(`Failed to send MFA email to ${user.email}`, error instanceof Error ? error.stack : error);
+      this.logger.error(
+        `Failed to send MFA email to ${user.email}`,
+        error instanceof Error ? error.stack : error,
+      );
       await this.clearMfaSetupOtp(user.id);
-      throw new BadRequestException('Error sending email OTP. Please try again.');
+      throw new BadRequestException(
+        'Error sending email OTP. Please try again.',
+      );
     }
   }
 
@@ -316,7 +323,10 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
       // Prevent email enumeration
-      return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
+      return {
+        message:
+          'Si el correo existe, recibirás un enlace para restablecer tu contraseña.',
+      };
     }
 
     const resetToken = crypto.randomUUID();
@@ -326,12 +336,24 @@ export class AuthService {
       await this.emailService.sendPasswordResetEmail(user.email, resetToken);
     } catch (e) {
       // Create a deterministic hash of the email to avoid PII leak in logs
-      const emailHash = crypto.createHash('sha256').update(user.email).digest('hex').substring(0, 16);
-      this.logger.error(`Failed to send password reset email to user [${emailHash}]:`, e);
-      throw new BadRequestException('No se pudo enviar el correo de recuperación. Inténtalo de nuevo.');
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(user.email)
+        .digest('hex')
+        .substring(0, 16);
+      this.logger.error(
+        `Failed to send password reset email to user [${emailHash}]:`,
+        e,
+      );
+      throw new BadRequestException(
+        'No se pudo enviar el correo de recuperación. Inténtalo de nuevo.',
+      );
     }
 
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -341,7 +363,10 @@ export class AuthService {
       },
     });
 
-    return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
+    return {
+      message:
+        'Si el correo existe, recibirás un enlace para restablecer tu contraseña.',
+    };
   }
 
   async logout(userId: string) {
@@ -366,11 +391,15 @@ export class AuthService {
     if (user?.resetPasswordExpiresAt) {
       const expiresAt = user.resetPasswordExpiresAt;
       if (expiresAt < new Date()) {
-        throw new BadRequestException('El token de restablecimiento ha expirado.');
+        throw new BadRequestException(
+          'El token de restablecimiento ha expirado.',
+        );
       }
       return user;
     } else {
-      throw new BadRequestException('El token de restablecimiento es inválido.');
+      throw new BadRequestException(
+        'El token de restablecimiento es inválido.',
+      );
     }
   }
 

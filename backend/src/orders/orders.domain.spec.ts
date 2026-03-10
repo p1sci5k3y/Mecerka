@@ -143,7 +143,11 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     // Expected: Order CONFIRMED
     const paymentRef = 'PAY_A_' + Date.now();
-    const result: any = await paymentsService.confirmPayment(order.id, paymentRef, 'evt_A_' + Date.now());
+    const result: any = await paymentsService.confirmPayment(
+      order.id,
+      paymentRef,
+      'evt_A_' + Date.now(),
+    );
 
     // Expected: Order CONFIRMED
     expect(result.status).toBe(DeliveryStatus.CONFIRMED);

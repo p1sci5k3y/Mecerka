@@ -23,7 +23,7 @@ import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminController {
-  constructor(private readonly adminService: AdminService) { }
+  constructor(private readonly adminService: AdminService) {}
 
   // --- Users ---
   @Get('users')
