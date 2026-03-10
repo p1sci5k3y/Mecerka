@@ -7,6 +7,7 @@ import {
   Logger,
   HttpStatus,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import Stripe from 'stripe';
@@ -17,6 +18,7 @@ interface RequestWithRawBody extends Request {
   rawBody: Buffer;
 }
 
+@SkipThrottle() // Stripe retries quickly on failure — throttle would cause permanent event loss
 @Controller('webhooks/stripe')
 export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
