@@ -1,4 +1,4 @@
-export default {
+const config = {
   testDir: './e2e',
   timeout: 30000,
   expect: { timeout: 10000 },
@@ -15,3 +15,5 @@ export default {
     },
   ],
 };
+
+export default config;
