@@ -12,29 +12,46 @@ jobs:
     runs-on: ubuntu-latest
     # Only deploy if CI passed (or if triggered manually)
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
 
+    steps:
       - name: Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: POSTGRES_PASSWORD,JWT_SECRET,JWT_SECRET_CURRENT,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL
           script: |
-            # 1. Pull latest changes
+            set -e
+
+            # 1. Pull latest application code
             cd /opt/mecerka
             git fetch --all
             git reset --hard origin/main
-            
-            # 2. Rebuild and restart Next.js and NestJS containers
-            # The backend/frontend images will be built locally on the EC2 machine
-            docker-compose -f docker-compose.prod.yml build --pull
-            
-            # 3. Apply latest configuration detached
-            docker-compose -f docker-compose.prod.yml up -d
-            
+
+            # 2. Write secrets to .env file (never stored in the repo)
+            cat > .env << EOF
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            JWT_SECRET=${JWT_SECRET}
+            JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
+            NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+            CORS_ORIGIN=${CORS_ORIGIN}
+            FRONTEND_URL=${FRONTEND_URL}
+            EOF
+            chmod 600 .env
+
+            # 3. Rebuild images and restart containers
+            docker compose -f docker-compose.prod.yml build --pull
+            docker compose -f docker-compose.prod.yml up -d
+
             # 4. Prune old dangling images to preserve t3.micro disk space
             docker image prune -f
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_SECRET_CURRENT: ${{ secrets.JWT_SECRET_CURRENT }}
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
