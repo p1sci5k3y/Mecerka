@@ -18,49 +18,58 @@ resource "aws_security_group" "mecerka_sg" {
   description = "Security group for Mecerka EC2 instance (HTTP, HTTPS, SSH)"
   vpc_id      = var.existing_vpc_id
 
-  # SSH Access — restricted to admin_cidr_blocks (defaults to 0.0.0.0/0, override per environment)
-  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
-  ingress {
-    description = "SSH access (restrict admin_cidr_blocks in tfvars for production)"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.admin_cidr_blocks
-  }
-
-  # HTTP Access — must be public for all web visitors
-  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
-  ingress {
-    description = "HTTP web traffic"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTPS Access — must be public for all web visitors
-  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
-  ingress {
-    description = "HTTPS web traffic"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Egress: Allow all outbound (needed for apt/dnf, docker pulls, Stripe API, etc.)
-  # tfsec:ignore:aws-vpc-no-public-egress-sgr
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = {
     Name    = "mecerka-production-sg"
     Project = "Mecerka"
   }
+}
+
+# SSH Access — restricted to admin_cidr_blocks (provided via tfvars or dynamic GitHub whitelisting)
+# tfsec:ignore:aws-vpc-no-public-ingress-sgr
+resource "aws_security_group_rule" "allow_ssh" {
+  count             = length(var.admin_cidr_blocks) > 0 ? 1 : 0
+  type              = "ingress"
+  description       = "Manually whitelisted admin SSH access"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = var.admin_cidr_blocks
+  security_group_id = aws_security_group.mecerka_sg.id
+}
+
+# HTTP Access — Public traffic for web visitors
+# tfsec:ignore:aws-vpc-no-public-ingress-sgr
+resource "aws_security_group_rule" "allow_http" {
+  type              = "ingress"
+  description       = "Public HTTP traffic"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.mecerka_sg.id
+}
+
+# HTTPS Access — Public traffic for web visitors
+# tfsec:ignore:aws-vpc-no-public-ingress-sgr
+resource "aws_security_group_rule" "allow_https" {
+  type              = "ingress"
+  description       = "Public HTTPS traffic"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.mecerka_sg.id
+}
+
+# Egress: Allow all outbound (Essential for updates, Docker pulls, and Stripe API responses)
+# tfsec:ignore:aws-vpc-no-public-egress-sgr
+resource "aws_security_group_rule" "allow_all_egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.mecerka_sg.id
 }
 
 # 2. Existing EC2 Instance Management (Import Block)
