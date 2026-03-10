@@ -3,21 +3,23 @@ import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PaymentsService } from '../payments/payments.service';
 
 describe('OrdersService - Saga Lite Payment Domain', () => {
-  let ordersService: OrdersService;
+  let paymentsService: PaymentsService;
   let prisma: PrismaService;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        PaymentsService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
-    ordersService = module.get<OrdersService>(OrdersService);
+    paymentsService = module.get<PaymentsService>(PaymentsService);
     prisma = module.get<PrismaService>(PrismaService);
   });
 
@@ -141,7 +143,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     // Expected: Order CONFIRMED
     const paymentRef = 'PAY_A_' + Date.now();
-    const result: any = await ordersService.confirmPayment(order.id, paymentRef, 'evt_A_' + Date.now());
+    const result: any = await paymentsService.confirmPayment(order.id, paymentRef, 'evt_A_' + Date.now());
 
     // Expected: Order CONFIRMED
     expect(result.status).toBe(DeliveryStatus.CONFIRMED);
@@ -168,7 +170,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     // User tries to buy 2 units of each
     const order = await createTestOrder(data, 2, 2);
 
-    const result: any = await ordersService.confirmPayment(
+    const result: any = await paymentsService.confirmPayment(
       order.id,
       'PAY_B_' + Date.now(),
       'evt_B_' + Date.now(),
@@ -203,7 +205,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     const data = await setupTestData(0, 0);
     const order = await createTestOrder(data, 2, 2);
 
-    const result: any = await ordersService.confirmPayment(
+    const result: any = await paymentsService.confirmPayment(
       order.id,
       'PAY_C_' + Date.now(),
       'evt_C_' + Date.now(),
@@ -231,18 +233,18 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     // Fire confirmation simultaneously
     const now = Date.now();
-    const p1 = ordersService.confirmPayment(
+    const p1 = paymentsService.confirmPayment(
       order1.id,
       'PAY_CONCURRENT_1_' + now,
       'evt_D1_' + now,
     );
-    const p2 = ordersService.confirmPayment(
+    const p2 = paymentsService.confirmPayment(
       order2.id,
       'PAY_CONCURRENT_2_' + now,
       'evt_D2_' + now,
     );
 
-    const results = await Promise.allSettled([p1, p2]);
+    await Promise.allSettled([p1, p2]);
 
     // Inspect
     // Promise resolution check if needed

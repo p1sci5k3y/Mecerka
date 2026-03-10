@@ -10,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import Stripe from 'stripe';
-import { OrdersService } from '../orders/orders.service';
+import { PaymentsService } from './payments.service';
 
 // Requerimos que la request contenga la propiedad rawBody, inyectada por NestFactory({rawBody: true})
 interface RequestWithRawBody extends Request {
@@ -24,7 +24,7 @@ export class WebhooksController {
   private readonly webhookSecret: string;
 
   constructor(
-    private readonly ordersService: OrdersService,
+    private readonly paymentsService: PaymentsService,
     private readonly configService: ConfigService
   ) {
     const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -89,13 +89,13 @@ export class WebhooksController {
       }
 
       // Idempotency check: short-circuit duplicate events
-      if (await this.ordersService.isProcessed(event.id)) {
+      if (await this.paymentsService.isProcessed(event.id)) {
         this.logger.debug(`Webhook event ${event.id} already processed.`);
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
       try {
-        const result: any = await this.ordersService.confirmPayment(
+        const result: any = await this.paymentsService.confirmPayment(
           orderId,
           paymentRef,
           event.id,

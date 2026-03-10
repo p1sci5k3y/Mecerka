@@ -368,15 +368,7 @@ export class OrdersService {
     });
     if (!po) throw new NotFoundException('ProviderOrder not found');
 
-    const isAdmin = roles.includes(Role.ADMIN);
-    const isProvider = po.providerId === userId && roles.includes(Role.PROVIDER);
-    const isRunner = po.order.runnerId === userId && roles.includes(Role.RUNNER);
-
-    let actingRole: Role | null = null;
-    if (isAdmin) actingRole = Role.ADMIN;
-    else if (isRunner) actingRole = Role.RUNNER;
-    else if (isProvider) actingRole = Role.PROVIDER;
-    else if (roles.includes(Role.CLIENT) && po.order.clientId === userId) actingRole = Role.CLIENT;
+    const actingRole = this.getActingRole(po, userId, roles);
 
     if (!actingRole) {
       throw new ForbiddenException('You do not have permission to update this provider order');
@@ -768,132 +760,13 @@ export class OrdersService {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
   }
-  async isProcessed(eventId: string): Promise<boolean> {
-    const event = await this.prisma.webhookEvent.findUnique({
-      where: { id: eventId },
-    });
-    return !!event;
-  }
 
-  async markProcessed(eventId: string): Promise<void> {
-    await this.prisma.webhookEvent.create({
-      data: { id: eventId },
-    });
-  }
 
-  /**
-   * Completes the payment process idempotently using a webhook event ID.
-   * Handles partial fulfillment if stock runs out concurrently.
-   */
-  async confirmPayment(orderId: string, paymentRef: string, eventId: string) {
-    // 1. Early idempotency check
-    if (await this.isProcessed(eventId)) {
-      return { message: 'Webhook already processed' };
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      // 2. Atomic Event Registration
-      try {
-        await tx.webhookEvent.create({
-          data: { id: eventId },
-        });
-      } catch (e: any) {
-        if (e.code === 'P2002') return { message: 'Webhook already processed concurrently' };
-        throw e;
-      }
-
-      // 3. Fetch Order with pending state
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: {
-          providerOrders: {
-            include: { items: true },
-          },
-        },
-      });
-
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-
-      if (order.status !== DeliveryStatus.PENDING) {
-        return { message: 'Order is no longer PENDING', status: order.status };
-      }
-
-      const confirmedProviderOrders: string[] = [];
-      const rejectedProviderOrders: string[] = [];
-
-      // 4. Optimistic Stock Deduction & Partial Fulfillment Logic
-      for (const po of order.providerOrders) {
-        let providerHasStock = true;
-
-        for (const item of po.items) {
-          if (!providerHasStock) break; // Optimization: skip remaining operations if already failed
-
-          const updatedProduct = await tx.product.updateMany({
-            where: {
-              id: item.productId,
-              stock: { gte: item.quantity },
-            },
-            data: {
-              stock: { decrement: item.quantity },
-            },
-          });
-
-          if (updatedProduct.count === 0) {
-            providerHasStock = false;
-            // Note: Since Prisma transactions don't support partial rollbacks easily,
-            // we accept that items decremented BEFORE this failure for the SAME PO
-            // might theoretically stay decremented, but this would only happen if
-            // proper relational consistency or nested transactions were used.
-            // For TFM scope, we proceed marking REJECTED.
-          }
-        }
-
-        if (providerHasStock) {
-          confirmedProviderOrders.push(po.id);
-          // ProviderOrder remains PENDING until the store manually accepts it
-        } else {
-          rejectedProviderOrders.push(po.id);
-          await tx.providerOrder.update({
-            where: { id: po.id },
-            data: { status: ProviderOrderStatus.REJECTED_BY_STORE },
-          });
-        }
-      }
-
-      // 5. Update Order to final state using optimistic concurrency
-      const allRejected = confirmedProviderOrders.length === 0;
-      const finalStatus = allRejected ? DeliveryStatus.CANCELLED : DeliveryStatus.CONFIRMED;
-
-      const updatedOrder = await tx.order.updateMany({
-        where: { id: orderId, status: DeliveryStatus.PENDING },
-        data: {
-          status: finalStatus,
-          paymentRef,
-          confirmedAt: new Date(),
-        },
-      });
-
-      if (updatedOrder.count === 0) {
-        throw new ConflictException('Order status changed concurrently during payment confirmation');
-      }
-
-      // 6. Emit event to decouple downstream logic
-      this.eventEmitter.emit('order.stateChanged', {
-        orderId: order.id,
-        status: finalStatus,
-        paymentRef,
-      });
-
-      if (!allRejected && rejectedProviderOrders.length > 0) {
-        this.eventEmitter.emit('order.partialCancelled', {
-          orderId: order.id,
-          rejectedProviderOrderIds: rejectedProviderOrders
-        });
-      }
-
-      return { success: true, orderId: order.id, status: finalStatus, paymentRef };
-    });
+  private getActingRole(po: any, userId: string, roles: Role[]): Role | null {
+    if (roles.includes(Role.ADMIN)) return Role.ADMIN;
+    if (po.order.runnerId === userId && roles.includes(Role.RUNNER)) return Role.RUNNER;
+    if (po.providerId === userId && roles.includes(Role.PROVIDER)) return Role.PROVIDER;
+    if (po.order.clientId === userId && roles.includes(Role.CLIENT)) return Role.CLIENT;
+    return null;
   }
 }

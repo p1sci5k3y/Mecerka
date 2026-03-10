@@ -17,7 +17,7 @@ import { ConfirmResetPasswordDto } from './dto/confirm-reset-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { UserFromJwt } from './interfaces/auth.interfaces';
+import type { RequestWithUser } from './interfaces/auth.interfaces';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
 
 @Controller('auth')
@@ -37,6 +37,12 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  async logout(@Request() req: RequestWithUser) {
+    return this.authService.logout(req.user.userId);
   }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
@@ -79,7 +85,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Request() req: { user: UserFromJwt }) {
+  async getProfile(@Request() req: RequestWithUser) {
     const user = await this.authService.findById(req.user.userId);
     if (!user) throw new BadRequestException('User not found');
     return {
@@ -93,7 +99,7 @@ export class AuthController {
 
   @Post('mfa/generate-email-otp')
   @UseGuards(JwtAuthGuard)
-  async generateMfaEmailOtp(@Request() req: { user: UserFromJwt }) {
+  async generateMfaEmailOtp(@Request() req: RequestWithUser) {
     const user = await this.authService.findById(req.user.userId);
     if (!user) {
       throw new BadRequestException('User not found');
@@ -104,7 +110,7 @@ export class AuthController {
 
   @Post('mfa/setup')
   @UseGuards(JwtAuthGuard)
-  async setupMfa(@Request() req: { user: UserFromJwt }, @Body('otpCode') otpCode: string) {
+  async setupMfa(@Request() req: RequestWithUser, @Body('otpCode') otpCode: string) {
     const user = await this.authService.findById(req.user.userId);
     if (!user) {
       throw new BadRequestException('User not found');
@@ -123,7 +129,7 @@ export class AuthController {
   @Post('mfa/verify')
   @UseGuards(JwtAuthGuard)
   async verifyMfa(
-    @Request() req: { user: UserFromJwt },
+    @Request() req: RequestWithUser,
     @Body() verifyMfaDto: VerifyMfaDto,
   ) {
     const isValid = await this.mfaService.verifyMfaToken(
