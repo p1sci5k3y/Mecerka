@@ -59,10 +59,12 @@ function CheckoutForm({
             onSuccess();
         } else if (paymentIntent && paymentIntent.status === 'requires_action') {
             toast.info(t('requiresAction'));
-            // keep processing true while waiting for auth
+            // keep processing true while waiting for auth, fallback clear
+            setTimeout(() => setIsProcessing(false), 5000);
         } else if (paymentIntent && paymentIntent.status === 'processing') {
             toast.info(t('processingPayment'));
-            // keep processing true
+            // keep processing true, fallback clear
+            setTimeout(() => setIsProcessing(false), 5000);
         } else {
             setIsProcessing(false);
         }
