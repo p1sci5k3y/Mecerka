@@ -35,8 +35,6 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mecerka}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mecerka}?schema=public
       - JWT_SECRET=${JWT_SECRET}
       - JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://mecerka.com}
       - FRONTEND_URL=${FRONTEND_URL:-https://mecerka.com}
       - PORT=3000
