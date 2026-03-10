@@ -25,7 +25,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
-  ) { }
+  ) {}
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
@@ -110,13 +110,21 @@ export class AuthController {
 
   @Post('mfa/setup')
   @UseGuards(JwtAuthGuard)
-  async setupMfa(@Request() req: RequestWithUser, @Body('otpCode') otpCode: string) {
+  async setupMfa(
+    @Request() req: RequestWithUser,
+    @Body('otpCode') otpCode: string,
+  ) {
     const user = await this.authService.findById(req.user.userId);
     if (!user) {
       throw new BadRequestException('User not found');
     }
 
-    if (!otpCode || user.mfaSetupToken !== otpCode || !user.mfaSetupExpiresAt || user.mfaSetupExpiresAt < new Date()) {
+    if (
+      !otpCode ||
+      user.mfaSetupToken !== otpCode ||
+      !user.mfaSetupExpiresAt ||
+      user.mfaSetupExpiresAt < new Date()
+    ) {
       throw new BadRequestException('Invalid or expired OTP code.');
     }
 

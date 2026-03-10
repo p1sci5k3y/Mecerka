@@ -20,7 +20,7 @@ import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 @Controller('runner')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 export class RunnerController {
-  constructor(private readonly runnerService: RunnerService) { }
+  constructor(private readonly runnerService: RunnerService) {}
 
   @Post('preview-delivery')
   @Roles(Role.CLIENT, Role.ADMIN)

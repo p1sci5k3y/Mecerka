@@ -25,7 +25,7 @@ export class WebhooksController {
 
   constructor(
     private readonly paymentsService: PaymentsService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {
     const stripeKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     const webhookKey = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
@@ -105,8 +105,13 @@ export class WebhooksController {
         );
       } catch (error: any) {
         // Ignore known concurrent errors if already processed successfully by an overlapping webhook
-        if (error.status === 409 || error.message.includes('Concurrent stock update detected')) {
-          this.logger.warn(`Ignored concurrent retry or conflict for order ${orderId}: ${error.message}`);
+        if (
+          error.status === 409 ||
+          error.message.includes('Concurrent stock update detected')
+        ) {
+          this.logger.warn(
+            `Ignored concurrent retry or conflict for order ${orderId}: ${error.message}`,
+          );
           return res.status(HttpStatus.OK).json({ received: true });
         }
 
