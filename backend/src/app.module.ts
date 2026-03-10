@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -18,6 +19,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }), // Makes ConfigService injectable across all modules
     EventEmitterModule.forRoot(),
     PrismaModule,
     CitiesModule,
@@ -46,4 +48,4 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

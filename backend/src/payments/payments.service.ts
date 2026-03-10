@@ -32,6 +32,8 @@ export class PaymentsService {
     }
 
     this.stripe = new Stripe(stripeSecretKey, {
+      // TODO: Update when Stripe publishes a stable GA SDK — stripe@20.x only
+      // supports '2026-02-25.clover'; changing this causes a TS compilation error.
       apiVersion: '2026-02-25.clover',
     });
   }
@@ -400,9 +402,9 @@ export class PaymentsService {
           partialCancelled:
             !allRejected && rejectedProviderOrders.length > 0
               ? {
-                  orderId: order.id,
-                  rejectedProviderOrderIds: rejectedProviderOrders,
-                }
+                orderId: order.id,
+                rejectedProviderOrderIds: rejectedProviderOrders,
+              }
               : null,
         },
       };
