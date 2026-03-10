@@ -11,10 +11,24 @@ env:
 
 jobs:
   backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./backend
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: mecerka
+          POSTGRES_PASSWORD: mecerka_test_pass
+          POSTGRES_DB: mecerka_test
+        ports:
+          - 5432:5432
+        # Wait for postgres to be ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://mecerka:mecerka_test_pass@localhost:5432/mecerka_test?schema=public
 
     steps:
       - uses: actions/checkout@v4
@@ -29,6 +43,7 @@ jobs:
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run build
+      - run: npx prisma migrate deploy
       - run: npm run test
       - run: npm audit --audit-level=high
 
