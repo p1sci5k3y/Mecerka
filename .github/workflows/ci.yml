@@ -81,7 +81,7 @@ jobs:
           node -v
           npm -v
       - name: Build Frontend
-        run: npm run build > build.log 2>&1 || (cat build.log && exit 1)
+        run: npm run build
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           NEXT_TELEMETRY_DISABLED: 1
