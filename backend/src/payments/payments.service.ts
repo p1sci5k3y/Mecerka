@@ -20,8 +20,22 @@ export class PaymentsService {
     }
 
     private async attemptStockDeduction(tx: any, items: any[]): Promise<boolean> {
+        const productIds = items.map((i) => i.productId);
+        const products = await tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: { id: true, stock: true },
+        });
+        const productMap = new Map(products.map((p: any) => [p.id, p]));
+
         for (const item of items) {
-            const updatedProduct = await tx.product.updateMany({
+            const p: any = productMap.get(item.productId);
+            if (!p || p.stock < item.quantity) {
+                return false;
+            }
+        }
+
+        for (const item of items) {
+            await tx.product.updateMany({
                 where: {
                     id: item.productId,
                     stock: { gte: item.quantity },
@@ -30,10 +44,6 @@ export class PaymentsService {
                     stock: { decrement: item.quantity },
                 },
             });
-
-            if (updatedProduct.count === 0) {
-                return false;
-            }
         }
         return true;
     }
@@ -48,7 +58,7 @@ export class PaymentsService {
             return { message: 'Webhook already processed' };
         }
 
-        return this.prisma.$transaction(async (tx) => {
+        const result: any = await this.prisma.$transaction(async (tx) => {
             // 2. Atomic Event Registration
             try {
                 await tx.webhookEvent.create({
@@ -113,21 +123,34 @@ export class PaymentsService {
                 throw new ConflictException('Order status changed concurrently during payment confirmation');
             }
 
-            // 6. Emit event to decouple downstream logic
-            this.eventEmitter.emit('order.stateChanged', {
+            // 6. Return events to decouple downstream logic from transaction
+            return {
+                success: true,
                 orderId: order.id,
                 status: finalStatus,
                 paymentRef,
-            });
-
-            if (!allRejected && rejectedProviderOrders.length > 0) {
-                this.eventEmitter.emit('order.partialCancelled', {
-                    orderId: order.id,
-                    rejectedProviderOrderIds: rejectedProviderOrders
-                });
-            }
-
-            return { success: true, orderId: order.id, status: finalStatus, paymentRef };
+                _events: {
+                    stateChanged: {
+                        orderId: order.id,
+                        status: finalStatus,
+                        paymentRef,
+                    },
+                    partialCancelled: (!allRejected && rejectedProviderOrders.length > 0) ? {
+                        orderId: order.id,
+                        rejectedProviderOrderIds: rejectedProviderOrders
+                    } : null
+                }
+            };
         });
+
+        if (result?._events) {
+            this.eventEmitter.emit('order.stateChanged', result._events.stateChanged);
+            if (result._events.partialCancelled) {
+                this.eventEmitter.emit('order.partialCancelled', result._events.partialCancelled);
+            }
+            delete result._events;
+        }
+
+        return result;
     }
 }
