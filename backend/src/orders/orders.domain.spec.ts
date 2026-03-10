@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaymentsService } from '../payments/payments.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('OrdersService - Saga Lite Payment Domain', () => {
   let paymentsService: PaymentsService;
@@ -16,6 +17,10 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
         PaymentsService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('dummy') },
+        },
       ],
     }).compile();
 
