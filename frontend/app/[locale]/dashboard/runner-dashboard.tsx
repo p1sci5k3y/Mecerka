@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Route, CheckCircle, Clock, Navigation, MapPin, Truck, CheckCircle2, Package } from 'lucide-react';
+import { Loader2, Route, CheckCircle, Clock, Navigation, MapPin, Truck, CheckCircle2, Package, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 export function RunnerDashboard() {
     const { user } = useAuth();
@@ -24,7 +25,39 @@ export function RunnerDashboard() {
             }
         }
         loadData();
+
+        // Check for oauth return flags
+        const params = new URLSearchParams(globalThis.location?.search);
+        if (params.get('stripe_connected') === 'true') {
+            toast.success("¡Cuenta de Stripe vinculada con éxito!");
+            // Remove params from URL silently
+            globalThis.history.replaceState({}, '', globalThis.location.pathname);
+        } else if (params.get('error') === 'verification_failed') {
+            toast.error("Hubo un problema verificando tu cuenta de Stripe. Asegúrate de completar todos los datos.");
+        }
     }, [user]);
+
+    const handleStripeConnect = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/connect/link`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Failed to get onboarding link');
+            const data = await res.json();
+
+            // Mitigate Open Redirect: Validate URL origin before redirecting
+            if (typeof data?.url === 'string' && data.url.startsWith('https://connect.stripe.com')) {
+                // eslint-disable-next-line
+                globalThis.location.href = data.url;
+            } else {
+                throw new Error('Invalid or unsafe Stripe connecting URL');
+            }
+        } catch (error) {
+            toast.error("No se pudo iniciar la conexión con Stripe.");
+        }
+    };
+
 
     if (loading) {
         return (
@@ -41,7 +74,7 @@ export function RunnerDashboard() {
 
     const activeStop = activeOrders.length > 0 ? activeOrders[0] : null;
 
-    const handleMarkDelivered = async () => {
+    const handleMarkDelivered = async (orderId: number) => {
         // In a real app we'd call an endpoint like completed
         // await ordersService.completeOrder(orderId);
         // Refresh
@@ -61,6 +94,38 @@ export function RunnerDashboard() {
                 <p className="text-slate-500 dark:text-slate-400 text-lg">
                     Gestiona tus entregas y ganancias en Mecerka.
                 </p>
+            </div>
+
+            {/* STRIPE CONNECT SECTION */}
+            <div className="bg-white dark:bg-[#201512]/50 rounded-xl p-8 shadow-sm border border-[#df795d]/10 mb-8 overflow-hidden relative">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
+                    <div className="flex gap-4 items-start">
+                        <div className={`p-3 rounded-full ${user?.stripeAccountId ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                            <CreditCard className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <h2 className="text-slate-900 dark:text-slate-100 text-xl font-serif font-bold">Cobros y Depósitos Automáticos</h2>
+                            {user?.stripeAccountId ? (
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                    Tu cuenta bancaria está conectada y verificada. Recibirás en ella el pago de todos tus viajes (liquidación 50/50 Cliente-Restaurante).
+                                </p>
+                            ) : (
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                    Es obligatorio conectar tu cuenta bancaria (Stripe) para poder recibir el dinero de los viajes que realices.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    {!user?.stripeAccountId && (
+                        <Button onClick={handleStripeConnect} className="bg-[#df795d] hover:bg-[#c96a51] text-white whitespace-nowrap">
+                            Conectar con Stripe
+                        </Button>
+                    )}
+                </div>
+                {/* Decorative background element */}
+                <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-[#df795d]/5 rounded-full blur-3xl -z-0"></div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
@@ -159,7 +224,7 @@ export function RunnerDashboard() {
                                     </div>
                                 </div>
 
-                                <Button className="w-full h-14 bg-[#81A16C] hover:bg-[#6b8c56] text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm rounded-xl" onClick={() => handleMarkDelivered()}>
+                                <Button className="w-full h-14 bg-[#81A16C] hover:bg-[#6b8c56] text-white text-lg font-bold flex items-center justify-center gap-2 shadow-sm rounded-xl" onClick={() => handleMarkDelivered(activeStop.id)}>
                                     <CheckCircle2 className="w-5 h-5" /> Marcar Entregado
                                 </Button>
 

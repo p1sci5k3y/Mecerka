@@ -7,12 +7,15 @@ import {
   Minus,
   Plus,
   ArrowRight,
-  
+
   Inbox,
   MapPin,
   Truck,
-  
+  Loader2,
+  CreditCard,
+  Banknote,
 } from "lucide-react"
+import { StripeCheckoutWrapper } from "./stripe-checkout"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -58,7 +61,12 @@ function CartContent() {
   const [showPinModal, setShowPinModal] = useState(false)
   const [pinValue, setPinValue] = useState("")
 
-  const startCheckoutFlow = () => {
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "cash">("card")
+  const [clientSecret, setClientSecret] = useState("")
+  const [stripeAccountId, setStripeAccountId] = useState("")
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
+
+  const startCheckoutFlow = async () => {
     if (!deliveryAddress.trim()) {
       toast.error("Por favor, indícanos dónde entregarlo para que el repartidor pueda llegar.", {
         icon: "📍"
@@ -66,26 +74,11 @@ function CartContent() {
       return
     }
 
-    // Check if user has PIN
-    if (user && !user.hasPin) {
-      toast.error("Debes configurar un PIN transaccional en tu Ficha Personal antes de comprar.", {
+    if (paymentMethod === "cash" && user && !user.hasPin) {
+      toast.error("Debes configurar un PIN transaccional en tu Ficha Personal antes de comprar al contado.", {
         icon: "🔐",
-        action: {
-          label: "Configurar PIN",
-          onClick: () => router.push("/profile")
-        }
+        action: { label: "Configurar PIN", onClick: () => router.push("/profile") }
       })
-      return
-    }
-
-    setPinValue("")
-    setShowPinModal(true)
-  }
-
-  const submitOrderWithPin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!pinValue || pinValue.length < 4) {
-      toast.error("Por favor, introduce tu PIN de compra válido.")
       return
     }
 
@@ -97,26 +90,74 @@ function CartContent() {
           quantity: i.quantity,
         })),
         deliveryAddress: deliveryAddress.trim(),
-        pin: pinValue,
       }
-      await ordersService.create(payload)
-      clearCart()
-      setShowPinModal(false)
-      toast.success("¡Pedido firmado y confirmado! Los talleres ya están preparando tus artículos.", {
-        icon: "🎉"
-      })
-      router.push("/dashboard")
+
+      const createdOrder = await ordersService.create(payload)
+      setPendingOrderId(createdOrder.id)
+
+      if (paymentMethod === "card") {
+        const token = localStorage.getItem('token')
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/intent/${createdOrder.id}`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || 'Error al conectar con la pasarela de pago segura');
+        }
+
+        const data = await res.json();
+        setClientSecret(data.clientSecret);
+        setStripeAccountId(data.stripeAccountId);
+      }
+
+      setPinValue("")
+      setShowPinModal(true)
     } catch (error: any) {
-      if (error?.response?.status === 401 || error?.status === 401) {
-        toast.error("El PIN introducido es incorrecto.")
-      } else {
-        toast.error(error.message || "¡Vaya! Tuvimos un problema temporal conectando con los talleres.", {
-          icon: "🛠️"
-        })
-      }
+      toast.error(error.message || "Tuvimos un problema procesando tu compra.", { icon: "🛠️" })
     } finally {
       setCheckingOut(false)
     }
+  }
+
+  const submitOrderWithPin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!pinValue || pinValue.length < 4) {
+      toast.error("Por favor, introduce tu PIN de compra válido.")
+      return
+    }
+
+    setCheckingOut(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/cash/${pendingOrderId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ pin: pinValue })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Error confirmando el pago al contado');
+      }
+
+      handleSuccessfulPayment(true);
+    } catch (error: any) {
+      toast.error(error.message || "¡Vaya! Tuvimos un problema confirmando tu pedido.", { icon: "🛠️" })
+    } finally {
+      setCheckingOut(false)
+    }
+  }
+
+  const handleSuccessfulPayment = (isCash = false) => {
+    clearCart()
+    setShowPinModal(false)
+    toast.success(`¡Pedido ${isCash ? 'al contado ' : ''}confirmado! Los talleres ya están preparándolo.`, { icon: "🎉" })
+    router.push("/dashboard")
   }
 
   // Calculate simulated shipping cost based on items
@@ -284,6 +325,44 @@ function CartContent() {
                         </button>
                       </div>
                     </div>
+
+                    <div className="mt-2 flex flex-col gap-3">
+                      <Label className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                        Método de Pago
+                      </Label>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("card")}
+                          className={`flex flex-col items-start gap-1 p-4 rounded-xl border-2 text-left transition-all ${paymentMethod === "card"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                            : "border-border/60 hover:border-border/80"
+                            }`}
+                        >
+                          <span className="font-bold flex items-center gap-2 w-full">
+                            <CreditCard className="h-5 w-5 text-primary" />
+                            Tarjeta / Apple Pay
+                          </span>
+                          <span className="text-xs text-muted-foreground leading-relaxed">Pago online seguro a través de Stripe.</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("cash")}
+                          className={`flex flex-col items-start gap-1 p-4 rounded-xl border-2 text-left transition-all ${paymentMethod === "cash"
+                            ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                            : "border-border/60 hover:border-border/80"
+                            }`}
+                        >
+                          <span className="font-bold flex items-center gap-2 w-full">
+                            <Banknote className="h-5 w-5 text-primary" />
+                            Pago al Contado
+                          </span>
+                          <span className="text-xs text-muted-foreground leading-relaxed">Paga en efectivo al repartidor al recibir.</span>
+                        </button>
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               </div>
@@ -374,44 +453,67 @@ function CartContent() {
       </main>
       <Footer />
 
-      {/* Transaction PIN Modal */}
-      <Dialog open={showPinModal} onOpenChange={setShowPinModal}>
+      {/* Transaction Modal (PIN for Cash OR Stripe Elements for Card) */}
+      <Dialog open={showPinModal} onOpenChange={(open) => {
+        if (!open && checkingOut) return; // Prevent closing if processing
+        setShowPinModal(open);
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl">Confirmar Pedido</DialogTitle>
+            <DialogTitle className="font-display text-2xl">
+              {paymentMethod === 'card' ? 'Pago Seguro' : 'Confirmar Pedido'}
+            </DialogTitle>
             <DialogDescription>
-              Firma esta transacción introduciendo tu PIN de seguridad (4-6 dígitos).
+              {paymentMethod === 'card'
+                ? 'Introduce tus datos de pago de forma segura a través de Stripe.'
+                : 'Firma esta transacción introduciendo tu PIN de seguridad (4-6 dígitos).'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submitOrderWithPin} className="flex flex-col gap-4 py-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="pin-input" className="sr-only">PIN de Compra</Label>
-              <Input
-                id="pin-input"
-                type="password"
-                maxLength={6}
-                value={pinValue}
-                onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
-                placeholder="****"
-                className="text-center text-2xl tracking-widest font-mono h-14 rounded-xl"
-                autoFocus
+
+          {paymentMethod === 'card' && clientSecret && stripeAccountId ? (
+            <div className="py-4">
+              <StripeCheckoutWrapper
+                clientSecret={clientSecret}
+                stripeAccountId={stripeAccountId}
+                totalAmount={(totalPrice + activeShippingCost)}
+                onPaymentSuccess={() => handleSuccessfulPayment(false)}
               />
             </div>
-            <DialogFooter className="mt-4 sm:justify-center">
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full text-base font-bold h-12 rounded-xl shadow-sm"
-                disabled={checkingOut}
-              >
-                {checkingOut ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                ) : (
-                  `Pagar ${(totalPrice + activeShippingCost).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
+          ) : paymentMethod === 'cash' ? (
+            <form onSubmit={submitOrderWithPin} className="flex flex-col gap-4 py-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="pin-input" className="sr-only">PIN de Compra</Label>
+                <Input
+                  id="pin-input"
+                  type="password"
+                  maxLength={6}
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
+                  placeholder="****"
+                  className="text-center text-2xl tracking-widest font-mono h-14 rounded-xl"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter className="mt-4 sm:justify-center">
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="w-full text-base font-bold h-12 rounded-xl shadow-sm"
+                  disabled={checkingOut}
+                >
+                  {checkingOut ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    `Pagar al Contado: ${(totalPrice + activeShippingCost).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

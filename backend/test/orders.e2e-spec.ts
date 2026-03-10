@@ -21,6 +21,8 @@ describe('Order Lifecycle (e2e)', () => {
     let providerOrderId: string;
 
     beforeAll(async () => {
+
+
         const moduleFixture: TestingModule = await Test.createTestingModule({
             imports: [AppModule],
         }).compile();
@@ -29,6 +31,11 @@ describe('Order Lifecycle (e2e)', () => {
         app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
         await app.init();
 
+        const PWD_VAL = process.env.E2E_PASS;
+        if (!PWD_VAL) {
+            throw new Error('Missing E2E_PASS environment variable for creating test users');
+        }
+
         prisma = app.get<PrismaService>(PrismaService);
 
         // Clean DB setup (or handle uniquely)
@@ -36,32 +43,32 @@ describe('Order Lifecycle (e2e)', () => {
 
         await request(app.getHttpServer())
             .post('/auth/register')
-            .send({ email: `client_${suffix}@e2e.com`, password: 'A1_StrongPassword!', name: 'Client', role: Role.CLIENT });
+            .send({ email: `client_${suffix}@e2e.com`, password: PWD_VAL, name: 'Client', role: Role.CLIENT });
 
         const client = await prisma.user.findFirst({ where: { email: `client_${suffix}@e2e.com` } });
         await prisma.user.update({ where: { id: client!.id }, data: { emailVerified: true } });
 
         await request(app.getHttpServer())
             .post('/auth/register')
-            .send({ email: `prov_${suffix}@e2e.com`, password: 'A1_StrongPassword!', name: 'Provider', role: Role.PROVIDER });
+            .send({ email: `prov_${suffix}@e2e.com`, password: PWD_VAL, name: 'Provider', role: Role.PROVIDER });
         const prov = await prisma.user.findFirst({ where: { email: `prov_${suffix}@e2e.com` } });
         await prisma.user.update({ where: { id: prov!.id }, data: { emailVerified: true } });
         providerId = prov!.id;
 
         await request(app.getHttpServer())
             .post('/auth/register')
-            .send({ email: `run_${suffix}@e2e.com`, password: 'A1_StrongPassword!', name: 'Runner', role: Role.RUNNER });
+            .send({ email: `run_${suffix}@e2e.com`, password: PWD_VAL, name: 'Runner', role: Role.RUNNER });
         const runUsr = await prisma.user.findFirst({ where: { email: `run_${suffix}@e2e.com` } });
         await prisma.user.update({ where: { id: runUsr!.id }, data: { emailVerified: true } });
 
         // Login calls
-        const cLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `client_${suffix}@e2e.com`, password: 'A1_StrongPassword!' });
+        const cLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `client_${suffix}@e2e.com`, password: PWD_VAL });
         clientToken = cLogin.body.access_token;
 
-        const pLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `prov_${suffix}@e2e.com`, password: 'A1_StrongPassword!' });
+        const pLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `prov_${suffix}@e2e.com`, password: PWD_VAL });
         providerToken = pLogin.body.access_token;
 
-        const rLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `run_${suffix}@e2e.com`, password: 'A1_StrongPassword!' });
+        const rLogin = await request(app.getHttpServer()).post('/auth/login').send({ email: `run_${suffix}@e2e.com`, password: PWD_VAL });
         runnerToken = rLogin.body.access_token;
 
         // Set pin for client
@@ -74,7 +81,7 @@ describe('Order Lifecycle (e2e)', () => {
             data: { name: `Prod E2E ${suffix}`, price: 10.5, stock: 100, providerId, cityId: city.id, categoryId: cat.id }
         });
 
-        cityId = city.id;
+
         productId = prod.id;
     });
 
