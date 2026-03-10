@@ -65,9 +65,10 @@ resource "aws_security_group" "mecerka_sg" {
 
 # 2. Existing EC2 Instance Management (Import Block)
 # We use an import block so Terraform takes over the existing instance without deleting it
+# Note: import blocks do not support variable references — the id must be a literal value
 import {
   to = aws_instance.mecerka_server
-  id = var.existing_instance_id
+  id = "i-07b8b2ff00c18d875"
 }
 
 resource "aws_instance" "mecerka_server" {
