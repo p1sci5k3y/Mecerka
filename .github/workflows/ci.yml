@@ -66,6 +66,22 @@ jobs:
     defaults:
       run:
         working-directory: ./frontend
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: mecerka
+          POSTGRES_PASSWORD: mecerka_test_pass
+          POSTGRES_DB: mecerka_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mecerka:mecerka_test_pass@127.0.0.1:5432/mecerka_test?schema=public
 
     steps:
       - uses: actions/checkout@v4
@@ -78,8 +94,12 @@ jobs:
 
       - run: npm install --legacy-peer-deps
       - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           node -v
           npm -v
+          echo "Waiting for PostgreSQL to be ready..."
+          timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
+          echo "PostgreSQL is up!"
       - name: Build Frontend
         run: npm run build
         env:
