@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mecerka_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mecerka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-mecerka}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mecerka_network
+    # We do NOT publish ports to the EC2 host to keep DB closed from public internet
+    # Internally accessible via the mecerka_network on 5432
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mecerka_backend_prod
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-mecerka}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mecerka}?schema=public
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://mecerka.com}
+      - PORT=3000
+    ports:
+      - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
+    networks:
+      - mecerka_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.mecerka.com}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+    container_name: mecerka_frontend_prod
+    restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.mecerka.com}
+      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      - PORT=3001
+    ports:
+      - "127.0.0.1:3001:3001" # Expose only to localhost for Nginx reverse proxy
+    networks:
+      - mecerka_network
+
+volumes:
+  postgres_data:
+    name: mecerka_postgres_volume
+
+networks:
+  mecerka_network:
+    name: mecerka_network
+    driver: bridge
