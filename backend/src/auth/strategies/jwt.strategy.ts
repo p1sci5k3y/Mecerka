@@ -28,11 +28,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
             try {
               jwt.verify(rawJwtToken, previousSecret);
               return done(null, previousSecret);
-            } catch {
-              return done(error_, previousSecret);
+            } catch (err) {
+              return done(err);
             }
           }
-          return done(error_, currentSecret);
+          return done(error_);
         }
       },
     });
