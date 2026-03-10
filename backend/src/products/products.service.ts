@@ -17,8 +17,12 @@ export class ProductsService {
       select: { stripeAccountId: true },
     });
 
-    if (!user?.stripeAccountId) {
-      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de publicar productos.');
+    if (!user) {
+      throw new NotFoundException(`User with ID ${providerId} not found`);
+    }
+
+    if (!user.stripeAccountId) {
+      throw new ForbiddenException('Complete your Stripe financial registration before publishing products.');
     }
 
     return this.prisma.product.create({
@@ -89,8 +93,12 @@ export class ProductsService {
       select: { stripeAccountId: true },
     });
 
-    if (!user?.stripeAccountId) {
-      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de gestionar tu stock.');
+    if (!user) {
+      throw new NotFoundException(`User with ID ${providerId} not found`);
+    }
+
+    if (!user.stripeAccountId) {
+      throw new ForbiddenException('Complete your Stripe financial registration before managing your stock.');
     }
 
     const product = await this.prisma.product.findUnique({
