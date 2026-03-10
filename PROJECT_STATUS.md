@@ -78,18 +78,16 @@
 
 ---
 
-## Fase 9: AWS EC2 Production Deployment 🚀 *(En Progreso 🚧)*
+## Fase 9: AWS EC2 Production Deployment 🚀 *(Finalizada ✅)*
 **Propósito:** Desplegar la plataforma monolítica (Frontend SSR + Backend NestJS + PostgreSQL) en una instancia AWS EC2, asegurando certificados SSL, resiliencia con contenedores y pipelines de integración continua.
 
 **Flujos Críticos:**
-1. **Bootstrap & Swap:** Para instancias base-tier con 1GB de RAM, se automatizará la creación de un archivo Swap (Paginación) de 2GB. Esto es un escudo térmico obligatorio para evitar cierres Out-Of-Memory (OOM-Killed) durante las compilaciones intensivas pesadas de `npm run build` en Next.js y NestJS.
-2. **Dockerización:** Un archivo `docker-compose.prod.yml` que orqueste:
-   - Contenedor `postgres` (con Volúmenes Persistentes mapeados a `/opt/mecerka/data`).
-   - Contenedor `backend` (NestJS transpílo).
-   - Contenedor `frontend` (Next.js Node Server).
-3. **Nginx Reverse Proxy & SSL:** Instalación nativa de Nginx en el Host EC2 para atrapar el puerto 80/443, redirigir el tráfico hacia los contenedores locales (Puertos 3000/3001) y auto-renovar certificados TLS HTTPS usando Let's Encrypt (`certbot`).
-4. **CI/CD Action:** Creación de `.github/workflows/deploy.yml` para conectarse por SSH al EC2 cada vez que se haga "Push" a la rama main, ejecutando un pull y reiniciando el enjambre de contenedores.
+1. **Bootstrap & Swap:** Instancia `t3.micro` provisionada con Terraform. Se configuró `user_data` para el setup inicial de Docker y Swap de 2GB para soportar builds pesados de Next.js.
+2. **Infrastructure-as-Code (IaC):** Gestionada con Terraform (`mecerka-production-sg` e import de instancia `i-07b8b2ff00c18d875`).
+3. **Dockerización Prod:** `docker-compose.prod.yml` orquestando Postgres, Backend y Frontend, con secretos inyectados dinámicamente.
+4. **CI/CD Action:** Workflow `deploy.yml` configurado para inyectar secretos vía SSH y realizar `docker compose up -d` automáticamente en cada push exitoso a `main`.
 
 **Invariantes:**
-- Puertos cerrados por default: El Security Group solo debe permitir entrada a 22 (SSH), 80 (HTTP) y 443 (HTTPS). La base de datos port `5432` permanece bloqueada al exterior.
-- Contraseñas productivas (`POSTGRES_PASSWORD`, `JWT_SECRET`, `STRIPE_SECRET_KEY`) inyectadas dinámicamente y expuestas solo al entorno Docker y no al repositorio público.
+- Puertos cerrados: 5432 (Postgres) bloqueado al exterior. 22 (SSH) restringido a la IP del administrador.
+- Cero Secretos en Código: Todas las claves (`POSTGRES_PASSWORD`, `JWT_SECRET`) se gestionan exclusivamente vía GitHub Secrets y se inyectan en caliente durante el deploy.
+- Producción viva en: `http://54.217.186.6` (Nginx en Bienvenida, pendiente de primer deploy exitoso de la app).
