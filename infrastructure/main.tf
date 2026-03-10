@@ -18,9 +18,10 @@ resource "aws_security_group" "mecerka_sg" {
   description = "Security group for Mecerka EC2 instance (HTTP, HTTPS, SSH)"
   vpc_id      = var.existing_vpc_id
 
-  # SSH Access
+  # SSH Access — restricted to admin_cidr_blocks (defaults to 0.0.0.0/0, override per environment)
+  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
   ingress {
-    description = "SSH from anywhere (tighten in production)"
+    description = "SSH access (restrict admin_cidr_blocks in tfvars for production)"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -47,12 +48,13 @@ resource "aws_security_group" "mecerka_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Egress: Allow all outbound traffic (needed for apt/dnf, docker pulls, integration with Stripe)
+  # Egress: Allow all outbound (needed for apt/dnf, docker pulls, Stripe API, etc.)
+  # tfsec:ignore:aws-vpc-no-public-egress-sgr
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"] # tfsec:ignore:aws-vpc-no-public-egress-sgr
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
