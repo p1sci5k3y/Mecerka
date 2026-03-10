@@ -101,12 +101,14 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           node -v
           npm -v
+          echo "Isolating frontend workspace..."
+          rm -f ../package.json ../package-lock.json
           echo "Waiting for PostgreSQL to be ready..."
           timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
           echo "PostgreSQL is up!"
 
       - name: Build Frontend
-        run: cd frontend && npm run build
+        run: cd frontend && npx next build
       
       - name: Test Frontend
         run: cd frontend && npm run test
