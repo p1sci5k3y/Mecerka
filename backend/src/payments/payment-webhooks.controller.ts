@@ -6,8 +6,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { PaymentsService } from './payments.service';
+
+@SkipThrottle() // Stripe retries quickly on failure — throttle would cause permanent event loss
 @Controller('webhooks/stripe')
 export class PaymentWebhooksController {
   // private stripe: Stripe;
