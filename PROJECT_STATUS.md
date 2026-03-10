@@ -9,6 +9,8 @@
 - **Fase 5 (Dominio Zero-Trust & Bastionado Avanzado)**: Finalizada ✅
 - **Fase 6 (Governance & Metrics)**: Finalizada ✅
 - **Fase 7 (Deploy, Security & Documentation)**: Finalizada ✅
+- **Fase 8 (Stripe Connect & Split Payments)**: Finalizada ✅
+- **Fase 9 (AWS EC2 Production Deployment)**: En Progreso 🚧
 
 ## Hitos Completados (Milestones & Fases Socráticas)
 
@@ -61,14 +63,33 @@
 
 ---
 
-## Fase 8: Stripe Connect (Split Payments) 🏗️ *(Pending)*
-**Propósito:** Transicionar de un modelo "Dummy Merchant" a un Marketplace real Multi-Vendor sin custodia de credenciales de terceros.
+## Fase 8: Stripe Connect (Split Payments) 🏗️ *(Finalizada ✅)*
+**Propósito:** Transicionar de un modelo "Dummy Merchant" a un Marketplace real Multi-Vendor (Zero-Liability Architecture) sin custodia de credenciales de terceros.
 
 **Flujos Críticos:**
 1. **Onboarding Seguro (OAuth):** Flujo en el Dashboard donde Providers y Runners vinculan sus cuentas de cobro ("Connect with Stripe"), devolviendo un `account_id` transparente.
-2. **Checkout Unificado (Client):** El cliente sigue pagando un único monto (Pedido + Tarifa de Envío) a la llave base de Mecerka.
-3. **Split Computado:** El backend de Mecerka utiliza `transfer_data` durante el SetupIntent para automáticamente dividir el fondo unificado entre el comercio, el transportista y la reserva de plataforma.
+2. **Checkout Unificado (Client):** El cliente paga un único monto (Pedido + Tarifa de Envío) a través de Stripe Payment Element (Soporte Google Pay, Apple Pay).
+3. **Split Computado (Direct Charges):** El backend de Mecerka utiliza *PaymentIntents* con el header `Stripe-Account` para crear el Cargo Directamente a la cuenta del Proveedor. Mecerka aísla el coste logístico a través de `application_fee_amount` para luego transferirlo al Runner, logrando un flujo donde la plataforma asume **Cero Responsabilidad** (Zero Liability) legal por *chargebacks* o devoluciones.
 
 **Invariantes:**
 - Mecerka JAMÁS almacenará ni solicitará llaves secretas (`sk_live_...`) de proveedores ni repartidores en sus bases de datos.
-- Las comisiones de Plataforma (Application Fee) se deducirán o programarán simétricamente en el momento exacto en que el Runner marca el pedido como "Entregado".
+- Las comisiones o costes (Application Fee) se deducen dinámicamente mediante el orquestador backend con precisión aritmética (`Math.round()` en céntimos) y tipados estrictos.
+- KYC Obligatorio: Un proveedor sin la cuenta verificada `stripeAccountId` tiene denegada por API la subida de inventario y no puede recibir órdenes de compra.
+
+---
+
+## Fase 9: AWS EC2 Production Deployment 🚀 *(En Progreso 🚧)*
+**Propósito:** Desplegar la plataforma monolítica (Frontend SSR + Backend NestJS + PostgreSQL) en una instancia AWS EC2, asegurando certificados SSL, resiliencia con contenedores y pipelines de integración continua.
+
+**Flujos Críticos:**
+1. **Bootstrap & Swap:** Para instancias base-tier con 1GB de RAM, se automatizará la creación de un archivo Swap (Paginación) de 2GB. Esto es un escudo térmico obligatorio para evitar cierres Out-Of-Memory (OOM-Killed) durante las compilaciones intensivas pesadas de `npm run build` en Next.js y NestJS.
+2. **Dockerización:** Un archivo `docker-compose.prod.yml` que orqueste:
+   - Contenedor `postgres` (con Volúmenes Persistentes mapeados a `/opt/mecerka/data`).
+   - Contenedor `backend` (NestJS transpílo).
+   - Contenedor `frontend` (Next.js Node Server).
+3. **Nginx Reverse Proxy & SSL:** Instalación nativa de Nginx en el Host EC2 para atrapar el puerto 80/443, redirigir el tráfico hacia los contenedores locales (Puertos 3000/3001) y auto-renovar certificados TLS HTTPS usando Let's Encrypt (`certbot`).
+4. **CI/CD Action:** Creación de `.github/workflows/deploy.yml` para conectarse por SSH al EC2 cada vez que se haga "Push" a la rama main, ejecutando un pull y reiniciando el enjambre de contenedores.
+
+**Invariantes:**
+- Puertos cerrados por default: El Security Group solo debe permitir entrada a 22 (SSH), 80 (HTTP) y 443 (HTTPS). La base de datos port `5432` permanece bloqueada al exterior.
+- Contraseñas productivas (`POSTGRES_PASSWORD`, `JWT_SECRET`, `STRIPE_SECRET_KEY`) inyectadas dinámicamente y expuestas solo al entorno Docker y no al repositorio público.
