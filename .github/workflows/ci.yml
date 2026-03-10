@@ -63,9 +63,6 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
     services:
       postgres:
         image: postgres:15
@@ -82,6 +79,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql://mecerka:mecerka_test_pass@127.0.0.1:5432/mecerka_test?schema=public
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3001
+      NEXT_TELEMETRY_DISABLED: 1
+      NODE_OPTIONS: "--max-old-space-size=4096"
 
     steps:
       - uses: actions/checkout@v4
@@ -92,20 +92,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - run: npm install --legacy-peer-deps
-      - run: |
+      - name: Install dependencies
+        run: cd frontend && npm install --legacy-peer-deps
+
+      - name: Verify environment
+        run: |
+          cd frontend
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           node -v
           npm -v
           echo "Waiting for PostgreSQL to be ready..."
           timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
           echo "PostgreSQL is up!"
+
       - name: Build Frontend
-        run: npm run build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-          NEXT_TELEMETRY_DISABLED: 1
-      - run: npm run test
+        run: cd frontend && npm run build
+      
+      - name: Test Frontend
+        run: cd frontend && npm run test
       - run: npm audit --audit-level=high
 
   security-scans:
