@@ -94,8 +94,8 @@ Mecerka se desarrolla iterativamente siguiendo una Arquitectura Socrática (Prop
 - **Fase 5 (Payment & Idempotency):** Propósito: Pagos atómicos, deducción de stock en tiempo real y webhooks 100% seguros (Zero-Trust).
 - **Fase 6 (Governance & Metrics):** Propósito: Consistencia en métricas analíticas exclusivas de flujos económicamente válidos y roles granulares seguros (Grant/Revoke).
 - **Fase 7 (Deploy, Security & Documentation):** Propósito: Asegurar la calidad para producción a través de CI/CD continuo (testeos unitarios y E2E), endurecer directrices de mitigación DoS mediante rate limiters, revocación inmediata asíncrona de JWT (`tokenVersion`) y consolidación arquitectónica de pagos en un proveedor aislado.
-- **Fase 8 (Stripe Connect & Split Payments):** Propósito: Orquestación de mercado Multi-Vendor real. Onboarding OAuth seguro para Proveedores y Runners sin exponer llaves privadas, y ejecución de cargos unificados al Cliente con separación de saldo automatizada (`transfer_data`).
-
+- **Fase 8 (Stripe Connect & Tripartite Payments):** Propósito: Orquestación de mercado Multi-Vendor real. Onboarding OAuth seguro para Proveedores y Runners, y ejecución de cargos unificados al Cliente mediante **Direct Charges** (Zero-Liability), aislando instantáneamente la comisión de logística mediante `application_fee_amount` sin retener los fondos.
+- **Fase 9 (AWS EC2 Production Deployment):** Propósito: Despliegue de la plataforma en la nube pública mediante Infraestructura e Integración Continua. Aprovisionamiento de instancia EC2 genérica, configuración de Swap para builds seguros, orquestación con Docker Compose (Frontend, Backend, PostgreSQL) y Proxy Inverso con Nginx + SSL Automático (Certbot).
 ## 📋 Changelog
 
 Todas las versiones, correcciones de errores y decisiones arquitectónicas (ej. _Phase 5: Security Hardening_) se registran estrictamente en [CHANGELOG.md](./CHANGELOG.md).
