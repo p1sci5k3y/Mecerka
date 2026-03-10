@@ -1,0 +1,37 @@
+name: Deploy to Production (AWS EC2)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Pull latest changes
+            cd /opt/mecerka
+            git fetch --all
+            git reset --hard origin/main
+            
+            # 2. Rebuild and restart Next.js and NestJS containers
+            # The backend/frontend images will be built locally on the EC2 machine
+            docker-compose -f docker-compose.prod.yml build --pull
+            
+            # 3. Apply latest configuration detached
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            # 4. Prune old dangling images to preserve t3.micro disk space
+            docker image prune -f
