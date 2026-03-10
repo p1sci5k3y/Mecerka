@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, HeartHandshake, Users, ShoppingBag, Truck, Receipt, ArrowRight, Package, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, HeartHandshake, Users, ShoppingBag, Receipt, ArrowRight } from 'lucide-react';
 import { Link } from '@/lib/navigation';
 import { Button } from '@/components/ui/button';
 import type { Order } from '@/lib/types';

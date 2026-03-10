@@ -87,8 +87,8 @@ Al arrancar con `db seed`, tendrás un entorno listo para operar. Recomendamos s
 
 Mecerka se desarrolla iterativamente siguiendo una Arquitectura Socrática (Propósitos, Flujos e Invariantes claros por fase). Para mayor detalle ver [PROJECT_STATUS.md](./PROJECT_STATUS.md).
 
-- **Fase 1 (MVP Identity & Basics):** Propósito: Autenticación base, Catálogo (Publico/Privado) y BBDD.
-- **Fase 2 (Public Catalog & Privacy):** Propósito: Filtrado dinámico de inventario activo y omisión de PII.
+- **Fase 1 (MVP Identity & Basics):** Propósito: Autenticación base y BBDD.
+- **Fase 2 (Public Catalog & Privacy):** Propósito: Catálogo (Público/Privado), filtrado dinámico de inventario activo y omisión de PII.
 - **Fase 3 (Order Integrity):** Propósito: Consolidación de carritos y candados anti-crossing-cities.
 - **Fase 4 (State Machines):** Propósito: Robustez del flujo de ProviderOrder con Concurrencia Optimista.
 - **Fase 5 (Payment & Idempotency):** Propósito: Pagos atómicos, deducción de stock en tiempo real y webhooks 100% seguros (Zero-Trust).

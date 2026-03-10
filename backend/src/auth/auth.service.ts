@@ -345,12 +345,15 @@ export class AuthService {
   }
 
   async logout(userId: string) {
-    await this.prisma.user.update({
+    const res = await this.prisma.user.updateMany({
       where: { id: userId },
       data: {
         tokenVersion: { increment: 1 },
       },
     });
+    if (res.count === 0) {
+      return { success: false, message: 'Usuario no encontrado' };
+    }
     return { success: true, message: 'Logged out successfully' };
   }
 
