@@ -23,7 +23,8 @@ export class OnboardingController {
     }
 
     @Get('callback')
-    @UseGuards(JwtAuthGuard) // Can be somewhat relaxed if relying on state param, but requiring auth is safer
+    @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
+    @Roles(Role.PROVIDER, Role.RUNNER)
     async handleStripeCallback(
         @Request() req: RequestWithUser,
         @Query('accountId') accountId: string,

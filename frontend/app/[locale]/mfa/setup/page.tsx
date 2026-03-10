@@ -127,8 +127,8 @@ export default function MfaSetupPage() {
                 {step === 2 && (
                     <>
                         <div className="flex justify-center rounded-xl border border-border bg-white p-6 shadow-inner relative z-10 w-fit mx-auto mt-6">
-                            {qrCode ? (
-                                <Image src={qrCode.startsWith('data:image') ? qrCode : ''} alt="QR Code" width={176} height={176} className="h-44 w-44" unoptimized />
+                            {qrCode && qrCode.startsWith('data:image') ? (
+                                <Image src={qrCode} alt="QR Code" width={176} height={176} className="h-44 w-44" unoptimized />
                             ) : (
                                 <div className="h-44 w-44 animate-pulse bg-muted rounded-md" />
                             )}
