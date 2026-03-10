@@ -58,6 +58,7 @@ model User {
   mfaLockUntil               DateTime?
   active                     Boolean   @default(true)
   tokenVersion               Int       @default(1)
+  stripeAccountId            String?   @unique // Stores the Connected Account ID for payout routing
   resetPasswordTokenHash     String?   @unique
   resetPasswordExpiresAt     DateTime?
   passwordChangedAt          DateTime?

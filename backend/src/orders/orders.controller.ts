@@ -89,7 +89,8 @@ export class OrdersController {
   @Get('provider/top-products')
   @Roles(Role.PROVIDER)
   getProviderTopProducts(@Request() req: RequestWithUser) {
-    return this.ordersService.getProviderTopProducts(req.user.userId);
+    const uId = String(req.user.userId);
+    return this.ordersService.getProviderTopProducts(uId);
   }
 
   @Patch('provider-order/:id/status')

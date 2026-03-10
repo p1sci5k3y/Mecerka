@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { authService } from "@/lib/services/auth-service"
 import { Loader2, ShieldCheck } from "lucide-react"
+import Image from "next/image"
 
 export default function MfaSetupPage() {
     const { user, logout, isLoading } = useAuth()
@@ -63,7 +64,7 @@ export default function MfaSetupPage() {
             await authService.verifyMfa(token)
             toast.success("MFA activado correctamente")
             // Force reload or re-hydrate to update mfaEnabled status
-            window.location.href = "/dashboard"
+            globalThis.location.href = "/dashboard"
         } catch {
             toast.error("Código incorrecto")
         } finally {
@@ -127,7 +128,7 @@ export default function MfaSetupPage() {
                     <>
                         <div className="flex justify-center rounded-xl border border-border bg-white p-6 shadow-inner relative z-10 w-fit mx-auto mt-6">
                             {qrCode ? (
-                                <img src={qrCode} alt="QR Code" className="h-44 w-44" />
+                                <Image src={qrCode.startsWith('data:image') ? qrCode : ''} alt="QR Code" width={176} height={176} className="h-44 w-44" unoptimized />
                             ) : (
                                 <div className="h-44 w-44 animate-pulse bg-muted rounded-md" />
                             )}

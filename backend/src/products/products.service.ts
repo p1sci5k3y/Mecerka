@@ -11,7 +11,16 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) { }
 
-  create(createProductDto: CreateProductDto, providerId: string) {
+  async create(createProductDto: CreateProductDto, providerId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: providerId },
+      select: { stripeAccountId: true },
+    });
+
+    if (!user?.stripeAccountId) {
+      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de publicar productos.');
+    }
+
     return this.prisma.product.create({
       data: {
         ...createProductDto,
@@ -22,7 +31,10 @@ export class ProductsService {
 
   findAll() {
     return this.prisma.product.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        provider: { stripeAccountId: { not: null } }
+      },
       include: {
         city: true,
         category: true,
@@ -48,7 +60,11 @@ export class ProductsService {
 
   async findOne(id: string) {
     const product = await this.prisma.product.findFirst({
-      where: { id, isActive: true },
+      where: {
+        id,
+        isActive: true,
+        provider: { stripeAccountId: { not: null } }
+      },
       include: {
         city: true,
         category: true,
@@ -68,6 +84,15 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
     providerId: string,
   ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: providerId },
+      select: { stripeAccountId: true },
+    });
+
+    if (!user?.stripeAccountId) {
+      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de gestionar tu stock.');
+    }
+
     const product = await this.prisma.product.findUnique({
       where: { id },
     });

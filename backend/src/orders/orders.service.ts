@@ -28,17 +28,14 @@ export class OrdersService {
     const { items, deliveryAddress, pin, deliveryLat, deliveryLng } =
       createOrderDto;
 
-    // 0. Verify Transactional PIN
-    const user = await this.prisma.user.findUnique({ where: { id: clientId } });
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    if (!user.pin)
-      throw new BadRequestException(
-        'Debes configurar un PIN de compra en tu perfil.',
-      );
-
-    const isPinValid = await argon2.verify(user.pin, pin);
-    if (!isPinValid)
-      throw new UnauthorizedException('PIN de compra incorrecto.');
+    // 0. Verify Transactional PIN (if provided)
+    if (pin) {
+      const user = await this.prisma.user.findUnique({ where: { id: clientId } });
+      if (!user) throw new NotFoundException('Usuario no encontrado');
+      if (!user.pin) throw new BadRequestException('Debes configurar un PIN de compra en tu perfil.');
+      const isPinValid = await argon2.verify(user.pin, pin);
+      if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
+    }
 
     // 1. Consolidate Duplicate Items in Memory
     const aggregatedItems: { productId: string; quantity: number }[] = [];
@@ -66,6 +63,7 @@ export class OrdersService {
         cityId: true,
         price: true,
         providerId: true,
+        provider: { select: { stripeAccountId: true } },
       },
     });
 
@@ -78,11 +76,16 @@ export class OrdersService {
       );
     }
 
-    // 4. Validation: Active Status
+    // 4. Validation: Active Status & KYC Status
     for (const product of products) {
       if (!product.isActive) {
         throw new BadRequestException(
           `El producto '${product.name}' ya no está disponible (inactivo)`,
+        );
+      }
+      if (!product.provider.stripeAccountId) {
+        throw new BadRequestException(
+          `El producto '${product.name}' pertenece a un proveedor sin cuenta de pagos verificada. Compra no procesable por seguridad.`,
         );
       }
     }
@@ -427,6 +430,14 @@ export class OrdersService {
   }
 
   async acceptOrder(id: string, runnerId: string) {
+    const runner = await this.prisma.user.findUnique({
+      where: { id: runnerId },
+      select: { stripeAccountId: true },
+    });
+    if (!runner?.stripeAccountId) {
+      throw new ForbiddenException('Debes completar tu registro financiero en Stripe antes de aceptar pedidos.');
+    }
+
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Order not found');
     if (!canTransitionOrder(order.status, DeliveryStatus.ASSIGNED)) {
