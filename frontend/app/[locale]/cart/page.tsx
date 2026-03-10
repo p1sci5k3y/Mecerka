@@ -97,6 +97,12 @@ function CartContent() {
 
       if (paymentMethod === "card") {
         const token = localStorage.getItem('token')
+        if (!token) {
+          toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+          router.push('/login');
+          return;
+        }
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/intent/${createdOrder.id}`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
@@ -115,6 +121,7 @@ function CartContent() {
       setPinValue("")
       setShowPinModal(true)
     } catch (error: any) {
+      setPendingOrderId(null);
       toast.error(error.message || "Tuvimos un problema procesando tu compra.", { icon: "🛠️" })
     } finally {
       setCheckingOut(false)
@@ -130,7 +137,18 @@ function CartContent() {
 
     setCheckingOut(true)
     try {
+      if (!pendingOrderId) {
+        toast.error("No hay pedido pendiente por confirmar.");
+        return;
+      }
+
       const token = localStorage.getItem('token')
+      if (!token) {
+        toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+        router.push('/login');
+        return;
+      }
+
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/cash/${pendingOrderId}`, {
         method: 'POST',
         headers: {
@@ -510,8 +528,22 @@ function CartContent() {
               </DialogFooter>
             </form>
           ) : (
-            <div className="py-8 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="py-8 flex flex-col items-center justify-center gap-4">
+              {(!clientSecret || !stripeAccountId) && paymentMethod === 'card' ? (
+                <>
+                  <p className="text-sm font-medium text-destructive text-center max-w-sm">
+                    No se pudo cargar la pasarela de pago.
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => {
+                    setShowPinModal(false);
+                    toast.error("Vuelve a intentarlo desde la cesta.");
+                  }}>
+                    Volver y Reintentar
+                  </Button>
+                </>
+              ) : (
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              )}
             </div>
           )}
         </DialogContent>

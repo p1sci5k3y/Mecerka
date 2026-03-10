@@ -36,10 +36,12 @@ export function ProviderDashboard() {
         const params = new URLSearchParams(globalThis.location?.search);
         if (params.get('stripe_connected') === 'true') {
             toast.success("¡Cuenta de Stripe vinculada con éxito!");
-            // Remove params from URL silently
-            globalThis.history.replaceState({}, '', globalThis.location.pathname);
         } else if (params.get('error') === 'verification_failed') {
             toast.error("Hubo un problema verificando tu cuenta de Stripe. Asegúrate de completar todos los datos.");
+        }
+
+        if (params.has('stripe_connected') || params.has('error')) {
+            globalThis.history.replaceState({}, '', globalThis.location.pathname);
         }
     }, [user]);
 
@@ -54,10 +56,15 @@ export function ProviderDashboard() {
             const data = await res.json();
 
             // Mitigate Open Redirect: Validate URL origin before redirecting
-            if (typeof data?.url === 'string' && data.url.startsWith('https://connect.stripe.com')) {
-                // eslint-disable-next-line
-                globalThis.location.href = data.url;
-            } else {
+            try {
+                const urlObj = new URL(data.url);
+                if (urlObj.protocol === 'https:' && urlObj.hostname === 'connect.stripe.com') {
+                    // eslint-disable-next-line
+                    globalThis.location.href = data.url;
+                } else {
+                    throw new Error('Invalid or unsafe Stripe connecting URL');
+                }
+            } catch (e) {
                 throw new Error('Invalid or unsafe Stripe connecting URL');
             }
         } catch (error) {
