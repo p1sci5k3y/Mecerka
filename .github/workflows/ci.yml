@@ -77,10 +77,14 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - run: npm install --legacy-peer-deps
-      - run: ls -a
-      - run: npm run lint
-        continue-on-error: true
-      - run: npm run build
+      - run: |
+          node -v
+          npm -v
+      - name: Build Frontend
+        run: npm run build > build.log 2>&1 || (cat build.log && exit 1)
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          NEXT_TELEMETRY_DISABLED: 1
       - run: npm run test
       - run: npm audit --audit-level=high
 
