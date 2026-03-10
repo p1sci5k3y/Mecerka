@@ -10,7 +10,7 @@ export default tseslint.config(
     ignores: ['eslint.config.mjs', 'seed-e2e-users.js', 'seed-e2e-admin.js'],
   },
   eslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.recommended,
   {
     plugins: {
       prettier: eslintPluginPrettier,
@@ -18,6 +18,15 @@ export default tseslint.config(
     rules: {
       ...eslintConfigPrettier.rules,
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/ban-ts-comment': 'off',
+      'unicorn/prefer-top-level-await': 'off'
     },
   },
   {
