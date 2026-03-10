@@ -13,6 +13,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - mecerka_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mecerka} -d ${POSTGRES_DB:-mecerka}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     # We do NOT publish ports to the EC2 host to keep DB closed from public internet
     # Internally accessible via the mecerka_network on 5432
 
@@ -23,7 +28,9 @@ services:
     container_name: mecerka_backend_prod
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && node dist/src/main"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-mecerka}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mecerka}?schema=public
       - JWT_SECRET=${JWT_SECRET}
@@ -31,6 +38,7 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://mecerka.com}
+      - FRONTEND_URL=${FRONTEND_URL:-https://mecerka.com}
       - PORT=3000
     ports:
       - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
@@ -50,6 +58,7 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.mecerka.com}
       - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
       - PORT=3001
+      - HOSTNAME=0.0.0.0
     ports:
       - "127.0.0.1:3001:3001" # Expose only to localhost for Nginx reverse proxy
     networks:
