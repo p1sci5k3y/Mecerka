@@ -58,3 +58,17 @@
 - Puesta en producción (Vercel / Railway).
 - Revisión de UX Final para proveedores.
 - Pruebas E2E de simulación de flota con múltiples ventanas.
+
+---
+
+## Fase 8: Stripe Connect (Split Payments) 🏗️ *(Pending)*
+**Propósito:** Transicionar de un modelo "Dummy Merchant" a un Marketplace real Multi-Vendor sin custodia de credenciales de terceros.
+
+**Flujos Críticos:**
+1. **Onboarding Seguro (OAuth):** Flujo en el Dashboard donde Providers y Runners vinculan sus cuentas de cobro ("Connect with Stripe"), devolviendo un `account_id` transparente.
+2. **Checkout Unificado (Client):** El cliente sigue pagando un único monto (Pedido + Tarifa de Envío) a la llave base de Mecerka.
+3. **Split Computado:** El backend de Mecerka utiliza `transfer_data` durante el SetupIntent para automáticamente dividir el fondo unificado entre el comercio, el transportista y la reserva de plataforma.
+
+**Invariantes:**
+- Mecerka JAMÁS almacenará ni solicitará llaves secretas (`sk_live_...`) de proveedores ni repartidores en sus bases de datos.
+- Las comisiones de Plataforma (Application Fee) se deducirán o programarán simétricamente en el momento exacto en que el Runner marca el pedido como "Entregado".

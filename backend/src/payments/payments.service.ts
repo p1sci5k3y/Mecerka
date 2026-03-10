@@ -1,22 +1,235 @@
-import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
+import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentsService {
     private readonly logger = new Logger(PaymentsService.name);
 
+    private readonly stripe: Stripe;
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly eventEmitter: EventEmitter2,
-    ) { }
+        private readonly configService: ConfigService,
+    ) {
+        this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY') as string, {
+            apiVersion: '2025-01-27.acacia',
+        } as any);
+    }
 
     async isProcessed(eventId: string): Promise<boolean> {
         const event = await this.prisma.webhookEvent.findUnique({
             where: { id: eventId },
         });
         return !!event;
+    }
+    /**
+     * Generates a Stripe Onboarding Link for Providers/Runners.
+     * If the user doesn't have a stripeAccountId, it creates an Express account first.
+     */
+    async generateOnboardingLink(userId: string): Promise<string> {
+        let user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        let accountId = user.stripeAccountId;
+
+        // 1. Create a Stripe Express Account if none exists
+        if (!accountId) {
+            const account = await this.stripe.accounts.create({
+                type: 'express',
+                email: user.email,
+                capabilities: {
+                    transfers: { requested: true },
+                },
+                business_type: 'individual',
+            });
+            accountId = account.id;
+
+            // Save the dormant accountId to DB
+            user = await this.prisma.user.update({
+                where: { id: userId },
+                data: { stripeAccountId: accountId },
+            });
+        }
+
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3001';
+
+        // 2. Generate the Onboarding Link
+        const accountLink = await this.stripe.accountLinks.create({
+            account: accountId,
+            refresh_url: `${frontendUrl}/dashboard?stripe_connected=refresh`,
+            return_url: `${this.configService.get<string>('BACKEND_URL') || 'http://localhost:3000'}/payments/connect/callback?accountId=${accountId}`,
+            type: 'account_onboarding',
+        });
+
+        return accountLink.url;
+    }
+
+    /**
+     * Verifies if the Stripe Account is fully setup and active after OAuth callback.
+     */
+    async verifyAndSaveConnectedAccount(userId: string, accountId: string): Promise<boolean> {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user || user.stripeAccountId !== accountId) {
+            throw new ConflictException('Account ID mismatch or user not found');
+        }
+
+        const account = await this.stripe.accounts.retrieve(accountId);
+
+        if (!account.details_submitted) {
+            throw new ConflictException('Stripe Onboarding is incomplete. Please finish the registration.');
+        }
+
+        return true; // DB already has the ID, we just confirmed its active status
+    }
+
+    /**
+     * Creates a Stripe Payment Intent using Direct Charges (Zero-Liability).
+     * The charge is created directly on the Provider's Stripe Account.
+     * Mecerka routes the runner's cut through the application_fee_amount, then transfers it out.
+     */
+    async createTripartitePaymentIntent(orderId: string, clientId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId, clientId },
+            include: { providerOrders: { include: { provider: true, items: true } } },
+        });
+
+        if (!order || order.status !== DeliveryStatus.PENDING) {
+            throw new NotFoundException('Order not found or not in PENDING state');
+        }
+
+        // Simplification for Phase 8 MVP: Assuming 1 Provider Order per global Order
+        const po = order.providerOrders[0];
+        if (!po) throw new ConflictException('Order has no provider items');
+
+        const providerStripeId = po.provider.stripeAccountId;
+        if (!providerStripeId) {
+            throw new ConflictException('El proveedor de este pedido aún no ha verificado su cuenta bancaria. No puede recibir pagos.');
+        }
+
+        // 1. Calculate Base Amounts
+        const productsTotalCents = po.items.reduce((acc, item) => acc + (Number(item.priceAtPurchase) * 100 * item.quantity), 0);
+
+        // 2. Logistics Business Rule: 50/50 Split (e.g. 6.00 EUR delivery = 3.00 Client, 3.00 Provider)
+        const totalLogisticsCents = 600; // Fixed for MVP. Total runner cost.
+        const clientLogisticsBurdenCents = totalLogisticsCents / 2; // 300 cents
+        const providerLogisticsBurdenCents = totalLogisticsCents / 2; // 300 cents
+
+        // 3. Final Amounts
+        // What the client actually pays on the Checkout screen (Products + their half of delivery)
+        const finalChargeToClientCents = productsTotalCents + clientLogisticsBurdenCents;
+
+        // The "Application Fee" is the conduit to extract the Runner's money from the charge
+        // It's the Client's half + The Provider's half.
+        const applicationFeeCents = clientLogisticsBurdenCents + providerLogisticsBurdenCents; // 600 cents
+
+        // 4. Create Direct Charge Intent onto Provider Account
+        const session = await this.stripe.paymentIntents.create({
+            amount: finalChargeToClientCents,
+            currency: 'eur',
+            application_fee_amount: applicationFeeCents,
+            transfer_group: `ORDER_${order.id}`,
+            metadata: {
+                mecerkaOrderId: order.id,
+                logisticsTotal: totalLogisticsCents,
+            },
+            automatic_payment_methods: { enabled: true },
+        }, {
+            stripeAccount: providerStripeId, // Directly onto the Provider's Connected Account
+        });
+
+        // 5. Save the Payment Intent ID (so webhooks can find order)
+        await this.prisma.order.update({
+            where: { id: order.id },
+            data: { paymentRef: session.id },
+        });
+
+        return {
+            clientSecret: session.client_secret,
+            stripeAccountId: providerStripeId, // Frontend needs this to mount the Elements widget
+            breakdown: {
+                totalCharge: finalChargeToClientCents / 100,
+                products: productsTotalCents / 100,
+                logisticsFeeClient: clientLogisticsBurdenCents / 100,
+                logisticsFeeProvider: providerLogisticsBurdenCents / 100,
+                providerNetRevenue: (productsTotalCents - providerLogisticsBurdenCents) / 100
+            }
+        };
+    }
+
+    /**
+     * Processes a "Cash on Delivery" or "Al Contado" payment.
+     * Skips Stripe entirely but marks the order securely and returns the 50/50 ledger breakdown.
+     */
+    async processCashPayment(orderId: string, clientId: string, pin: string) {
+        if (!pin) {
+            throw new BadRequestException('El PIN es requerido para pagos en efectivo');
+        }
+
+        const user = await this.prisma.user.findUnique({ where: { id: clientId } });
+        if (!user || !user.pin) throw new BadRequestException('Debes configurar un PIN transaccional.');
+
+        const argon2 = require('argon2'); // inline require to avoid editing imports at top of file
+        const isPinValid = await argon2.verify(user.pin, pin);
+        if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
+
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId, clientId },
+            include: { providerOrders: { include: { items: true } } },
+        });
+
+        if (!order || order.status !== DeliveryStatus.PENDING) {
+            throw new NotFoundException('Order not found or not in PENDING state');
+        }
+
+        const po = order.providerOrders[0];
+        if (!po) throw new ConflictException('Order has no provider items');
+
+        // Calculate logistics split for ledger
+        const productsTotalCents = po.items.reduce((acc, item) => acc + (Number(item.priceAtPurchase) * 100 * item.quantity), 0);
+        const totalLogisticsCents = 600;
+        const clientLogisticsBurdenCents = totalLogisticsCents / 2;
+        const providerLogisticsBurdenCents = totalLogisticsCents / 2;
+
+        const finalChargeToClientCents = productsTotalCents + clientLogisticsBurdenCents;
+
+        // Update the order locally as confirmed logically (simulate webhook success)
+        const paymentRef = `CASH_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        await this.prisma.$transaction(async (tx) => {
+            const providerHasStock = await this.attemptStockDeduction(tx, po.items);
+            if (!providerHasStock) throw new ConflictException('Out of stock items during cash order processing');
+
+            await tx.order.update({
+                where: { id: order.id },
+                data: {
+                    status: DeliveryStatus.CONFIRMED,
+                    paymentRef,
+                    confirmedAt: new Date(),
+                },
+            });
+        });
+
+        this.eventEmitter.emit('order.stateChanged', {
+            orderId: order.id,
+            status: DeliveryStatus.CONFIRMED,
+            paymentRef,
+        });
+
+        return {
+            method: 'CASH',
+            success: true,
+            breakdown: {
+                totalCharge: finalChargeToClientCents / 100,
+                logisticsDebtClient: clientLogisticsBurdenCents / 100,
+                logisticsDebtProvider: providerLogisticsBurdenCents / 100
+            }
+        };
     }
 
     private async attemptStockDeduction(tx: any, items: any[]): Promise<boolean> {
