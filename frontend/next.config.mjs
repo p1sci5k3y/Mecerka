@@ -8,12 +8,6 @@ const nextConfig = {
     unoptimized: true
   },
   output: "standalone",
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   outputFileTracingIncludes: {
     "/*": ["./messages/**/*", "./i18n/**/*"]
   }
