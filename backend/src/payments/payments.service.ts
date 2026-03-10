@@ -4,6 +4,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
+import * as argon2 from 'argon2';
 
 @Injectable()
 export class PaymentsService {
@@ -16,9 +17,14 @@ export class PaymentsService {
         private readonly eventEmitter: EventEmitter2,
         private readonly configService: ConfigService,
     ) {
-        this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY') as string, {
-            apiVersion: '2025-01-27.acacia',
-        } as any);
+        const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+        if (!stripeSecretKey) {
+            throw new Error('STRIPE_SECRET_KEY is missing or empty in the environment configuration.');
+        }
+
+        this.stripe = new Stripe(stripeSecretKey, {
+            apiVersion: '2026-02-25.clover',
+        });
     }
 
     async isProcessed(eventId: string): Promise<boolean> {
@@ -114,7 +120,7 @@ export class PaymentsService {
         }
 
         // 1. Calculate Base Amounts
-        const productsTotalCents = po.items.reduce((acc, item) => acc + (Number(item.priceAtPurchase) * 100 * item.quantity), 0);
+        const productsTotalCents = po.items.reduce((acc, item) => acc + (Math.round(Number(item.priceAtPurchase) * 100) * item.quantity), 0);
 
         // 2. Logistics Business Rule: 50/50 Split (e.g. 6.00 EUR delivery = 3.00 Client, 3.00 Provider)
         const totalLogisticsCents = 600; // Fixed for MVP. Total runner cost.
@@ -175,7 +181,6 @@ export class PaymentsService {
         const user = await this.prisma.user.findUnique({ where: { id: clientId } });
         if (!user || !user.pin) throw new BadRequestException('Debes configurar un PIN transaccional.');
 
-        const argon2 = require('argon2'); // inline require to avoid editing imports at top of file
         const isPinValid = await argon2.verify(user.pin, pin);
         if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
 
@@ -192,7 +197,7 @@ export class PaymentsService {
         if (!po) throw new ConflictException('Order has no provider items');
 
         // Calculate logistics split for ledger
-        const productsTotalCents = po.items.reduce((acc, item) => acc + (Number(item.priceAtPurchase) * 100 * item.quantity), 0);
+        const productsTotalCents = po.items.reduce((acc, item) => acc + (Math.round(Number(item.priceAtPurchase) * 100) * item.quantity), 0);
         const totalLogisticsCents = 600;
         const clientLogisticsBurdenCents = totalLogisticsCents / 2;
         const providerLogisticsBurdenCents = totalLogisticsCents / 2;

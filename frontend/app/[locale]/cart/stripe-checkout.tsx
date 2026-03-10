@@ -9,25 +9,30 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslations, useLocale } from 'next-intl';
 
 // Reusable function to load stripe dynamically based on the connected account ID
-let stripePromise: Promise<any> | null = null;
+const stripePromises: Record<string, Promise<any>> = {};
 const getStripe = (accountId: string) => {
-    if (!stripePromise) {
-        stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, {
+    if (!stripePromises[accountId]) {
+        stripePromises[accountId] = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!, {
             stripeAccount: accountId, // Required for Direct Charges!
         });
     }
-    return stripePromise;
+    return stripePromises[accountId];
 };
 
 function CheckoutForm({
     onSuccess,
     totalToPay,
+    currency = 'EUR'
 }: {
     onSuccess: () => void;
     totalToPay: number;
+    currency?: string;
 }) {
+    const locale = useLocale();
+    const t = useTranslations('Cart');
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
@@ -47,11 +52,17 @@ function CheckoutForm({
         });
 
         if (error) {
-            toast.error(error.message || 'Se produjo un error al procesar el pago.');
+            toast.error(error.message || t('paymentError'));
             setIsProcessing(false);
         } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-            toast.success('¡Pago validado con éxito!');
+            toast.success(t('paymentSuccess'));
             onSuccess();
+        } else if (paymentIntent && paymentIntent.status === 'requires_action') {
+            toast.info(t('requiresAction'));
+            // keep processing true while waiting for auth
+        } else if (paymentIntent && paymentIntent.status === 'processing') {
+            toast.info(t('processingPayment'));
+            // keep processing true
         } else {
             setIsProcessing(false);
         }
@@ -69,10 +80,10 @@ function CheckoutForm({
                 {isProcessing ? (
                     <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Procesando...
+                        {t('processing')}
                     </>
                 ) : (
-                    `Pagar ${totalToPay.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}`
+                    `${t('pay')} ${new Intl.NumberFormat(locale, { style: 'currency', currency }).format(totalToPay)}`
                 )}
             </Button>
         </form>
