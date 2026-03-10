@@ -3,9 +3,7 @@ import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
-import {
-  ConflictException,
-} from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let service: OrdersService;

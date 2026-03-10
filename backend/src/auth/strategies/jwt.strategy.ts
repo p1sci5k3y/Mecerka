@@ -59,7 +59,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User account is suspended');
     }
 
-    if (payload.tokenVersion !== undefined && payload.tokenVersion < user.tokenVersion) {
+    if (
+      payload.tokenVersion !== undefined &&
+      payload.tokenVersion < user.tokenVersion
+    ) {
       throw new UnauthorizedException('Token revoked');
     }
 

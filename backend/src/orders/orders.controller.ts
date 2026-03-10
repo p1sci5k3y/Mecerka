@@ -21,7 +21,7 @@ import type { RequestWithUser } from '../auth/interfaces/auth.interfaces';
 @Controller('orders')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) { }
+  constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
   @Roles(Role.CLIENT)

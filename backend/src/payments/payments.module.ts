@@ -9,7 +9,12 @@ import { PaymentsService } from './payments.service';
 
 @Module({
   imports: [ConfigModule, OrdersModule],
-  controllers: [WebhooksController, PaymentWebhooksController, OnboardingController, PaymentsController],
+  controllers: [
+    WebhooksController,
+    PaymentWebhooksController,
+    OnboardingController,
+    PaymentsController,
+  ],
   providers: [PaymentsService],
 })
-export class PaymentsModule { }
+export class PaymentsModule {}
