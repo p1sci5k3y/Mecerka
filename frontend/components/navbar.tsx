@@ -2,15 +2,13 @@
 
 import { usePathname, useRouter, Link } from "@/lib/navigation" // Localized navigation
 import {
-  
-  
+  User,
+  Package,
   LogOut,
   LayoutDashboard,
   Menu,
   X,
-  
-  
-  Languages, // Icon for lang switcher
+  Languages,
   Truck,
   Inbox,
   Search,
