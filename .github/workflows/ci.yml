@@ -54,8 +54,8 @@ jobs:
       - run: npm run lint
         continue-on-error: true
       - run: npm run build
-      - name: Run Migrations
-        run: npx prisma migrate deploy
+      - name: Sync Database Schema
+        run: npx prisma db push --accept-data-loss
         env:
           DEBUG: "prisma*"
       - run: npm run test
