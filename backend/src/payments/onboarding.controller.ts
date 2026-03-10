@@ -37,7 +37,6 @@ export class OnboardingController {
         try {
             await this.paymentsService.verifyAndSaveConnectedAccount(req.user.userId, accountId);
             // Redirect back to frontend dashboard settings with success flag
-            // TODO: Extract baseUrl dynamically or via env var
             return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3001'}/dashboard?stripe_connected=true`);
         } catch (error) {
             this.logger.error(`Failed to verify connected account for user ${req.user.userId}:`, error);

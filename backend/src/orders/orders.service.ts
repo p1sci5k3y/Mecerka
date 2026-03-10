@@ -747,27 +747,27 @@ export class OrdersService {
       },
     });
 
-    const productStats: Record<
+    const productStats = new Map<
       string,
       { name: string; revenue: number; quantity: number }
-    > = {};
+    >();
 
     providerOrders.forEach((po) => {
       po.items.forEach((item) => {
-        if (!productStats[item.productId]) {
-          productStats[item.productId] = {
+        if (!productStats.has(item.productId)) {
+          productStats.set(item.productId, {
             name: item.product.name,
             revenue: 0,
             quantity: 0,
-          };
+          });
         }
-        productStats[item.productId].revenue +=
-          Number(item.priceAtPurchase) * item.quantity;
-        productStats[item.productId].quantity += item.quantity;
+        const stat = productStats.get(item.productId)!;
+        stat.revenue += Number(item.priceAtPurchase) * item.quantity;
+        stat.quantity += item.quantity;
       });
     });
 
-    return Object.values(productStats)
+    return Array.from(productStats.values())
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
   }

@@ -58,7 +58,7 @@ export class PaymentsService {
             accountId = account.id;
 
             // Save the dormant accountId to DB
-            user = await this.prisma.user.update({
+            await this.prisma.user.update({
                 where: { id: userId },
                 data: { stripeAccountId: accountId },
             });
@@ -82,7 +82,7 @@ export class PaymentsService {
      */
     async verifyAndSaveConnectedAccount(userId: string, accountId: string): Promise<boolean> {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
-        if (!user || user.stripeAccountId !== accountId) {
+        if (user?.stripeAccountId !== accountId) {
             throw new ConflictException('Account ID mismatch or user not found');
         }
 
@@ -179,7 +179,7 @@ export class PaymentsService {
         }
 
         const user = await this.prisma.user.findUnique({ where: { id: clientId } });
-        if (!user || !user.pin) throw new BadRequestException('Debes configurar un PIN transaccional.');
+        if (!user?.pin) throw new BadRequestException('Debes configurar un PIN transaccional.');
 
         const isPinValid = await argon2.verify(user.pin, pin);
         if (!isPinValid) throw new UnauthorizedException('PIN de compra incorrecto.');
