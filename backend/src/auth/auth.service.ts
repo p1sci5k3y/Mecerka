@@ -265,30 +265,7 @@ export class AuthService {
 
     const verificationToken = crypto.randomUUID();
 
-    try {
-      // Direct call here; ideally enqueue to a queueService.
-      await this.emailService.sendVerificationEmail(
-        user.email,
-        verificationToken,
-      );
-    } catch (e) {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email)
-        .digest('hex')
-        .substring(0, 8);
-      this.logger.error(
-        `Failed to resend verification email for ${emailHash}:`,
-        e,
-      );
-      this.logger.warn(
-        `Verification email resend failed for ${emailHash}. Please trigger manual resend or queue job (pending queueService).`,
-      );
-      throw new BadRequestException(
-        'No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.',
-      );
-    }
-
+    // 1. Save token to DB FIRST — so any subsequent email link is always valid
     try {
       await this.prisma.user.update({
         where: { id: user.id },
@@ -306,11 +283,36 @@ export class AuthService {
         .digest('hex')
         .substring(0, 8);
       this.logger.error(
-        `Failed to update verification token in DB after successful email for ${emailHash}:`,
+        `Failed to save verification token to DB for ${emailHash}:`,
         e,
       );
       throw new BadRequestException(
-        'Se envió el correo, pero ocurrió un error interno al registrar el token.',
+        'No se pudo procesar la solicitud. Por favor, inténtalo de nuevo.',
+      );
+    }
+
+    // 2. Send email AFTER the token is safely persisted
+    try {
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        verificationToken,
+      );
+    } catch (e) {
+      const emailHash = crypto
+        .createHash('sha256')
+        .update(email)
+        .digest('hex')
+        .substring(0, 8);
+      this.logger.error(
+        `Failed to resend verification email for ${emailHash}:`,
+        e,
+      );
+      // Token is already saved — user can retry the resend action from the UI
+      this.logger.warn(
+        `Verification email resend failed for ${emailHash}. Token is saved; user can retry.`,
+      );
+      throw new BadRequestException(
+        'No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.',
       );
     }
 
