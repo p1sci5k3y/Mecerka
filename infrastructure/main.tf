@@ -24,7 +24,7 @@ resource "aws_security_group" "mecerka_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.admin_cidr_blocks
   }
 
   # HTTP Access
@@ -50,7 +50,7 @@ resource "aws_security_group" "mecerka_sg" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] # tfsec:ignore:aws-vpc-no-public-egress-sgr
   }
 
   tags = {
@@ -74,6 +74,19 @@ resource "aws_instance" "mecerka_server" {
   
   # Attach the newly created Security Group to the existing instance
   vpc_security_group_ids = [aws_security_group.mecerka_sg.id]
+
+  # Security Hardening (IMDSv2, Termination Protection, Encryption)
+  disable_api_termination = true
+
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  root_block_device {
+    encrypted = true
+  }
+
 
   # We use lifecycle ignore_changes so Terraform doesn't try to replace the instance 
   # if the AMI or other base config differs from the template
