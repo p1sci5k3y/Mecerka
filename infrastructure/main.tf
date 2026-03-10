@@ -27,7 +27,8 @@ resource "aws_security_group" "mecerka_sg" {
     cidr_blocks = var.admin_cidr_blocks
   }
 
-  # HTTP Access
+  # HTTP Access — must be public for all web visitors
+  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
   ingress {
     description = "HTTP web traffic"
     from_port   = 80
@@ -36,7 +37,8 @@ resource "aws_security_group" "mecerka_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS Access
+  # HTTPS Access — must be public for all web visitors
+  # tfsec:ignore:aws-vpc-no-public-ingress-sgr
   ingress {
     description = "HTTPS web traffic"
     from_port   = 443
