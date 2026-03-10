@@ -134,6 +134,7 @@ export class AuthService {
       email: user.email,
       roles: user.roles,
       mfaAuthenticated: !user.mfaEnabled,
+      tokenVersion: user.tokenVersion,
     };
     const accessToken = this.jwtService.sign(sessionPayload);
 
@@ -153,7 +154,7 @@ export class AuthService {
   async generateMfaCompleteToken(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { email: true, roles: true },
+      select: { email: true, roles: true, tokenVersion: true },
     });
     if (!user) {
       throw new UnauthorizedException('Usuario no encontrado');
@@ -163,6 +164,7 @@ export class AuthService {
       email: user.email,
       roles: user.roles,
       mfaAuthenticated: true,
+      tokenVersion: user.tokenVersion,
     };
     return {
       success: true,
@@ -340,6 +342,16 @@ export class AuthService {
     });
 
     return { message: 'Si el correo existe, recibirás un enlace para restablecer tu contraseña.' };
+  }
+
+  async logout(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        tokenVersion: { increment: 1 },
+      },
+    });
+    return { success: true, message: 'Logged out successfully' };
   }
 
   async verifyResetToken(token: string) {

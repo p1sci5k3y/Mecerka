@@ -3,14 +3,12 @@ import {
   Post,
   UseGuards,
   Request,
-  ConflictException,
-  NotFoundException,
   Body,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Role } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
+import type { RequestWithUser } from '../auth/interfaces/auth.interfaces';
 import { SetPinDto } from './dto/set-pin.dto';
 import * as argon2 from 'argon2';
 
@@ -27,7 +25,7 @@ export class UsersController {
   ) { }
 
   @Post('pin')
-  async setTransactionPin(@Request() req: any, @Body() dto: SetPinDto) {
+  async setTransactionPin(@Request() req: RequestWithUser, @Body() dto: SetPinDto) {
     const userId = req.user.userId;
     const hashedPin = await argon2.hash(dto.pin);
 

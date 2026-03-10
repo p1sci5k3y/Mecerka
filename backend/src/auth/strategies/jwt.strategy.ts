@@ -1,7 +1,6 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { Role } from '@prisma/client';
 import { JwtPayload, UserFromJwt } from '../interfaces/auth.interfaces';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as jwt from 'jsonwebtoken';
@@ -24,16 +23,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         try {
           jwt.verify(rawJwtToken, currentSecret);
           return done(null, currentSecret);
-        } catch (firstErr) {
+        } catch (error_) {
           if (previousSecret) {
             try {
               jwt.verify(rawJwtToken, previousSecret);
               return done(null, previousSecret);
-            } catch (fallbackError) {
-              return done(firstErr, previousSecret);
+            } catch {
+              return done(error_, previousSecret);
             }
           }
-          return done(firstErr, currentSecret);
+          return done(error_, currentSecret);
         }
       },
     });
@@ -46,6 +45,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         active: true,
         emailVerified: true,
         roles: true,
+        tokenVersion: true,
         mfaEnabled: true,
         passwordChangedAt: true,
       },
@@ -59,6 +59,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User account is suspended');
     }
 
+    if (payload.tokenVersion !== undefined && payload.tokenVersion < user.tokenVersion) {
+      throw new UnauthorizedException('Token revoked');
+    }
+
     if (user.passwordChangedAt && payload.iat) {
       // payload.iat is in seconds, passwordChangedAt is in ms
       if (payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
@@ -66,7 +70,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       }
     }
 
-    const mfaAuthenticated = payload.mfaAuthenticated ?? (user.mfaEnabled ? false : true);
+    const mfaAuthenticated = payload.mfaAuthenticated ?? !user.mfaEnabled;
 
     return {
       userId: payload.sub,

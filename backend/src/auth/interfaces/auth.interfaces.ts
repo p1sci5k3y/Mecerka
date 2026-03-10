@@ -9,6 +9,7 @@ export interface JwtPayload {
   iat?: number;
   exp?: number;
   mfaAuthenticated?: boolean;
+  tokenVersion?: number;
 }
 
 export interface UserFromJwt {
@@ -18,6 +19,6 @@ export interface UserFromJwt {
   mfaAuthenticated: boolean;
 }
 
-export interface AuthenticatedRequest extends Request {
+export interface RequestWithUser extends Request {
   user: UserFromJwt;
 }

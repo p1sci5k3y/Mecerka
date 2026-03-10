@@ -1,15 +1,13 @@
 import { Controller, Post, Req, Headers, BadRequestException } from '@nestjs/common';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
-import { OrdersService } from '../orders/orders.service';
-// import Stripe from 'stripe'; // We will use a mock or environment variable if Stripe is installed
-
+import { PaymentsService } from './payments.service';
 @Controller('webhooks/stripe')
 export class PaymentWebhooksController {
     // private stripe: Stripe;
     private readonly endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_test_secret';
 
-    constructor(private readonly ordersService: OrdersService) {
+    constructor(private readonly paymentsService: PaymentsService) {
         // Initialize stripe if the real library is needed. For conceptual TDD, we mock the validation or use it if installed.
         // this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
     }
@@ -68,7 +66,7 @@ export class PaymentWebhooksController {
                 return { received: true };
             }
 
-            await this.ordersService.confirmPayment(orderId, paymentRef, eventId);
+            await this.paymentsService.confirmPayment(orderId, paymentRef, eventId);
         } // Ignore other events
 
         return { received: true };
