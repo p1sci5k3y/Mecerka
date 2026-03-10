@@ -83,7 +83,7 @@
 
 **Flujos Críticos:**
 1. **Bootstrap & Swap:** Instancia `t3.micro` provisionada con Terraform. Se configuró `user_data` para el setup inicial de Docker y Swap de 2GB para soportar builds pesados de Next.js.
-2. **Infrastructure-as-Code (IaC):** Gestionada con Terraform (`mecerka-production-sg` e import de instancia `i-07b8b2ff00c18d875`).
+2. **Infrastructure-as-Code (IaC):** Gestionada con Terraform (`mecerka-production-sg` e import de instancia).
 3. **Dockerización Prod:** `docker-compose.prod.yml` orquestando Postgres, Backend y Frontend, con secretos inyectados dinámicamente.
 4. **CI/CD Action:** Workflow `deploy.yml` configurado para inyectar secretos vía SSH y realizar `docker compose up -d` automáticamente en cada push exitoso a `main`.
 
