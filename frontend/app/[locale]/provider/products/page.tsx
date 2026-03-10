@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Plus, Edit, Trash2, MapPin, Tag, Package, Loader2 } from "lucide-react"
 import { Link } from "@/lib/navigation"
 
@@ -27,11 +27,7 @@ function ProductsContent() {
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        loadProducts()
-    }, [])
-
-    const loadProducts = async () => {
+    const loadProducts = useCallback(async () => {
         try {
             setLoading(true)
             const data = await productsService.getMyProducts()
@@ -46,7 +42,11 @@ function ProductsContent() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [toast])
+
+    useEffect(() => {
+        loadProducts()
+    }, [loadProducts])
 
     const handleDelete = async (id: string) => {
         if (!confirm("¿Estás seguro de que quieres eliminar este producto?")) return

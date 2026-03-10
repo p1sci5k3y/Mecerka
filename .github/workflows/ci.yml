@@ -45,6 +45,7 @@ jobs:
 
       - run: npm install
       - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           echo "Waiting for PostgreSQL to be ready..."
           timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
           echo "PostgreSQL is up!"
