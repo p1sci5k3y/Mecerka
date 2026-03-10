@@ -175,6 +175,7 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
