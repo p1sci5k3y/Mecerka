@@ -13,3 +13,7 @@ coverage
 infrastructure/.terraform*
 infrastructure/terraform.tfstate*
 infrastructure/*.tfvars
+*.pem
+*_key
+id_rsa*
+id_ed25519*
