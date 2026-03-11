@@ -39,7 +39,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: POSTGRES_PASSWORD,JWT_SECRET,JWT_SECRET_CURRENT,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL
+          envs: POSTGRES_PASSWORD,JWT_SECRET,JWT_SECRET_CURRENT,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,BACKEND_URL
           script: |
             set -e
             echo "Starting deployment..."
@@ -67,6 +67,9 @@ jobs:
             NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
             CORS_ORIGIN=${CORS_ORIGIN}
             FRONTEND_URL=${FRONTEND_URL}
+            STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+            STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+            BACKEND_URL=${BACKEND_URL}
             EOF
             chmod 600 .env
 
@@ -90,6 +93,9 @@ jobs:
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
 
       - name: Revoke GitHub Runner IP
         if: always()
