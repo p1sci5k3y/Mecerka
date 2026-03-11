@@ -74,7 +74,13 @@ jobs:
             docker compose -f docker-compose.prod.yml build --pull
             docker compose -f docker-compose.prod.yml up -d
 
-            # 4. Prune old dangling images
+            # 4. Configure Nginx Reverse Proxy
+            sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
+            sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo systemctl restart nginx
+
+            # 5. Prune old dangling images
             docker image prune -f
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
