@@ -1,5 +1,5 @@
 # ── Stage 1: Build (includes devDependencies for TypeScript compilation) ─────
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN npx tsc -p tsconfig.build.json
 
 # ── Stage 2: Production deps (lean — no devDependencies) ─────────────────────
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN npm ci --omit=dev
 RUN npx prisma generate
 
 # ── Stage 3: Final runner image (smallest possible footprint) ─────────────────
-FROM node:22-alpine AS runner
+FROM node:25-alpine AS runner
 
 WORKDIR /app
 
