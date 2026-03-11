@@ -37,6 +37,9 @@ services:
       - JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://mecerka.com}
       - FRONTEND_URL=${FRONTEND_URL:-https://mecerka.com}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - BACKEND_URL=${BACKEND_URL:-https://mecerka.me/api}
       - PORT=3000
     ports:
       - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
