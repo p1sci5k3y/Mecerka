@@ -71,8 +71,8 @@ jobs:
             chmod 600 .env
 
             # 3. Rebuild images and restart containers
-            docker compose -f docker-compose.prod.yml build --pull
-            docker compose -f docker-compose.prod.yml up -d
+            sudo docker compose -f docker-compose.prod.yml build --pull
+            sudo docker compose -f docker-compose.prod.yml up -d
 
             # 4. Configure Nginx Reverse Proxy
             sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
@@ -81,7 +81,7 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. Prune old dangling images
-            docker image prune -f
+            sudo docker image prune -f
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
