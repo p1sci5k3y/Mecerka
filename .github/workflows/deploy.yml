@@ -42,8 +42,18 @@ jobs:
           envs: POSTGRES_PASSWORD,JWT_SECRET,JWT_SECRET_CURRENT,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL
           script: |
             set -e
+            echo "Starting deployment..."
 
-            # 1. Pull latest application code
+            # 1. Setup /opt/mecerka if missing
+            if [ ! -d "/opt/mecerka/.git" ]; then
+              echo "Directory /opt/mecerka not found or not a git repo. Setting up..."
+              sudo mkdir -p /opt/mecerka
+              # Give current user permissions
+              sudo chown -R $USER:$USER /opt/mecerka
+              git clone https://github.com/p1sci5k3y/Mecerka.git /opt/mecerka
+            fi
+
+            # 2. Pull latest application code
             cd /opt/mecerka
             git fetch --all
             git reset --hard origin/main
