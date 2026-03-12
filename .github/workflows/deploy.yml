@@ -28,7 +28,7 @@ jobs:
       - name: Authorize GitHub Runner IP
         run: |
           aws ec2 authorize-security-group-ingress \
-            --group-name mecerka-production-sg \
+            --group-id sg-0124b199fb9cb1b59 \
             --protocol tcp \
             --port 22 \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
@@ -74,8 +74,9 @@ jobs:
             chmod 600 .env
 
             # 3. Rebuild images and restart containers
-            sudo docker compose -f docker-compose.prod.yml build --pull
-            sudo docker compose -f docker-compose.prod.yml up -d
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans
+            sudo docker compose -f docker-compose.prod.yml build --pull --no-cache
+            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
 
             # 4. Configure Nginx Reverse Proxy
             sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
@@ -106,7 +107,7 @@ jobs:
         if: always()
         run: |
           aws ec2 revoke-security-group-ingress \
-            --group-name mecerka-production-sg \
+            --group-id sg-0124b199fb9cb1b59 \
             --protocol tcp \
             --port 22 \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
