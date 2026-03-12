@@ -76,13 +76,15 @@ export class MfaService {
         `Verifying MFA for user ${userId}. TimeStep: ${currentStep}. Secret length: ${secret?.length || 0}`,
       );
 
-      // Using the class instance verify with explicit options object.
-      // We also add an epochTolerance (window) of 30s (1 period) or as specified.
-      const result = await totp.verify(token, {
-        secret,
-        epochTolerance: 60, // ± 1 minute
-      });
-      isValid = result.valid;
+      // Refactored to use boolean return and window as periods.
+      // We calculate seconds from periods for otplib v13 compatibility.
+      const window = 2; // ± 2 periods (60s)
+      isValid = (
+        await totp.verify(token, {
+          secret,
+          epochTolerance: window * 30,
+        })
+      ).valid;
 
       this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
     } catch (e) {
