@@ -24,7 +24,7 @@ export class MfaService {
 
   async generateMfaSecret(userId: string, email: string) {
     const secret = totp.generateSecret();
-    const otpauthUrl = totp.keyuri(email, 'Mecerka (Startup)', secret);
+    const otpauthUrl = totp.toURI({ label: email, issuer: 'Mecerka (Startup)', secret });
 
     // Save secret to user but keep MFA disabled until verified
     await this.prisma.user.update({
@@ -77,12 +77,12 @@ export class MfaService {
       );
 
       // Using the class instance verify with explicit options object.
-      // We also add a window of 2 to allow for some drift.
-      isValid = totp.verify({
-        token,
+      // We also add an epochTolerance (window) of 30s (1 period) or as specified.
+      const result = await totp.verify(token, {
         secret,
-        window: 2,
+        epochTolerance: 60, // ± 1 minute
       });
+      isValid = result.valid;
 
       this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
     } catch (e) {
