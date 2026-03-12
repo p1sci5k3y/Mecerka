@@ -46,8 +46,8 @@ describe('WebhooksController', () => {
   });
 
   it('1. Rejects missing signature with 400', async () => {
-    const req = { rawBody: Buffer.from('') } as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const req = { rawBody: Buffer.from('') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
 
     await controller.handleStripeWebhook(req, res, '');
 
@@ -56,8 +56,8 @@ describe('WebhooksController', () => {
   });
 
   it('2. Rejects missing raw body with 400', async () => {
-    const req = {} as any; // Empty Request
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const req = {} as unknown as any; // Empty Request
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
 
     await controller.handleStripeWebhook(req, res, 'dummy-sig');
 
@@ -66,8 +66,8 @@ describe('WebhooksController', () => {
   });
 
   it('3. Rejects invalid stripe signature with 400', async () => {
-    const req = { rawBody: Buffer.from('bad_payload') } as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const req = { rawBody: Buffer.from('bad_payload') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
 
     mockConstructEvent.mockImplementation(() => {
       throw new Error('Invalid signature');
@@ -80,8 +80,8 @@ describe('WebhooksController', () => {
   });
 
   it('4. Processes valid signature + payment_intent.succeeded calling confirmPayment', async () => {
-    const req = { rawBody: Buffer.from('valid_payload') } as any;
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as any;
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       id: 'evt_123',
@@ -106,8 +106,8 @@ describe('WebhooksController', () => {
   });
 
   it('5. Returns 200 for unhandled events to prevent Stripe retries', async () => {
-    const req = { rawBody: Buffer.from('other_payload') } as any;
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as any;
+    const req = { rawBody: Buffer.from('other_payload') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       type: 'charge.succeeded',
@@ -122,8 +122,8 @@ describe('WebhooksController', () => {
   });
 
   it('6. Returns 500 when confirmPayment fails so Stripe retries later', async () => {
-    const req = { rawBody: Buffer.from('valid_payload') } as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       id: 'evt_123',
