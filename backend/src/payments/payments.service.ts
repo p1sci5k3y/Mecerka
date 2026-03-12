@@ -418,7 +418,7 @@ export class PaymentsService {
           result._events.partialCancelled,
         );
       }
-      delete result._events;
+      delete (result as any)._events;
     }
 
     return result;
