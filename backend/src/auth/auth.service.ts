@@ -54,6 +54,7 @@ export class AuthService {
               Date.now() + 24 * 60 * 60 * 1000,
             ),
             emailVerified: false,
+            lastEmailSentAt: new Date(),
           },
         });
 
@@ -207,11 +208,13 @@ export class AuthService {
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    await this.checkEmailRateLimit(user.id);
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         mfaSetupToken: otpCode,
         mfaSetupExpiresAt: expiresAt,
+        lastEmailSentAt: new Date(),
       },
     });
 
@@ -265,6 +268,9 @@ export class AuthService {
 
     const verificationToken = crypto.randomUUID();
 
+    // 0. Check Rate Limit
+    await this.checkEmailRateLimit(user.id);
+
     // 1. Save token to DB FIRST — so any subsequent email link is always valid
     try {
       await this.prisma.user.update({
@@ -274,6 +280,7 @@ export class AuthService {
           verificationTokenExpiresAt: new Date(
             Date.now() + 24 * 60 * 60 * 1000,
           ),
+          lastEmailSentAt: new Date(),
         },
       });
     } catch (e) {
@@ -352,6 +359,9 @@ export class AuthService {
       );
     }
 
+    // 0. Check Rate Limit
+    await this.checkEmailRateLimit(user.id);
+
     const hashedToken = crypto
       .createHash('sha256')
       .update(resetToken)
@@ -362,6 +372,7 @@ export class AuthService {
       data: {
         resetPasswordTokenHash: hashedToken,
         resetPasswordExpiresAt: expiresAt,
+        lastEmailSentAt: new Date(),
       },
     });
 
@@ -421,5 +432,23 @@ export class AuthService {
     });
 
     return { message: 'Tu contraseña ha sido restablecida con éxito.' };
+  }
+
+  private async checkEmailRateLimit(userId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastEmailSentAt: true },
+    });
+
+    if (user?.lastEmailSentAt) {
+      const now = new Date();
+      const diffSeconds = (now.getTime() - user.lastEmailSentAt.getTime()) / 1000;
+      if (diffSeconds < 90) {
+        const remaining = Math.ceil(90 - diffSeconds);
+        throw new BadRequestException(
+          `Por seguridad, solo puedes solicitar un correo cada 90 segundos. Por favor, espera ${remaining} segundos más.`,
+        );
+      }
+    }
   }
 }
