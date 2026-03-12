@@ -278,7 +278,10 @@ export class PaymentsService {
     };
   }
 
-  private async attemptStockDeduction(tx: Prisma.TransactionClient, items: any[]): Promise<boolean> {
+  private async attemptStockDeduction(
+    tx: Prisma.TransactionClient,
+    items: any[],
+  ): Promise<boolean> {
     const productIds = items.map((i) => i.productId);
     const products = await tx.product.findMany({
       where: { id: { in: productIds } },
@@ -402,9 +405,9 @@ export class PaymentsService {
           partialCancelled:
             !allRejected && rejectedProviderOrders.length > 0
               ? {
-                orderId: order.id,
-                rejectedProviderOrderIds: rejectedProviderOrders,
-              }
+                  orderId: order.id,
+                  rejectedProviderOrderIds: rejectedProviderOrders,
+                }
               : null,
         },
       };

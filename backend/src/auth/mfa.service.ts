@@ -32,7 +32,7 @@ export class MfaService {
       data: { mfaSecret: secret, mfaEnabled: false },
     });
 
-    const qrCode = await QRCode.toDataURL(otpauthUrl as string);
+    const qrCode = await QRCode.toDataURL(otpauthUrl);
 
     // Send notification email without sensitive data
     await this.emailService
