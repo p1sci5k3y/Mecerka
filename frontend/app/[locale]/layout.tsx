@@ -17,6 +17,10 @@ export const metadata: Metadata = {
   title: "Mecerka | Comercio de cercanía, al alcance de un clic",
   description:
     "Mecerka conecta a los comercios de tu ciudad contigo. Compra local, recibe cerca. El marketplace que revitaliza tu barrio.",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 }
 
 export const viewport: Viewport = {

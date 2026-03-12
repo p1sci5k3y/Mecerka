@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { BrandMark, BrandWordmark } from "@/components/brand-mark"
 
 const OTP_IDS = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"]
 
@@ -91,10 +92,10 @@ export default function LoginPage() {
           <button onClick={() => router.back()} className="text-[#e07b61] p-1 -ml-1 hover:bg-[#e07b61]/10 rounded-full transition-colors lg:hidden">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div className="text-[#e07b61] hidden lg:block">
-            <span className="material-symbols-outlined text-4xl">grid_view</span>
-          </div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">Mecerka</h1>
+          <Link href="/" className="flex items-center gap-2 group">
+            <BrandMark className="text-[#e07b61] group-hover:opacity-80 transition-opacity" size={32} />
+            <BrandWordmark className="text-2xl font-serif" />
+          </Link>
         </header>
 
         <div className="max-w-md w-full mx-auto my-auto py-8">

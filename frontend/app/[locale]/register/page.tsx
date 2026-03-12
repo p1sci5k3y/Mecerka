@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { Link } from "@/lib/navigation"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail, User as UserIcon, CheckCircle2, ShieldCheck } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { BrandMark, BrandWordmark } from "@/components/brand-mark"
 
 export default function RegisterPage() {
   const t = useTranslations('Auth')
@@ -60,12 +61,10 @@ export default function RegisterPage() {
           <button onClick={() => router.back()} className="text-[#e07d61] p-1 -ml-1 hover:bg-[#e07d61]/10 rounded-full transition-colors lg:hidden">
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <div className="text-[#e07d61] hidden lg:block">
-            <svg className="size-8" fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-              <path clipRule="evenodd" d="M24 4H6V17.3333V30.6667H24V44H42V30.6667V17.3333H24V4Z" fillRule="evenodd"></path>
-            </svg>
-          </div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">Mecerka</h1>
+          <Link href="/" className="flex items-center gap-2 group">
+            <BrandMark className="text-[#e07d61] group-hover:opacity-80 transition-opacity" size={32} />
+            <BrandWordmark className="text-2xl font-serif" />
+          </Link>
         </header>
 
         <div className="max-w-md w-full mx-auto my-auto py-8">

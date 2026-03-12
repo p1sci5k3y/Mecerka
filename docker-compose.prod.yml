@@ -39,6 +39,11 @@ services:
       - FRONTEND_URL=${FRONTEND_URL:-https://mecerka.com}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT}
+      - MAIL_USER=${MAIL_USER}
+      - MAIL_PASS=${MAIL_PASS}
+      - MAIL_FROM=${MAIL_FROM}
       - BACKEND_URL=${BACKEND_URL:-https://mecerka.me/api}
       - PORT=3000
     ports:

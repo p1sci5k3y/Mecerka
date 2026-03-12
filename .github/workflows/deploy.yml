@@ -95,7 +95,12 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          BACKEND_URL: "https://mecerka.me"
+          MAIL_HOST: ${{ secrets.MAIL_HOST }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
 
       - name: Revoke GitHub Runner IP
         if: always()
