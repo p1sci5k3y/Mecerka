@@ -1,16 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
-import { totp, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
 
-// Configure the singleton once with necessary plugins for v13
-totp.options = {
+const totp = new TOTP({
   digits: 6,
   period: 30,
   crypto: new NobleCryptoPlugin(),
   base32: new ScureBase32Plugin(),
-};
+});
 
 @Injectable()
 export class MfaService {
@@ -77,16 +76,13 @@ export class MfaService {
         `Verifying MFA for user ${userId}. TimeStep: ${currentStep}. Secret length: ${secret?.length || 0}`,
       );
 
-      // In otplib v13, the singleton totp.verify({token, secret}) is the most reliable object signature.
-      // We use window: 2 to allow for some drift. We cast result to boolean.
-      const verifyResult = totp.verify({
+      // Using the class instance verify with explicit options object.
+      // We also add a window of 2 to allow for some drift.
+      isValid = totp.verify({
         token,
         secret,
         window: 2,
       });
-
-      // Handle both Promise and boolean returns (v13 can be either depending on config)
-      isValid = verifyResult instanceof Promise ? await verifyResult : Boolean(verifyResult);
 
       this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
     } catch (e) {
