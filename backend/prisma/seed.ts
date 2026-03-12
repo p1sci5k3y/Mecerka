@@ -160,9 +160,9 @@ async function main() {
 
         // 2. Create Products for Provider
         const products = [
-            { name: 'Manzanas Golden (1kg)', price: 2.5, stock: 100, categoryId: alimentacion.id },
-            { name: 'Pan Artesano', price: 1.2, stock: 50, categoryId: alimentacion.id },
-            { name: 'Camiseta Básica', price: 15, stock: 200, categoryId: moda.id } // Different category
+            { name: 'Manzanas Golden (1kg)', price: 2.5, stock: 100, categoryId: alimentacion.id, imageUrl: 'https://images.unsplash.com/photo-1570913149827-d2ac84ab3f9a?q=80&w=800' },
+            { name: 'Pan Artesano', price: 1.2, stock: 50, categoryId: alimentacion.id, imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800' },
+            { name: 'Camiseta Básica', price: 15, stock: 200, categoryId: moda.id, imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=800' }
         ];
 
         for (const p of products) {
@@ -178,7 +178,7 @@ async function main() {
                         description: `Delicious ${p.name}`,
                         price: p.price,
                         stock: p.stock,
-                        imageUrl: 'https://images.unsplash.com/photo-1568724309179-1c662888c385',
+                        imageUrl: p.imageUrl,
                         providerId: provider.id,
                         cityId: madrid.id, // All in Madrid for now
                         categoryId: p.categoryId
