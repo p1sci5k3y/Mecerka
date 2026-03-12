@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Loader2 } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { BrandMark, BrandWordmark } from "@/components/brand-mark"
 import { useSearchParams } from 'next/navigation'
 
 export default function ResetPasswordPage() {
@@ -76,10 +77,10 @@ export default function ResetPasswordPage() {
                     <button onClick={() => router.back()} className="text-[#e07b61] p-1 -ml-1 hover:bg-[#e07b61]/10 rounded-full transition-colors lg:hidden">
                         <ArrowLeft className="w-6 h-6" />
                     </button>
-                    <div className="text-[#e07b61] hidden lg:block">
-                        <span className="material-symbols-outlined text-4xl">grid_view</span>
-                    </div>
-                    <h1 className="font-serif text-2xl font-semibold tracking-tight">Mecerka</h1>
+                    <Link href="/" className="flex items-center gap-2 group">
+                        <BrandMark className="text-[#e07b61] group-hover:opacity-80 transition-opacity" size={32} />
+                        <BrandWordmark className="text-2xl font-serif" />
+                    </Link>
                 </header>
 
                 <div className="max-w-md w-full mx-auto my-auto py-8">
