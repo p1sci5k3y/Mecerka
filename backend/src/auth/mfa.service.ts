@@ -1,3 +1,6 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { toDataURL } from 'qrcode';
+import { PrismaService } from '../prisma/prisma.service';
 import { totp, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
 
