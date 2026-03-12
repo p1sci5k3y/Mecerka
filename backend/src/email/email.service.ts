@@ -8,12 +8,21 @@ export class EmailService {
   constructor() {
     const host = process.env.MAIL_HOST || 'mailpit';
     const port = Number(process.env.MAIL_PORT) || 1025;
+    const user = process.env.MAIL_USER;
+    const pass = process.env.MAIL_PASS;
+
     this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: false,
+      secure: port === 465, // Use SSL for port 465, otherwise STARTTLS
+      auth: user && pass ? { user, pass } : undefined,
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      },
     });
-    console.log(`[EmailService] Configured with host: ${host}, port: ${port}`);
+    console.log(
+      `[EmailService] Configured with host: ${host}, port: ${port}, auth: ${!!(user && pass)}`,
+    );
   }
 
   async sendEmail(to: string, subject: string, html: string) {
@@ -70,7 +79,7 @@ export class EmailService {
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {
-    const from = process.env.EMAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
+    const from = process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);
 
     const info = (await this.transporter.sendMail({
