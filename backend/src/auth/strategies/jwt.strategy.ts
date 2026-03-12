@@ -11,13 +11,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKeyProvider: (request: any, rawJwtToken: any, done: any) => {
+      secretOrKeyProvider: (
+        _request: unknown,
+        rawJwtToken: string,
+        done: (err: any, secret?: string) => void,
+      ) => {
         const currentSecret =
           process.env.JWT_SECRET_CURRENT || process.env.JWT_SECRET;
         const previousSecret = process.env.JWT_SECRET_PREVIOUS;
 
         if (!currentSecret) {
-          return done(new Error('JWT_SECRET configuration is missing'), null);
+          return done(new Error('JWT_SECRET configuration is missing'), undefined);
         }
 
         try {
