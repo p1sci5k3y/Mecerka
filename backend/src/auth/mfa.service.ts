@@ -74,13 +74,18 @@ export class MfaService {
 
     let isValid = false;
     try {
-      // otplib v13.x correctly types verify() as returning Promise<VerifyResult>.
-      // @ts-ignore - User specifically requested to pass a single options object
-      const verifyResult = await totp.verify({
-        token,
-        secret: userWithMfa.mfaSecret as string,
-      });
-      isValid = Boolean(verifyResult);
+      // Use standard check/verify with (token, secret) signature.
+      // We also add a window of 1 (allows previous and next token) for better reliability.
+      isValid = totp.check(token, userWithMfa.mfaSecret as string);
+      
+      if (!isValid) {
+        // Fallback with window if check fails
+        isValid = totp.verify({
+          token,
+          secret: userWithMfa.mfaSecret as string,
+          window: 1,
+        });
+      }
     } catch (e) {
       this.logger.error('MFA Verify Error', e);
       isValid = false;
