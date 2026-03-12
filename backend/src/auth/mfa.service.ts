@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { toDataURL } from 'qrcode';
+import * as QRCode from 'qrcode';
 import { PrismaService } from '../prisma/prisma.service';
 import { totp, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
@@ -25,11 +25,7 @@ export class MfaService {
 
   async generateMfaSecret(userId: string, email: string) {
     const secret = totp.generateSecret();
-    const otpauthUrl = totp.toURI({
-      label: email,
-      issuer: 'Mecerka (Startup)',
-      secret,
-    });
+    const otpauthUrl = totp.keyuri(email, 'Mecerka (Startup)', secret);
 
     // Save secret to user but keep MFA disabled until verified
     await this.prisma.user.update({
@@ -37,7 +33,7 @@ export class MfaService {
       data: { mfaSecret: secret, mfaEnabled: false },
     });
 
-    const qrCode = await toDataURL(otpauthUrl);
+    const qrCode = await QRCode.toDataURL(otpauthUrl);
 
     // Send notification email without sensitive data
     await this.emailService
@@ -82,12 +78,15 @@ export class MfaService {
       );
 
       // In otplib v13, the singleton totp.verify({token, secret}) is the most reliable object signature.
-      // We use window: 2 to allow for some drift, but it won't fix 20 minutes!
-      isValid = totp.verify({
+      // We use window: 2 to allow for some drift. We cast result to boolean.
+      const verifyResult = totp.verify({
         token,
         secret,
         window: 2,
       });
+
+      // Handle both Promise and boolean returns (v13 can be either depending on config)
+      isValid = verifyResult instanceof Promise ? await verifyResult : Boolean(verifyResult);
 
       this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
     } catch (e) {
