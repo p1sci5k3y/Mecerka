@@ -1,16 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { toDataURL } from 'qrcode';
-import { PrismaService } from '../prisma/prisma.service';
-import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
+import { totp, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
 
-const totp = new TOTP({
+// Configure the singleton once with necessary plugins for v13
+totp.options = {
   digits: 6,
   period: 30,
-  // Explicitly provide plugins to avoid CryptoPluginMissingError
   crypto: new NobleCryptoPlugin(),
   base32: new ScureBase32Plugin(),
-});
+};
 
 @Injectable()
 export class MfaService {
@@ -75,21 +72,23 @@ export class MfaService {
     let isValid = false;
     try {
       const secret = userWithMfa.mfaSecret as string;
+      const currentStep = Math.floor(Date.now() / 1000 / 30);
+      
       this.logger.debug(
-        `Verifying MFA token for user ${userId}. Secret length: ${secret?.length || 0}`,
+        `Verifying MFA for user ${userId}. TimeStep: ${currentStep}. Secret length: ${secret?.length || 0}`,
       );
 
-      // In otplib v13, class methods expect an options object.
-      // We use a window of 2 to be extra lenient with time drift.
+      // In otplib v13, the singleton totp.verify({token, secret}) is the most reliable object signature.
+      // We use window: 2 to allow for some drift, but it won't fix 20 minutes!
       isValid = totp.verify({
         token,
         secret,
         window: 2,
       });
 
-      this.logger.log(`MFA verification result for user ${userId}: ${isValid}`);
+      this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
     } catch (e) {
-      this.logger.error(`MFA Verify Error for user ${userId}:`, e);
+      this.logger.error(`MFA Critical Error for user ${userId}:`, e);
       isValid = false;
     }
 
