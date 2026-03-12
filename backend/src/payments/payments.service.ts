@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
+import { DeliveryStatus, ProviderOrderStatus, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import * as argon2 from 'argon2';
@@ -278,7 +278,7 @@ export class PaymentsService {
     };
   }
 
-  private async attemptStockDeduction(tx: any, items: any[]): Promise<boolean> {
+  private async attemptStockDeduction(tx: Prisma.TransactionClient, items: any[]): Promise<boolean> {
     const productIds = items.map((i) => i.productId);
     const products = await tx.product.findMany({
       where: { id: { in: productIds } },
@@ -317,7 +317,7 @@ export class PaymentsService {
       return { message: 'Webhook already processed' };
     }
 
-    const result: any = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 2. Atomic Event Registration
       try {
         await tx.webhookEvent.create({

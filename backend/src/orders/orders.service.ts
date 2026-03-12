@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role, DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
+import { Role, DeliveryStatus, ProviderOrderStatus, Prisma } from '@prisma/client';
 import * as argon2 from 'argon2';
 import {
   canTransitionOrder,
@@ -243,7 +243,7 @@ export class OrdersService {
   }
 
   private async checkAndDecrementStock(
-    tx: any,
+    tx: Prisma.TransactionClient,
     items: { productId: string; quantity: number }[],
   ): Promise<boolean> {
     const productIds = items.map((i) => i.productId);
@@ -281,7 +281,7 @@ export class OrdersService {
   }
 
   private async evaluateProviderOrdersStock(
-    tx: any,
+    tx: Prisma.TransactionClient,
     providerOrders: any[],
   ): Promise<{ rejected: string[]; confirmed: string[] }> {
     const rejected: string[] = [];
