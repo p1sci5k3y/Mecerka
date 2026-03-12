@@ -46,6 +46,7 @@ services:
       - MAIL_FROM=${MAIL_FROM}
       - BACKEND_URL=${BACKEND_URL:-https://mecerka.me/api}
       - PORT=3000
+      - NODE_ENV=production
     ports:
       - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
     networks:
