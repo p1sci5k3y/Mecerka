@@ -74,20 +74,22 @@ export class MfaService {
 
     let isValid = false;
     try {
-      // Use standard check/verify with (token, secret) signature.
-      // We also add a window of 1 (allows previous and next token) for better reliability.
-      isValid = totp.check(token, userWithMfa.mfaSecret as string);
-      
-      if (!isValid) {
-        // Fallback with window if check fails
-        isValid = totp.verify({
-          token,
-          secret: userWithMfa.mfaSecret as string,
-          window: 1,
-        });
-      }
+      const secret = userWithMfa.mfaSecret as string;
+      this.logger.debug(
+        `Verifying MFA token for user ${userId}. Secret length: ${secret?.length || 0}`,
+      );
+
+      // In otplib v13, class methods expect an options object.
+      // We use a window of 2 to be extra lenient with time drift.
+      isValid = totp.verify({
+        token,
+        secret,
+        window: 2,
+      });
+
+      this.logger.log(`MFA verification result for user ${userId}: ${isValid}`);
     } catch (e) {
-      this.logger.error('MFA Verify Error', e);
+      this.logger.error(`MFA Verify Error for user ${userId}:`, e);
       isValid = false;
     }
 
