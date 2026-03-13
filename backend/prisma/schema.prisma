@@ -38,6 +38,18 @@ enum ProviderOrderStatus {
   CANCELLED
 }
 
+enum ProductImportJobStatus {
+  VALIDATING
+  VALIDATED
+  APPLIED
+  FAILED
+}
+
+enum ProductImportFormat {
+  CSV
+  XLSX
+}
+
 model User {
   id                         String    @id @default(uuid()) @db.Uuid
   email                      String    @unique
@@ -72,9 +84,11 @@ model User {
   // Relations
   orders         Order[]         @relation("ClientOrders")
   runnerProfile  RunnerProfile?
+  providerProfile Provider?
   products       Product[]       @relation("ProviderProducts")
   runnerOrders   Order[]         @relation("RunnerOrders")
   providerOrders ProviderOrder[] @relation("ProviderOrders")
+  productImportJobs ProductImportJob[]
 }
 
 model City {
@@ -87,6 +101,7 @@ model City {
   // Relations
   products Product[]
   orders   Order[]
+  providers Provider[]
 }
 
 model Category {
@@ -98,13 +113,41 @@ model Category {
 
   // Relations
   products Product[]
+  providers Provider[]
+}
+
+model Provider {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid
+  slug            String   @unique
+  businessName    String
+  cityId          String   @db.Uuid
+  categoryId      String   @db.Uuid
+  description     String
+  workshopHistory String
+  photos          String[]
+  videoUrl        String?
+  websiteUrl      String?
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  city     City     @relation(fields: [cityId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([userId])
+  @@index([cityId])
+  @@index([categoryId])
 }
 
 model Product {
   id          String   @id @default(uuid()) @db.Uuid
+  reference   String
   name        String
   description String?
   price       Decimal  @db.Decimal(10, 2)
+  discountPrice Decimal? @db.Decimal(10, 2)
   stock       Int      @default(0)
   imageUrl    String?
   createdAt   DateTime @default(now())
@@ -126,6 +169,7 @@ model Product {
   @@index([cityId])
   @@index([categoryId])
   @@index([isActive])
+  @@unique([providerId, reference])
 }
 
 model Order {
@@ -236,4 +280,27 @@ model RunnerProfile {
 model WebhookEvent {
   id        String   @id
   createdAt DateTime @default(now())
+}
+
+model ProductImportJob {
+  id               String                 @id @default(uuid()) @db.Uuid
+  providerId       String                 @db.Uuid
+  status           ProductImportJobStatus @default(VALIDATING)
+  format           ProductImportFormat
+  filename         String
+  totalRows        Int                    @default(0)
+  validRows        Int                    @default(0)
+  createdCount     Int                    @default(0)
+  updatedCount     Int                    @default(0)
+  failedCount      Int                    @default(0)
+  validationErrors Json?
+  payload          Json?
+  appliedAt        DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  provider User @relation(fields: [providerId], references: [id])
+
+  @@index([providerId, status])
+  @@index([createdAt])
 }
