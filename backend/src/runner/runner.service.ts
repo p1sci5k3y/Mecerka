@@ -40,7 +40,13 @@ export class RunnerService {
   async previewDelivery(dto: PreviewDeliveryDto) {
     // 1. Fetch active runners
     const runners = await this.prisma.runnerProfile.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        user: {
+          active: true,
+          stripeAccountId: { not: null },
+        },
+      },
       include: { user: { select: { name: true, id: true } } },
     });
 
@@ -104,10 +110,26 @@ export class RunnerService {
 
     const runner = await this.prisma.runnerProfile.findUnique({
       where: { userId: dto.runnerId },
+      include: {
+        user: {
+          select: {
+            active: true,
+            stripeAccountId: true,
+          },
+        },
+      },
     });
 
     if (!runner) throw new NotFoundException('Runner not found');
     if (!runner.isActive) throw new BadRequestException('Runner is not active');
+    if (!runner.user.active) {
+      throw new BadRequestException('Runner account is not active');
+    }
+    if (!runner.user.stripeAccountId) {
+      throw new BadRequestException(
+        'Runner must complete Stripe onboarding before being assigned.',
+      );
+    }
 
     // Re-validate distance just in case (optional but safe)
     // For now assuming the preview was correct, but in real world we'd check order destination vs runner base
