@@ -16,6 +16,7 @@ import { RunnerModule } from './runner/runner.module';
 import { UsersModule } from './users/app-users.module';
 import { PaymentsModule } from './payments/payments.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ProvidersModule } from './providers/providers.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
       },
     ]),
     PaymentsModule,
+    ProvidersModule,
   ],
   controllers: [AppController],
   providers: [
@@ -48,4 +50,4 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}
