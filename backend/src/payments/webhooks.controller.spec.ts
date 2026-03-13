@@ -105,6 +105,29 @@ describe('WebhooksController', () => {
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
 
+  it('4b. Short-circuits replayed events without reprocessing payment', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_replayed',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_123',
+          metadata: { orderId: 'ord_123' },
+        },
+      },
+    });
+    (paymentsServiceMock.isProcessed as jest.Mock).mockResolvedValueOnce(true);
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(paymentsServiceMock.confirmPayment).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
   it('5. Returns 200 for unhandled events to prevent Stripe retries', async () => {
     const req = { rawBody: Buffer.from('other_payload') } as unknown as any;
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;

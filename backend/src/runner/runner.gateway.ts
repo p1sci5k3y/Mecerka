@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { Role, DeliveryStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnEvent } from '@nestjs/event-emitter';
+import { JwtPayload } from '../auth/interfaces/auth.interfaces';
 
 interface SocketWithUser extends Socket {
   data: {
@@ -89,6 +90,8 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
         throw new Error('Invalid JWT: missing subject');
       }
 
+      await this.validateSocketSession(payload as JwtPayload);
+
       // Associate user identity aggressively inside the socket object
       (client as SocketWithUser).data = {
         userId: payload.sub,
@@ -103,6 +106,39 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
         `Handshake authentication failed: ${error instanceof Error ? error.message : 'Unknown'} (Client ${client.id})`,
       );
       client.disconnect(true);
+    }
+  }
+
+  private async validateSocketSession(payload: JwtPayload): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: {
+        active: true,
+        tokenVersion: true,
+        mfaEnabled: true,
+        passwordChangedAt: true,
+      },
+    });
+
+    if (!user?.active) {
+      throw new Error('User is inactive or missing');
+    }
+
+    if (
+      payload.tokenVersion !== undefined &&
+      payload.tokenVersion < user.tokenVersion
+    ) {
+      throw new Error('Token revoked');
+    }
+
+    if (user.passwordChangedAt && payload.iat) {
+      if (payload.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+        throw new Error('Token expired due to password change');
+      }
+    }
+
+    if (user.mfaEnabled && !payload.mfaAuthenticated) {
+      throw new Error('MFA verification is required');
     }
   }
 

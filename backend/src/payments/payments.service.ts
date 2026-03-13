@@ -127,7 +127,12 @@ export class PaymentsService {
       throw new NotFoundException('Order not found or not in PENDING state');
     }
 
-    // Simplification for Phase 8 MVP: Assuming 1 Provider Order per global Order
+    if (order.providerOrders.length !== 1) {
+      throw new ConflictException(
+        'El flujo de pago actual solo admite pedidos de un único proveedor.',
+      );
+    }
+
     const po = order.providerOrders[0];
     if (!po) throw new ConflictException('Order has no provider items');
 
@@ -168,7 +173,7 @@ export class PaymentsService {
         application_fee_amount: applicationFeeCents,
         transfer_group: `ORDER_${order.id}`,
         metadata: {
-          mecerkaOrderId: order.id,
+          orderId: order.id,
           logisticsTotal: totalLogisticsCents,
         },
         automatic_payment_methods: { enabled: true },
@@ -224,6 +229,12 @@ export class PaymentsService {
 
     if (!order || order.status !== DeliveryStatus.PENDING) {
       throw new NotFoundException('Order not found or not in PENDING state');
+    }
+
+    if (order.providerOrders.length !== 1) {
+      throw new ConflictException(
+        'El flujo de pago actual solo admite pedidos de un único proveedor.',
+      );
     }
 
     const po = order.providerOrders[0];

@@ -4,6 +4,7 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
@@ -28,6 +29,12 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const { email, password, name, role } = dto;
+
+    if (role === Role.ADMIN) {
+      throw new ForbiddenException(
+        'No puedes solicitar privilegios de administrador durante el registro.',
+      );
+    }
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
