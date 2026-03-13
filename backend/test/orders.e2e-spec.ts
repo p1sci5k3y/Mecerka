@@ -124,6 +124,7 @@ describe('Order Lifecycle (e2e)', () => {
     });
     const prod = await prisma.product.create({
       data: {
+        reference: `PROD-E2E-${suffix}`,
         name: `Prod E2E ${suffix}`,
         price: 10.5,
         stock: 100,

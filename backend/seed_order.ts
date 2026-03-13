@@ -1,11 +1,18 @@
-import { PrismaClient, DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
+import {
+  PrismaClient,
+  DeliveryStatus,
+  ProviderOrderStatus,
+  Role,
+} from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
 async function main() {
   // 1. Get or create a Client
-  let client = await prisma.user.findFirst({ where: { email: 'e2e_client@mecerka.com', roles: { has: Role.CLIENT } } });
+  let client = await prisma.user.findFirst({
+    where: { email: 'e2e_client@mecerka.com', roles: { has: Role.CLIENT } },
+  });
   if (!client) {
     client = await prisma.user.create({
       data: {
@@ -15,13 +22,15 @@ async function main() {
         roles: [Role.CLIENT],
         emailVerified: true,
         mfaEnabled: false,
-        pin: await argon2.hash('1234')
-      }
+        pin: await argon2.hash('1234'),
+      },
     });
   }
 
   // 2. Get or create a Provider
-  let provider = await prisma.user.findFirst({ where: { email: 'e2e_provider@mecerka.com', roles: { has: Role.PROVIDER } } });
+  let provider = await prisma.user.findFirst({
+    where: { email: 'e2e_provider@mecerka.com', roles: { has: Role.PROVIDER } },
+  });
   if (!provider) {
     provider = await prisma.user.create({
       data: {
@@ -31,7 +40,7 @@ async function main() {
         roles: [Role.PROVIDER],
         emailVerified: true,
         mfaEnabled: false,
-      }
+      },
     });
   }
 
@@ -43,7 +52,7 @@ async function main() {
         name: 'Madrid',
         slug: 'madrid',
         active: true,
-      }
+      },
     });
   }
 
@@ -54,24 +63,27 @@ async function main() {
       data: {
         name: 'E2E Validation Category',
         slug: 'e2e-validation-category',
-      }
+      },
     });
   }
 
   // 5. Get or create a Product
-  let product = await prisma.product.findFirst({ where: { providerId: provider.id } });
+  let product = await prisma.product.findFirst({
+    where: { providerId: provider.id },
+  });
   if (!product) {
     product = await prisma.product.create({
       data: {
+        reference: 'E2E-VALIDATION-PRODUCT',
         providerId: provider.id,
         cityId: city.id,
         categoryId: category.id,
         name: 'E2E Validation Product',
         description: 'Product used for E2E testing',
-        price: 15.50,
+        price: 15.5,
         stock: 100,
         isActive: true,
-      }
+      },
     });
   }
 
@@ -81,11 +93,11 @@ async function main() {
       clientId: client.id,
       cityId: city.id,
       status: DeliveryStatus.READY_FOR_ASSIGNMENT,
-      totalPrice: 15.50,
-      deliveryFee: 3.50,
+      totalPrice: 15.5,
+      deliveryFee: 3.5,
       deliveryAddress: 'Calle Princesa 12, Madrid',
-      deliveryLat: 40.4250,
-      deliveryLng: -3.7150,
+      deliveryLat: 40.425,
+      deliveryLng: -3.715,
       paymentRef: `pi_dummy_e2e_${Date.now()}`,
       confirmedAt: new Date(),
       providerOrders: {
@@ -93,27 +105,27 @@ async function main() {
           {
             providerId: provider.id,
             status: ProviderOrderStatus.READY_FOR_PICKUP,
-            subtotal: 15.50,
+            subtotal: 15.5,
             items: {
               create: [
                 {
                   productId: product.id,
                   quantity: 1,
-                  priceAtPurchase: 15.50
-                }
-              ]
-            }
-          }
-        ]
-      }
-    }
+                  priceAtPurchase: 15.5,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
   });
 
   console.log(`Successfully seeded Order ID: ${order.id}`);
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error(e);
     process.exit(1);
   })
