@@ -18,6 +18,9 @@ describe('RunnerGateway Security & Auth', () => {
     };
 
     prismaMock = {
+      user: {
+        findUnique: jest.fn(),
+      } as any,
       order: {
         findUnique: jest.fn(),
       } as any,
@@ -75,6 +78,15 @@ describe('RunnerGateway Security & Auth', () => {
       (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
         sub: 'user-id-123',
         roles: [Role.CLIENT],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: Math.floor(Date.now() / 1000),
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 1,
+        mfaEnabled: false,
+        passwordChangedAt: null,
       });
 
       await gateway.handleConnection(mockSocket);
@@ -84,6 +96,45 @@ describe('RunnerGateway Security & Auth', () => {
         userId: 'user-id-123',
         roles: [Role.CLIENT],
       });
+
+      expect(prismaMock.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-id-123' },
+        select: {
+          active: true,
+          tokenVersion: true,
+          mfaEnabled: true,
+          passwordChangedAt: true,
+        },
+      });
+    });
+
+    it('Should reject revoked or stale tokens even if the signature is valid', async () => {
+      const mockSocket = {
+        id: 'socket-123',
+        handshake: {
+          headers: { authorization: 'Bearer valid-but-stale-token' },
+        },
+        disconnect: jest.fn(),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        sub: 'user-id-123',
+        roles: [Role.CLIENT],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: Math.floor(Date.now() / 1000),
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 2,
+        mfaEnabled: false,
+        passwordChangedAt: null,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+      expect(mockSocket.data).toBeUndefined();
     });
   });
 

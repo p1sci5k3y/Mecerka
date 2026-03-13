@@ -138,6 +138,12 @@ export class OrdersService {
       providerGroups[providerId].subtotal += itemTotal;
     }
 
+    if (Object.keys(providerGroups).length !== 1) {
+      throw new BadRequestException(
+        'El flujo de pago actual solo admite pedidos de un único proveedor.',
+      );
+    }
+
     // 5. Calculate Logistics Economics dynamically on root payload
     const baseCityFee = 3.5; // Note: Fetch from config/DB map
     const multiStopPenalty = 1.5;
@@ -172,9 +178,23 @@ export class OrdersService {
     return order;
   }
 
+  private toProviderScopedOrderView(order: any, providerId: string) {
+    return {
+      id: order.id,
+      status: order.status,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      city: order.city,
+      providerOrders: order.providerOrders.filter(
+        (providerOrder: any) => providerOrder.providerId === providerId,
+      ),
+    };
+  }
+
   findAll(userId: string, roles: Role[]) {
     if (roles.includes(Role.PROVIDER)) {
-      return this.prisma.order.findMany({
+      return this.prisma.order
+        .findMany({
         where: { providerOrders: { some: { providerId: userId } } },
         include: {
           providerOrders: {
@@ -184,7 +204,10 @@ export class OrdersService {
           city: true,
         },
         orderBy: { createdAt: 'desc' },
-      });
+        })
+        .then((orders) =>
+          orders.map((order) => this.toProviderScopedOrderView(order, userId)),
+        );
     } else if (roles.includes(Role.RUNNER)) {
       return this.prisma.order.findMany({
         where: { runnerId: userId },
@@ -237,6 +260,10 @@ export class OrdersService {
       throw new ForbiddenException(
         'You do not have permission to view this order',
       );
+    }
+
+    if (isProvider && !isClient && !isRunner) {
+      return this.toProviderScopedOrderView(order, userId);
     }
 
     return order;
@@ -466,9 +493,19 @@ export class OrdersService {
   async acceptOrder(id: string, runnerId: string) {
     const runner = await this.prisma.user.findUnique({
       where: { id: runnerId },
-      select: { stripeAccountId: true },
+      select: {
+        stripeAccountId: true,
+        runnerProfile: { select: { isActive: true } },
+      },
     });
-    if (!runner?.stripeAccountId) {
+
+    if (!runner?.runnerProfile?.isActive) {
+      throw new ForbiddenException(
+        'Tu perfil de runner no esta activo para aceptar pedidos.',
+      );
+    }
+
+    if (!runner.stripeAccountId) {
       throw new ForbiddenException(
         'Debes completar tu registro financiero en Stripe antes de aceptar pedidos.',
       );
