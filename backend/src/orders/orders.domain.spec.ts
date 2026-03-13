@@ -73,6 +73,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     const prodA = await prisma.product.create({
       data: {
+        reference: 'PROD-A',
         name: 'Prod A',
         price: 10,
         stock: stockA,
@@ -84,6 +85,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     const prodB = await prisma.product.create({
       data: {
+        reference: 'PROD-B',
         name: 'Prod B',
         price: 15,
         stock: stockB,

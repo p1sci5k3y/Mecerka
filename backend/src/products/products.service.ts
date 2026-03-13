@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -6,10 +7,71 @@ import {
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assertDiscountPriceValid,
+  normalizeProductReference,
+} from './product-catalog.utils';
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private async ensureUniqueReference(
+    providerId: string,
+    requestedReference: string,
+    ignoreProductId?: string,
+  ): Promise<string> {
+    const baseReference = normalizeProductReference(requestedReference);
+
+    if (!baseReference) {
+      throw new BadRequestException('Product reference cannot be empty');
+    }
+
+    let candidate = baseReference;
+    let suffix = 1;
+
+    while (true) {
+      const existing = await this.prisma.product.findFirst({
+        where: {
+          providerId,
+          reference: candidate,
+          ...(ignoreProductId ? { NOT: { id: ignoreProductId } } : {}),
+        },
+        select: { id: true },
+      });
+
+      if (!existing) {
+        return candidate;
+      }
+
+      candidate = `${baseReference}-${suffix}`;
+      suffix += 1;
+    }
+  }
+
+  private async resolveReference(
+    providerId: string,
+    createProductDto: CreateProductDto | UpdateProductDto,
+    ignoreProductId?: string,
+  ): Promise<string | undefined> {
+    if (createProductDto.reference) {
+      return this.ensureUniqueReference(
+        providerId,
+        createProductDto.reference,
+        ignoreProductId,
+      );
+    }
+
+    if ('name' in createProductDto && createProductDto.name) {
+      return this.ensureUniqueReference(
+        providerId,
+        createProductDto.name,
+        ignoreProductId,
+      );
+    }
+
+    return undefined;
+  }
 
   async create(createProductDto: CreateProductDto, providerId: string) {
     const user = await this.prisma.user.findUnique({
@@ -27,9 +89,18 @@ export class ProductsService {
       );
     }
 
+    assertDiscountPriceValid(
+      createProductDto.price,
+      createProductDto.discountPrice,
+    );
+    const reference =
+      (await this.resolveReference(providerId, createProductDto)) ??
+      normalizeProductReference(createProductDto.name);
+
     return this.prisma.product.create({
       data: {
         ...createProductDto,
+        reference,
         providerId,
       },
     });
@@ -121,9 +192,24 @@ export class ProductsService {
       );
     }
 
+    const currentDiscountPrice =
+      product.discountPrice === null ? null : Number(product.discountPrice);
+    assertDiscountPriceValid(
+      updateProductDto.price ?? Number(product.price),
+      updateProductDto.discountPrice ?? currentDiscountPrice,
+    );
+    const reference = await this.resolveReference(
+      providerId,
+      updateProductDto,
+      id,
+    );
+
     return this.prisma.product.update({
       where: { id },
-      data: updateProductDto,
+      data: {
+        ...updateProductDto,
+        ...(reference ? { reference } : {}),
+      },
     });
   }
 
