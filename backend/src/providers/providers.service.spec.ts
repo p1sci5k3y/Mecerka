@@ -122,4 +122,33 @@ describe('ProvidersService', () => {
       NotFoundException,
     );
   });
+
+  it('normalizes long hostile slug input into a bounded safe slug', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'provider-user',
+      roles: [Role.PROVIDER],
+      active: true,
+    });
+    prismaMock.provider.findFirst.mockResolvedValue(null);
+    prismaMock.provider.upsert.mockImplementation(({ create }: any) => create);
+
+    const result = await service.upsertOwnProfile('provider-user', {
+      businessName: 'ignored-business-name',
+      slug: `${'Á'.repeat(300)}!!!____----${'x'.repeat(80)}`,
+      cityId: 'city-1',
+      categoryId: 'category-1',
+      description: 'Traditional craftwork',
+      workshopHistory: 'Founded in 1984',
+      photos: ['https://cdn.example.com/photo-1.jpg'],
+      websiteUrl: 'https://workshop.example.com',
+      videoUrl: 'https://cdn.example.com/video.mp4',
+      isPublished: true,
+    });
+
+    expect(result.slug).toMatch(/^[a-z0-9-]+$/);
+    expect(result.slug.length).toBeLessThanOrEqual(200);
+    expect(result.slug).not.toContain('--');
+    expect(result.slug.startsWith('-')).toBe(false);
+    expect(result.slug.endsWith('-')).toBe(false);
+  });
 });

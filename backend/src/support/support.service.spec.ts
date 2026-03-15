@@ -296,7 +296,10 @@ describe('SupportService', () => {
       }),
     );
 
-    const result = await service.confirmDonationPayment('pi_donation_123', 'evt_1');
+    const result = await service.confirmDonationPayment(
+      'pi_donation_123',
+      'evt_1',
+    );
 
     expect(transactionSessionUpdate).toHaveBeenCalledWith({
       where: { id: 'session-1' },
@@ -330,13 +333,18 @@ describe('SupportService', () => {
   it('ignores duplicate donation webhooks safely', async () => {
     prismaMock.donationWebhookEvent.create.mockRejectedValue({ code: 'P2002' });
 
-    const result = await service.confirmDonationPayment('pi_donation_123', 'evt_dup');
+    const result = await service.confirmDonationPayment(
+      'pi_donation_123',
+      'evt_dup',
+    );
 
     expect(result).toEqual({ message: 'Donation webhook already processed' });
   });
 
   it('marks failed donation webhooks without touching marketplace payments', async () => {
-    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_fail' });
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({
+      id: 'evt_fail',
+    });
     prismaMock.donationWebhookEvent.update.mockResolvedValue({});
 
     prismaMock.$transaction.mockImplementation(async (callback: any) =>
@@ -359,7 +367,10 @@ describe('SupportService', () => {
       }),
     );
 
-    const result = await service.failDonationPayment('pi_donation_123', 'evt_fail');
+    const result = await service.failDonationPayment(
+      'pi_donation_123',
+      'evt_fail',
+    );
 
     expect(prismaMock.donationWebhookEvent.update).toHaveBeenCalledWith({
       where: { id: 'evt_fail' },
@@ -382,9 +393,9 @@ describe('SupportService', () => {
       sessions: [],
     });
 
-    await expect(service.getDonation('donation-1', 'user-other')).rejects.toThrow(
-      'You do not have access to this donation',
-    );
+    await expect(
+      service.getDonation('donation-1', 'user-other'),
+    ).rejects.toThrow('You do not have access to this donation');
   });
 
   it('rejects anonymous retrieval through the authenticated endpoint flow', async () => {
@@ -400,7 +411,9 @@ describe('SupportService', () => {
   });
 
   it('marks webhook audit rows as failed when confirmation throws', async () => {
-    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_error' });
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({
+      id: 'evt_error',
+    });
     prismaMock.donationWebhookEvent.update.mockResolvedValue({});
     prismaMock.$transaction.mockRejectedValue(new Error('db-failure'));
 

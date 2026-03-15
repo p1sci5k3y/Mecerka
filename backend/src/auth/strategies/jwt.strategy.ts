@@ -21,7 +21,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         const previousSecret = process.env.JWT_SECRET_PREVIOUS;
 
         if (!currentSecret) {
-          return done(new Error('JWT_SECRET configuration is missing'), undefined);
+          return done(
+            new Error('JWT_SECRET configuration is missing'),
+            undefined,
+          );
         }
 
         try {

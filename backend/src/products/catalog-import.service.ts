@@ -331,7 +331,7 @@ export class CatalogImportService {
         });
       }
 
-      if (imageUrl && !/^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(imageUrl)) {
+      if (imageUrl && !this.isValidHttpUrl(imageUrl)) {
         errors.push({
           rowNumber,
           field: 'image_url',
@@ -410,6 +410,15 @@ export class CatalogImportService {
     }
 
     return parsed;
+  }
+
+  private isValidHttpUrl(value: string): boolean {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
   }
 
   private buildWorkbookResponse(

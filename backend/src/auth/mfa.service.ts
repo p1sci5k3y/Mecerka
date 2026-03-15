@@ -24,7 +24,11 @@ export class MfaService {
 
   async generateMfaSecret(userId: string, email: string) {
     const secret = totp.generateSecret();
-    const otpauthUrl = totp.toURI({ label: email, issuer: 'Mecerka (Startup)', secret });
+    const otpauthUrl = totp.toURI({
+      label: email,
+      issuer: 'Mecerka (Startup)',
+      secret,
+    });
 
     // Save secret to user but keep MFA disabled until verified
     await this.prisma.user.update({
@@ -71,7 +75,7 @@ export class MfaService {
     try {
       const secret = userWithMfa.mfaSecret as string;
       const currentStep = Math.floor(Date.now() / 1000 / 30);
-      
+
       this.logger.debug(
         `Verifying MFA for user ${userId}. TimeStep: ${currentStep}. Secret length: ${secret?.length || 0}`,
       );
@@ -86,7 +90,9 @@ export class MfaService {
         })
       ).valid;
 
-      this.logger.log(`MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`);
+      this.logger.log(
+        `MFA validation for ${userId}: ${isValid ? 'SUCCESS' : 'FAILED'}`,
+      );
     } catch (e) {
       this.logger.error(`MFA Critical Error for user ${userId}:`, e);
       isValid = false;
