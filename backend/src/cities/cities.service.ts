@@ -15,6 +15,14 @@ export class CitiesService {
   findAll() {
     return this.prisma.city.findMany({
       where: { active: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
     });
   }
 }

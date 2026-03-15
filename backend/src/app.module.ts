@@ -17,6 +17,9 @@ import { UsersModule } from './users/app-users.module';
 import { PaymentsModule } from './payments/payments.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ProvidersModule } from './providers/providers.module';
+import { CartModule } from './cart/cart.module';
+import { SupportModule } from './support/support.module';
+import { DeliveryModule } from './delivery/delivery.module';
 
 @Module({
   imports: [
@@ -40,6 +43,9 @@ import { ProvidersModule } from './providers/providers.module';
     ]),
     PaymentsModule,
     ProvidersModule,
+    CartModule,
+    SupportModule,
+    DeliveryModule,
   ],
   controllers: [AppController],
   providers: [

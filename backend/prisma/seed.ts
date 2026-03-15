@@ -12,14 +12,37 @@ async function main() {
     { name: 'Madrid', slug: 'madrid', active: true },
     { name: 'Barcelona', slug: 'barcelona', active: true },
     { name: 'Valencia', slug: 'valencia', active: true },
+    { name: 'Sevilla', slug: 'sevilla', active: true },
+    { name: 'Malaga', slug: 'malaga', active: true },
+    { name: 'Zaragoza', slug: 'zaragoza', active: true },
+    { name: 'Bilbao', slug: 'bilbao', active: true },
+    { name: 'Murcia', slug: 'murcia', active: true },
+    { name: 'Palma', slug: 'palma', active: true },
+    { name: 'Valladolid', slug: 'valladolid', active: true },
+    { name: 'Alicante', slug: 'alicante', active: true },
+    { name: 'A Coruna', slug: 'a-coruna', active: true },
+    { name: 'Granada', slug: 'granada', active: true },
+    { name: 'Cordoba', slug: 'cordoba', active: true },
+    { name: 'Vigo', slug: 'vigo', active: true },
+    { name: 'Gijon', slug: 'gijon', active: true },
+    { name: 'Santander', slug: 'santander', active: true },
+    { name: 'Pamplona', slug: 'pamplona', active: true },
+    { name: 'Salamanca', slug: 'salamanca', active: true },
+    { name: 'Cadiz', slug: 'cadiz', active: true },
+    { name: 'Las Palmas de Gran Canaria', slug: 'las-palmas-de-gran-canaria', active: true },
+    { name: 'Santa Cruz de Tenerife', slug: 'santa-cruz-de-tenerife', active: true },
   ];
 
   for (const city of cities) {
-    const exists = await prisma.city.findUnique({ where: { slug: city.slug } });
-    if (!exists) {
-      await prisma.city.create({ data: city });
-      console.log(`Created city: ${city.name}`);
-    }
+    await prisma.city.upsert({
+      where: { slug: city.slug },
+      update: {
+        name: city.name,
+        active: city.active,
+      },
+      create: city,
+    });
+    console.log(`Ensured city: ${city.name}`);
   }
 
   // Admin User

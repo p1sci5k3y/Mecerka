@@ -30,12 +30,18 @@ enum DeliveryStatus {
 
 enum ProviderOrderStatus {
   PENDING
+  PAYMENT_PENDING
+  PAYMENT_READY
+  PAID
   ACCEPTED
+  REJECTED
   PREPARING
   READY_FOR_PICKUP
   PICKED_UP
+  DELIVERED
   REJECTED_BY_STORE
   CANCELLED
+  EXPIRED
 }
 
 enum ProductImportJobStatus {
@@ -48,6 +54,77 @@ enum ProductImportJobStatus {
 enum ProductImportFormat {
   CSV
   XLSX
+}
+
+enum CartGroupStatus {
+  ACTIVE
+  CHECKED_OUT
+  ABANDONED
+  EXPIRED
+}
+
+enum ProviderPaymentStatus {
+  PENDING
+  PAYMENT_READY
+  PAID
+  FAILED
+}
+
+enum StockReservationStatus {
+  ACTIVE
+  CONSUMED
+  RELEASED
+  EXPIRED
+}
+
+enum PaymentSessionStatus {
+  CREATED
+  READY
+  EXPIRED
+  COMPLETED
+  FAILED
+}
+
+enum PaymentAccountOwnerType {
+  PROVIDER
+  RUNNER
+}
+
+enum PaymentAccountProvider {
+  STRIPE
+  PAYPAL
+}
+
+enum DonationStatus {
+  CREATED
+  READY
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum DeliveryOrderStatus {
+  PENDING
+  RUNNER_ASSIGNED
+  PICKUP_PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum RunnerPaymentStatus {
+  PENDING
+  PAYMENT_READY
+  PAID
+  FAILED
+}
+
+enum DeliveryJobStatus {
+  OPEN
+  ASSIGNED
+  EXPIRED
+  CANCELLED
 }
 
 model User {
@@ -89,6 +166,13 @@ model User {
   runnerOrders   Order[]         @relation("RunnerOrders")
   providerOrders ProviderOrder[] @relation("ProviderOrders")
   productImportJobs ProductImportJob[]
+  cartGroups     CartGroup[]
+  cartProviders  CartProvider[]
+  paymentAccounts PaymentAccount[]
+  donations      PlatformDonation[]
+  runnerDeliveries DeliveryOrder[] @relation("RunnerDeliveries")
+  deliveryJobClaims DeliveryJobClaim[]
+  runnerLocations RunnerLocation[]
 }
 
 model City {
@@ -102,6 +186,7 @@ model City {
   products Product[]
   orders   Order[]
   providers Provider[]
+  cartGroups CartGroup[]
 }
 
 model Category {
@@ -163,7 +248,9 @@ model Product {
   provider   User        @relation("ProviderProducts", fields: [providerId], references: [id])
   city       City        @relation(fields: [cityId], references: [id])
   category   Category    @relation(fields: [categoryId], references: [id])
+  cartItems  CartItem[]
   orderItems OrderItem[]
+  stockReservations StockReservation[]
 
   @@index([providerId])
   @@index([cityId])
@@ -172,10 +259,71 @@ model Product {
   @@unique([providerId, reference])
 }
 
+model CartGroup {
+  id        String          @id @default(uuid()) @db.Uuid
+  clientId  String          @db.Uuid
+  cityId    String?         @db.Uuid
+  status    CartGroupStatus @default(ACTIVE)
+  version   Int             @default(1)
+  expiresAt DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  client User  @relation(fields: [clientId], references: [id])
+  city   City? @relation(fields: [cityId], references: [id])
+  providers CartProvider[]
+
+  @@index([clientId, status])
+  @@index([status, expiresAt])
+  @@index([cityId])
+}
+
+model CartProvider {
+  id             String   @id @default(uuid()) @db.Uuid
+  cartGroupId    String   @db.Uuid
+  providerId     String   @db.Uuid
+  subtotalAmount Decimal  @default(0.00) @db.Decimal(10, 2)
+  itemCount      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  cartGroup CartGroup @relation(fields: [cartGroupId], references: [id])
+  provider  User      @relation(fields: [providerId], references: [id])
+  items     CartItem[]
+
+  @@unique([cartGroupId, providerId])
+  @@index([cartGroupId])
+  @@index([providerId])
+  @@index([cartGroupId, providerId])
+}
+
+model CartItem {
+  id                         String   @id @default(uuid()) @db.Uuid
+  cartProviderId             String   @db.Uuid
+  productId                  String   @db.Uuid
+  quantity                   Int
+  productReferenceSnapshot   String
+  productNameSnapshot        String
+  imageUrlSnapshot           String?
+  unitPriceSnapshot          Decimal  @db.Decimal(10, 2)
+  discountPriceSnapshot      Decimal? @db.Decimal(10, 2)
+  effectiveUnitPriceSnapshot Decimal  @db.Decimal(10, 2)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  cartProvider CartProvider @relation(fields: [cartProviderId], references: [id])
+  product      Product      @relation(fields: [productId], references: [id])
+
+  @@unique([cartProviderId, productId])
+  @@index([cartProviderId])
+  @@index([productId])
+}
+
 model Order {
   id         String         @id @default(uuid()) @db.Uuid
   totalPrice Decimal        @db.Decimal(10, 2)
   status     DeliveryStatus @default(PENDING)
+  checkoutIdempotencyKey String @unique
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
@@ -190,6 +338,8 @@ model Order {
   runner User? @relation("RunnerOrders", fields: [runnerId], references: [id])
 
   providerOrders ProviderOrder[]
+  summaryDocument OrderSummaryDocument?
+  deliveryOrder  DeliveryOrder?
 
   // Delivery Information
   deliveryAddress String?
@@ -213,11 +363,18 @@ model Order {
 }
 
 model ProviderOrder {
-  id        String              @id @default(uuid()) @db.Uuid
-  status    ProviderOrderStatus @default(PENDING)
-  subtotal  Decimal             @db.Decimal(10, 2)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
+  id             String                @id @default(uuid()) @db.Uuid
+  status         ProviderOrderStatus   @default(PENDING)
+  subtotalAmount Decimal               @db.Decimal(10, 2)
+  paymentStatus  ProviderPaymentStatus @default(PENDING)
+  paymentRef     String?
+  paidAt         DateTime?
+  paymentReadyAt DateTime?
+  paymentExpiresAt DateTime?
+  externalInvoiceUrl String?
+  externalInvoiceNumber String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   // Foreign Keys
   orderId    String @db.Uuid
@@ -227,11 +384,243 @@ model ProviderOrder {
   order    Order @relation(fields: [orderId], references: [id])
   provider User  @relation("ProviderOrders", fields: [providerId], references: [id])
 
-  items OrderItem[]
+  items        OrderItem[]
+  reservations StockReservation[]
+  paymentSessions ProviderPaymentSession[]
 
   @@index([orderId])
   @@index([providerId])
   @@index([status])
+  @@index([paymentStatus])
+  @@index([orderId, providerId])
+  @@unique([providerId, paymentRef])
+}
+
+model PaymentAccount {
+  id                String                  @id @default(uuid()) @db.Uuid
+  ownerType         PaymentAccountOwnerType
+  ownerId           String                  @db.Uuid
+  provider          PaymentAccountProvider
+  externalAccountId String
+  isActive          Boolean                 @default(true)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id])
+
+  @@unique([ownerType, ownerId, provider])
+  @@unique([provider, externalAccountId])
+  @@index([ownerType, ownerId, isActive])
+}
+
+model OrderSummaryDocument {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId      String   @unique @db.Uuid
+  displayNumber String   @unique
+  totalAmount   Decimal  @db.Decimal(10, 2)
+  currency      String   @default("EUR")
+  generatedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model ProviderPaymentSession {
+  id              String               @id @default(uuid()) @db.Uuid
+  providerOrderId String               @db.Uuid
+  paymentProvider String
+  externalSessionId String?            @unique
+  paymentUrl      String?
+  status          PaymentSessionStatus
+  expiresAt       DateTime?
+  providerResponsePayload Json?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  providerOrder ProviderOrder @relation(fields: [providerOrderId], references: [id])
+
+  @@index([providerOrderId])
+}
+
+model PaymentWebhookEvent {
+  id         String   @id
+  provider   String
+  eventType  String
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+  status     String?
+
+  @@index([provider, eventType, receivedAt])
+  @@index([status, receivedAt])
+}
+
+model PlatformDonation {
+  id          String                @id @default(uuid()) @db.Uuid
+  amount      Decimal               @db.Decimal(10, 2)
+  currency    String
+  donorUserId String?               @db.Uuid
+  provider    PaymentAccountProvider
+  status      DonationStatus        @default(CREATED)
+  externalRef String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  donor User? @relation(fields: [donorUserId], references: [id])
+  sessions DonationSession[]
+
+  @@index([donorUserId])
+  @@index([status, createdAt])
+}
+
+model DonationSession {
+  id                String                 @id @default(uuid()) @db.Uuid
+  donationId        String                 @db.Uuid
+  paymentProvider   PaymentAccountProvider
+  externalSessionId String?                @unique
+  paymentUrl        String?
+  status            PaymentSessionStatus
+  expiresAt         DateTime?
+  providerMetadata  Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  donation PlatformDonation @relation(fields: [donationId], references: [id])
+
+  @@index([donationId])
+  @@index([status, expiresAt])
+}
+
+model DonationWebhookEvent {
+  id          String   @id
+  provider    String
+  eventType   String
+  receivedAt  DateTime @default(now())
+  processedAt DateTime?
+  status      String?
+
+  @@index([provider, eventType, receivedAt])
+  @@index([status, receivedAt])
+}
+
+model DeliveryOrder {
+  id            String             @id @default(uuid()) @db.Uuid
+  orderId        String             @unique @db.Uuid
+  runnerId       String?            @db.Uuid
+  status         DeliveryOrderStatus @default(PENDING)
+  deliveryFee    Decimal            @db.Decimal(10, 2)
+  currency       String
+  paymentStatus  RunnerPaymentStatus @default(PENDING)
+  pickupAt       DateTime?
+  transitAt      DateTime?
+  deliveredAt    DateTime?
+  deliveryProofUrl String?
+  deliveryNotes  String?
+  lastRunnerLocationLat Float?
+  lastRunnerLocationLng Float?
+  lastLocationUpdateAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  order   Order  @relation(fields: [orderId], references: [id])
+  runner  User?  @relation("RunnerDeliveries", fields: [runnerId], references: [id])
+  job     DeliveryJob?
+  paymentSessions RunnerPaymentSession[]
+
+  @@index([orderId])
+  @@index([runnerId])
+  @@index([status])
+}
+
+model RunnerLocation {
+  id         String   @id @default(uuid()) @db.Uuid
+  runnerId   String   @db.Uuid
+  latitude   Float
+  longitude  Float
+  recordedAt DateTime @default(now())
+
+  runner User @relation(fields: [runnerId], references: [id])
+
+  @@index([runnerId])
+  @@index([recordedAt])
+}
+
+model DeliveryJob {
+  id              String            @id @default(uuid()) @db.Uuid
+  deliveryOrderId String            @unique @db.Uuid
+  status          DeliveryJobStatus @default(OPEN)
+  expiresAt       DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  deliveryOrder DeliveryOrder     @relation(fields: [deliveryOrderId], references: [id])
+  claims        DeliveryJobClaim[]
+
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model DeliveryJobClaim {
+  id        String   @id @default(uuid()) @db.Uuid
+  jobId      String   @db.Uuid
+  runnerId   String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  job     DeliveryJob @relation(fields: [jobId], references: [id])
+  runner  User        @relation(fields: [runnerId], references: [id])
+
+  @@index([jobId])
+  @@index([runnerId])
+  @@unique([jobId, runnerId])
+}
+
+model RunnerPaymentSession {
+  id                String                 @id @default(uuid()) @db.Uuid
+  deliveryOrderId   String                 @db.Uuid
+  paymentProvider   PaymentAccountProvider
+  externalSessionId String?                @unique
+  paymentUrl        String?
+  status            PaymentSessionStatus
+  expiresAt         DateTime?
+  providerMetadata  Json?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  deliveryOrder DeliveryOrder @relation(fields: [deliveryOrderId], references: [id])
+
+  @@index([deliveryOrderId])
+  @@index([status, expiresAt])
+}
+
+model RunnerWebhookEvent {
+  id          String   @id
+  provider    String
+  eventType   String
+  receivedAt  DateTime @default(now())
+  processedAt DateTime?
+  status      String?
+
+  @@index([provider, eventType, receivedAt])
+  @@index([status, receivedAt])
+}
+
+model StockReservation {
+  id              String                 @id @default(uuid()) @db.Uuid
+  providerOrderId String                 @db.Uuid
+  productId       String                 @db.Uuid
+  quantity        Int
+  status          StockReservationStatus
+  expiresAt       DateTime
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  providerOrder ProviderOrder @relation(fields: [providerOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([providerOrderId])
+  @@index([productId])
+  @@index([status, expiresAt])
+  @@unique([providerOrderId, productId])
 }
 
 model OrderItem {
@@ -277,11 +666,6 @@ model RunnerProfile {
   // Relations
   user User @relation(fields: [userId], references: [id])
 }
-model WebhookEvent {
-  id        String   @id
-  createdAt DateTime @default(now())
-}
-
 model ProductImportJob {
   id               String                 @id @default(uuid()) @db.Uuid
   providerId       String                 @db.Uuid

@@ -92,6 +92,7 @@ async function main() {
     data: {
       clientId: client.id,
       cityId: city.id,
+      checkoutIdempotencyKey: `seed-order-${Date.now()}`,
       status: DeliveryStatus.READY_FOR_ASSIGNMENT,
       totalPrice: 15.5,
       deliveryFee: 3.5,
@@ -105,7 +106,8 @@ async function main() {
           {
             providerId: provider.id,
             status: ProviderOrderStatus.READY_FOR_PICKUP,
-            subtotal: 15.5,
+            subtotalAmount: 15.5,
+            paymentStatus: 'PAID',
             items: {
               create: [
                 {
