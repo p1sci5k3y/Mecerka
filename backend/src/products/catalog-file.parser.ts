@@ -16,6 +16,7 @@ export class CatalogFileParser {
   private static readonly MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
   private static readonly MAX_ROW_COUNT = 1000;
   private static readonly MAX_COLUMN_COUNT = 50;
+  private static readonly MAX_CELL_LENGTH = 2000;
   private static readonly ALLOWED_CSV_MIME_TYPES = new Set([
     'text/csv',
     'application/csv',
@@ -146,7 +147,15 @@ export class CatalogFileParser {
       const record: ParsedCatalogRecord = {};
 
       headers.forEach((header, index) => {
-        record[header] = String(row[index] ?? '').trim();
+        const cellValue = String(row[index] ?? '').trim();
+
+        if (cellValue.length > CatalogFileParser.MAX_CELL_LENGTH) {
+          throw new BadRequestException(
+            `Catalog file exceeds the ${CatalogFileParser.MAX_CELL_LENGTH} character limit per cell`,
+          );
+        }
+
+        record[header] = cellValue;
       });
 
       return record;

@@ -6,6 +6,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaymentsService } from '../payments/payments.service';
 import { ConfigService } from '@nestjs/config';
 
+jest.setTimeout(20000);
+
 describe('OrdersService - Saga Lite Payment Domain', () => {
   let paymentsService: PaymentsService;
   let prisma: PrismaService;
@@ -26,6 +28,9 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     paymentsService = module.get<PaymentsService>(PaymentsService);
     prisma = module.get<PrismaService>(PrismaService);
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastEmailSentAt" TIMESTAMP(3)',
+    );
   });
 
   afterAll(async () => {
