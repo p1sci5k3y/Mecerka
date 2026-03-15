@@ -49,7 +49,10 @@ describe('WebhooksController', () => {
 
   it('1. Rejects missing signature with 400', async () => {
     const req = { rawBody: Buffer.from('') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
 
     await controller.handleStripeWebhook(req, res, '');
 
@@ -59,7 +62,10 @@ describe('WebhooksController', () => {
 
   it('2. Rejects missing raw body with 400', async () => {
     const req = {} as unknown as any; // Empty Request
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
 
     await controller.handleStripeWebhook(req, res, 'dummy-sig');
 
@@ -69,7 +75,10 @@ describe('WebhooksController', () => {
 
   it('3. Rejects invalid stripe signature with 400', async () => {
     const req = { rawBody: Buffer.from('bad_payload') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
 
     mockConstructEvent.mockImplementation(() => {
       throw new Error('Invalid signature');
@@ -83,7 +92,10 @@ describe('WebhooksController', () => {
 
   it('4. Processes valid signature + payment_intent.succeeded calling confirmPayment', async () => {
     const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
     const logSpy = jest.spyOn((controller as any).logger, 'log');
 
     mockConstructEvent.mockReturnValue({
@@ -98,11 +110,9 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmProviderOrderPayment).toHaveBeenCalledWith(
-      'pi_123',
-      'evt_123',
-      'payment_intent.succeeded',
-    );
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded');
     expect(logSpy).toHaveBeenCalledWith(
       'Provider payment confirmed via Webhook. Session: pi_123. Status: CONFIRMED',
     );
@@ -114,7 +124,10 @@ describe('WebhooksController', () => {
 
   it('4b. Short-circuits replayed events without reprocessing payment', async () => {
     const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       id: 'evt_replayed',
@@ -129,14 +142,19 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmProviderOrderPayment).not.toHaveBeenCalled();
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
 
   it('5. Returns 200 for unhandled events to prevent Stripe retries', async () => {
     const req = { rawBody: Buffer.from('other_payload') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       type: 'charge.succeeded',
@@ -145,14 +163,19 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmProviderOrderPayment).not.toHaveBeenCalled();
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
 
   it('6. Returns 500 when confirmPayment fails so Stripe retries later', async () => {
     const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
-    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
 
     mockConstructEvent.mockReturnValue({
       id: 'evt_123',
@@ -165,17 +188,15 @@ describe('WebhooksController', () => {
     });
 
     // Simulate DB failure or concurrency panic
-    (paymentsServiceMock.confirmProviderOrderPayment as jest.Mock).mockRejectedValueOnce(
-      new Error('DB Timeout'),
-    );
+    (
+      paymentsServiceMock.confirmProviderOrderPayment as jest.Mock
+    ).mockRejectedValueOnce(new Error('DB Timeout'));
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmProviderOrderPayment).toHaveBeenCalledWith(
-      'pi_123',
-      'evt_123',
-      'payment_intent.succeeded',
-    );
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded');
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.send).toHaveBeenCalledWith(
       'Error processing payment confirmation',

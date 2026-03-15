@@ -127,6 +127,30 @@ enum DeliveryJobStatus {
   CANCELLED
 }
 
+enum IncidentReporterRole {
+  CLIENT
+  RUNNER
+  PROVIDER
+  ADMIN
+}
+
+enum DeliveryIncidentType {
+  MISSING_ITEMS
+  DAMAGED_ITEMS
+  WRONG_DELIVERY
+  FAILED_DELIVERY
+  ADDRESS_PROBLEM
+  SAFETY_CONCERN
+  OTHER
+}
+
+enum DeliveryIncidentStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
+}
+
 model User {
   id                         String    @id @default(uuid()) @db.Uuid
   email                      String    @unique
@@ -173,6 +197,7 @@ model User {
   runnerDeliveries DeliveryOrder[] @relation("RunnerDeliveries")
   deliveryJobClaims DeliveryJobClaim[]
   runnerLocations RunnerLocation[]
+  deliveryIncidents DeliveryIncident[]
 }
 
 model City {
@@ -526,6 +551,7 @@ model DeliveryOrder {
   runner  User?  @relation("RunnerDeliveries", fields: [runnerId], references: [id])
   job     DeliveryJob?
   paymentSessions RunnerPaymentSession[]
+  incidents DeliveryIncident[]
 
   @@index([orderId])
   @@index([runnerId])
@@ -543,6 +569,26 @@ model RunnerLocation {
 
   @@index([runnerId])
   @@index([recordedAt])
+}
+
+model DeliveryIncident {
+  id              String                 @id @default(uuid()) @db.Uuid
+  deliveryOrderId String                 @db.Uuid
+  reporterId      String                 @db.Uuid
+  reporterRole    IncidentReporterRole
+  type            DeliveryIncidentType
+  status          DeliveryIncidentStatus @default(OPEN)
+  description     String
+  evidenceUrl     String?
+  createdAt       DateTime               @default(now())
+  resolvedAt      DateTime?
+
+  deliveryOrder DeliveryOrder @relation(fields: [deliveryOrderId], references: [id])
+  reporter      User          @relation(fields: [reporterId], references: [id])
+
+  @@index([deliveryOrderId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model DeliveryJob {

@@ -93,11 +93,12 @@ export class WebhooksController {
       }
 
       try {
-        const result: any = await this.paymentsService.confirmProviderOrderPayment(
-          paymentRef,
-          event.id,
-          event.type,
-        );
+        const result: any =
+          await this.paymentsService.confirmProviderOrderPayment(
+            paymentRef,
+            event.id,
+            event.type,
+          );
         this.logger.log(
           `Provider payment confirmed via Webhook. Session: ${paymentRef}. Status: ${result.status}`,
         );

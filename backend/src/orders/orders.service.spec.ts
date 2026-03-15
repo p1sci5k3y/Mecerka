@@ -176,9 +176,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         providers: [],
       });
 
-      await expect(service.checkoutFromCart('client-1', 'idem-empty')).rejects.toThrow(
-        'Active cart is empty',
-      );
+      await expect(
+        service.checkoutFromCart('client-1', 'idem-empty'),
+      ).rejects.toThrow('Active cart is empty');
     });
 
     it('returns the existing order when the same checkout key is retried', async () => {
@@ -232,7 +232,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         callback({
           $executeRaw: jest.fn(),
           product: {
-            findMany: jest.fn().mockResolvedValue([{ id: 'product-1', stock: 10 }]),
+            findMany: jest
+              .fn()
+              .mockResolvedValue([{ id: 'product-1', stock: 10 }]),
           },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
@@ -301,7 +303,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             subtotalAmount: 25,
             paymentStatus: 'PENDING',
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
-            items: [{ productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 }],
+            items: [
+              { productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 },
+            ],
           },
           {
             id: 'po-2',
@@ -309,7 +313,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             subtotalAmount: 20,
             paymentStatus: 'PENDING',
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
-            items: [{ productId: 'product-2', quantity: 1, priceAtPurchase: 20 }],
+            items: [
+              { productId: 'product-2', quantity: 1, priceAtPurchase: 20 },
+            ],
           },
         ],
       });
@@ -331,7 +337,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             subtotalAmount: 25,
             paymentStatus: 'PENDING',
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
-            items: [{ productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 }],
+            items: [
+              { productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 },
+            ],
           },
           {
             id: 'po-2',
@@ -339,11 +347,15 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             subtotalAmount: 20,
             paymentStatus: 'PENDING',
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
-            items: [{ productId: 'product-2', quantity: 1, priceAtPurchase: 20 }],
+            items: [
+              { productId: 'product-2', quantity: 1, priceAtPurchase: 20 },
+            ],
           },
         ],
       });
-      const transactionReservationCreateMany = jest.fn().mockResolvedValue({ count: 2 });
+      const transactionReservationCreateMany = jest
+        .fn()
+        .mockResolvedValue({ count: 2 });
       const transactionSummaryCreate = jest.fn().mockResolvedValue({
         id: 'summary-1',
       });
@@ -443,7 +455,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           currency: 'EUR',
         }),
       );
-      expect((result.summaryDocument as any).externalInvoiceNumber).toBeUndefined();
+      expect(
+        (result.summaryDocument as any).externalInvoiceNumber,
+      ).toBeUndefined();
       expect(result.providerOrders[0].items[0]).toEqual(
         expect.objectContaining({
           productId: 'product-1',
@@ -482,7 +496,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         callback({
           $executeRaw: jest.fn(),
           product: {
-            findMany: jest.fn().mockResolvedValue([{ id: 'product-1', stock: 2 }]),
+            findMany: jest
+              .fn()
+              .mockResolvedValue([{ id: 'product-1', stock: 2 }]),
           },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([
@@ -495,9 +511,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         }),
       );
 
-      await expect(service.checkoutFromCart('client-1', 'idem-stock')).rejects.toThrow(
-        'STOCK_UNAVAILABLE',
-      );
+      await expect(
+        service.checkoutFromCart('client-1', 'idem-stock'),
+      ).rejects.toThrow('STOCK_UNAVAILABLE');
     });
   });
 
@@ -528,7 +544,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               status: ProviderOrderStatus.PENDING,
               paymentStatus: ProviderPaymentStatus.PENDING,
               paymentReadyAt: null,
-              reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+              reservations: [
+                { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+              ],
               paymentSessions: [],
             }),
             update: transactionUpdateProviderOrder,
@@ -587,7 +605,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               status: ProviderOrderStatus.PAYMENT_READY,
               paymentStatus: ProviderPaymentStatus.PENDING,
               paymentReadyAt: null,
-              reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+              reservations: [
+                { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+              ],
               paymentSessions: [existingSession],
             }),
             update: transactionUpdateProviderOrder,
@@ -688,7 +708,10 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       ]);
 
       expect(result.providerOrders).toEqual([
-        expect.objectContaining({ id: 'po-provider-1', providerId: 'provider-1' }),
+        expect.objectContaining({
+          id: 'po-provider-1',
+          providerId: 'provider-1',
+        }),
       ]);
       expect((result as any).deliveryAddress).toBeUndefined();
       expect((result as any).paymentRef).toBeUndefined();

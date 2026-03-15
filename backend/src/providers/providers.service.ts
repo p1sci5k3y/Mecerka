@@ -10,13 +10,48 @@ import { UpsertProviderDto } from './dto/upsert-provider.dto';
 export class ProvidersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private static readonly MAX_SLUG_SOURCE_LENGTH = 200;
+
   private slugify(value: string): string {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .replace(/-{2,}/g, '-');
+    const normalizedInput = value
+      .normalize('NFKD')
+      .slice(0, ProvidersService.MAX_SLUG_SOURCE_LENGTH);
+
+    let slug = '';
+    let lastWasDash = false;
+
+    for (const rawChar of normalizedInput) {
+      const codePoint = rawChar.codePointAt(0);
+
+      if (
+        codePoint !== undefined &&
+        codePoint >= 0x0300 &&
+        codePoint <= 0x036f
+      ) {
+        continue;
+      }
+
+      const char = rawChar.toLowerCase();
+      const isAsciiLetter = char >= 'a' && char <= 'z';
+      const isDigit = char >= '0' && char <= '9';
+
+      if (isAsciiLetter || isDigit) {
+        slug += char;
+        lastWasDash = false;
+        continue;
+      }
+
+      if (!lastWasDash && slug.length > 0) {
+        slug += '-';
+        lastWasDash = true;
+      }
+    }
+
+    if (slug.endsWith('-')) {
+      slug = slug.slice(0, -1);
+    }
+
+    return slug;
   }
 
   private async ensureUniqueSlug(

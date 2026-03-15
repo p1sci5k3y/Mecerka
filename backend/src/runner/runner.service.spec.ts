@@ -47,12 +47,9 @@ describe('RunnerService assignment invariants', () => {
     });
 
     await expect(
-      service.selectRunner(
-        'order-1',
-        { runnerId: 'runner-1' },
-        'client-1',
-        [Role.CLIENT],
-      ),
+      service.selectRunner('order-1', { runnerId: 'runner-1' }, 'client-1', [
+        Role.CLIENT,
+      ]),
     ).rejects.toThrow(BadRequestException);
   });
 

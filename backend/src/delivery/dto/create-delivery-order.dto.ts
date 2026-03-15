@@ -8,7 +8,9 @@ export class CreateDeliveryOrderDto {
   @Type(() => Number)
   @IsNumber(
     { allowInfinity: false, allowNaN: false, maxDecimalPlaces: 2 },
-    { message: 'deliveryFee must be a valid number with up to 2 decimal places' },
+    {
+      message: 'deliveryFee must be a valid number with up to 2 decimal places',
+    },
   )
   @Min(0)
   @Max(500)

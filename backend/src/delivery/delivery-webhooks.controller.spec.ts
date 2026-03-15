@@ -27,7 +27,9 @@ describe('DeliveryWebhooksController', () => {
       confirmRunnerPayment: jest
         .fn()
         .mockResolvedValue({ paymentStatus: 'PAID' }),
-      failRunnerPayment: jest.fn().mockResolvedValue({ paymentStatus: 'FAILED' }),
+      failRunnerPayment: jest
+        .fn()
+        .mockResolvedValue({ paymentStatus: 'FAILED' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -39,7 +41,8 @@ describe('DeliveryWebhooksController', () => {
           useValue: {
             get: jest.fn((key: string) => {
               if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
-              if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET') return 'whsec_delivery';
+              if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET')
+                return 'whsec_delivery';
               return undefined;
             }),
           },
@@ -47,7 +50,9 @@ describe('DeliveryWebhooksController', () => {
       ],
     }).compile();
 
-    controller = module.get<DeliveryWebhooksController>(DeliveryWebhooksController);
+    controller = module.get<DeliveryWebhooksController>(
+      DeliveryWebhooksController,
+    );
   });
 
   afterEach(() => {

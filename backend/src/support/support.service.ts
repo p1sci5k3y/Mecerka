@@ -40,7 +40,9 @@ export class SupportService {
       return false;
     }
 
-    return this.configService.get<string>('DONATIONS_STRIPE_ENABLED') === 'true';
+    return (
+      this.configService.get<string>('DONATIONS_STRIPE_ENABLED') === 'true'
+    );
   }
 
   private getSupportedCurrencies() {
@@ -107,7 +109,9 @@ export class SupportService {
     const normalizedCurrency = String(currency).toUpperCase();
 
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
-      throw new BadRequestException('Donation amount must be greater than zero');
+      throw new BadRequestException(
+        'Donation amount must be greater than zero',
+      );
     }
 
     if (normalizedAmount < this.getMinimumDonationAmount()) {
@@ -207,7 +211,11 @@ export class SupportService {
       );
     }
 
-    if (donorUserId && donation.donorUserId && donation.donorUserId !== donorUserId) {
+    if (
+      donorUserId &&
+      donation.donorUserId &&
+      donation.donorUserId !== donorUserId
+    ) {
       throw new ForbiddenException('You do not have access to this donation');
     }
 
@@ -242,7 +250,11 @@ export class SupportService {
         throw new NotFoundException('Donation not found');
       }
 
-      if (donorUserId && donation.donorUserId && donation.donorUserId !== donorUserId) {
+      if (
+        donorUserId &&
+        donation.donorUserId &&
+        donation.donorUserId !== donorUserId
+      ) {
         throw new ForbiddenException('You do not have access to this donation');
       }
 
@@ -262,7 +274,9 @@ export class SupportService {
         await tx.donationSession.updateMany({
           where: {
             id: { in: expiredSessionIds },
-            status: { in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY] },
+            status: {
+              in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+            },
           },
           data: {
             status: PaymentSessionStatus.EXPIRED,

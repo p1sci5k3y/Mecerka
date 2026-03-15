@@ -227,8 +227,12 @@ describe('PaymentsService', () => {
   });
 
   it('confirms provider payment atomically, consumes reservations, and decrements stock once', async () => {
-    const transactionProductUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const transactionReservationsUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const transactionProductUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
+    const transactionReservationsUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
     const transactionSessionUpdate = jest.fn().mockResolvedValue({});
     const transactionProviderOrderUpdate = jest.fn().mockResolvedValue({});
     const transactionOrderUpdate = jest.fn().mockResolvedValue({});
@@ -415,7 +419,9 @@ describe('PaymentsService', () => {
     prismaMock.paymentWebhookEvent.create.mockResolvedValue({ id: 'evt_fail' });
     prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
     prismaMock.$transaction.mockImplementation(async () => {
-      throw new ConflictException('ProviderOrder has no active reservations to consume');
+      throw new ConflictException(
+        'ProviderOrder has no active reservations to consume',
+      );
     });
 
     await expect(
@@ -479,12 +485,18 @@ describe('PaymentsService', () => {
       }),
     );
 
-    const result = await service.prepareProviderOrderPayment('po-1', 'client-1');
+    const result = await service.prepareProviderOrderPayment(
+      'po-1',
+      'client-1',
+    );
 
     expect(stripePaymentIntentsCreate).not.toHaveBeenCalled();
-    expect(stripePaymentIntentsRetrieve).toHaveBeenCalledWith('pi_existing_123', {
-      stripeAccount: 'acct_provider_1',
-    });
+    expect(stripePaymentIntentsRetrieve).toHaveBeenCalledWith(
+      'pi_existing_123',
+      {
+        stripeAccount: 'acct_provider_1',
+      },
+    );
     expect(result).toEqual(
       expect.objectContaining({
         providerOrderId: 'po-1',
@@ -506,7 +518,9 @@ describe('PaymentsService', () => {
       isActive: true,
     });
     const transactionUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
-    const transactionCreate = jest.fn().mockResolvedValue({ id: 'session-new' });
+    const transactionCreate = jest
+      .fn()
+      .mockResolvedValue({ id: 'session-new' });
 
     prismaMock.$transaction.mockImplementation(async (callback: any) =>
       callback({
@@ -542,12 +556,17 @@ describe('PaymentsService', () => {
       }),
     );
 
-    const result = await service.prepareProviderOrderPayment('po-1', 'client-1');
+    const result = await service.prepareProviderOrderPayment(
+      'po-1',
+      'client-1',
+    );
 
     expect(transactionUpdateMany).toHaveBeenCalledWith({
       where: {
         id: { in: ['session-expired'] },
-        status: { in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY] },
+        status: {
+          in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+        },
       },
       data: {
         status: PaymentSessionStatus.EXPIRED,

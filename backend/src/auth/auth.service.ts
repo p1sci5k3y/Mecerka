@@ -449,7 +449,8 @@ export class AuthService {
 
     if (user?.lastEmailSentAt) {
       const now = new Date();
-      const diffSeconds = (now.getTime() - user.lastEmailSentAt.getTime()) / 1000;
+      const diffSeconds =
+        (now.getTime() - user.lastEmailSentAt.getTime()) / 1000;
       if (diffSeconds < 90) {
         const remaining = Math.ceil(90 - diffSeconds);
         throw new BadRequestException(
