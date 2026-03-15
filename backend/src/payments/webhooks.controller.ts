@@ -79,14 +79,10 @@ export class WebhooksController {
 
     if (event.type === 'payment_intent.succeeded') {
       const paymentIntent = event.data.object;
-
-      const orderId = paymentIntent.metadata?.orderId;
       const paymentRef = paymentIntent.id;
 
-      if (!orderId) {
-        this.logger.warn(
-          `payment_intent.succeeded missing orderId in metadata (Ref: ${paymentRef})`,
-        );
+      if (!paymentRef || typeof paymentRef !== 'string') {
+        this.logger.warn('payment_intent.succeeded missing payment intent id');
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
@@ -97,13 +93,13 @@ export class WebhooksController {
       }
 
       try {
-        const result: any = await this.paymentsService.confirmPayment(
-          orderId,
+        const result: any = await this.paymentsService.confirmProviderOrderPayment(
           paymentRef,
           event.id,
+          event.type,
         );
         this.logger.log(
-          `Order ${orderId} confirmed via Webhook! Ref: ${paymentRef}. Status: ${result.status}`,
+          `Provider payment confirmed via Webhook. Session: ${paymentRef}. Status: ${result.status}`,
         );
       } catch (error: any) {
         // Ignore known concurrent errors if already processed successfully by an overlapping webhook
@@ -112,14 +108,14 @@ export class WebhooksController {
           error.message.includes('Concurrent stock update detected')
         ) {
           this.logger.warn(
-            `Ignored concurrent retry or conflict for order ${orderId}: ${error.message}`,
+            `Ignored concurrent retry or conflict for provider payment ${paymentRef}: ${error.message}`,
           );
           return res.status(HttpStatus.OK).json({ received: true });
         }
 
         // Stripe requires a 500 status on unhandled backend errors so it can retry later
         this.logger.error(
-          `Error confirming payment for order ${orderId}: ${error.message}`,
+          `Error confirming provider payment for session ${paymentRef}: ${error.message}`,
         );
         return res
           .status(HttpStatus.INTERNAL_SERVER_ERROR)

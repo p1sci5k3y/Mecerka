@@ -8,7 +8,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DeliveryStatus, ProviderOrderStatus, Prisma } from '@prisma/client';
+import {
+  DeliveryStatus,
+  PaymentAccountOwnerType,
+  PaymentAccountProvider,
+  PaymentSessionStatus,
+  ProviderOrderStatus,
+  ProviderPaymentStatus,
+  Prisma,
+  Role,
+} from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import * as argon2 from 'argon2';
@@ -16,6 +25,10 @@ import * as argon2 from 'argon2';
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
+  private static readonly WEBHOOK_STATUS_RECEIVED = 'RECEIVED';
+  private static readonly WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
+  private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
+  private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
 
   private readonly stripe: Stripe;
 
@@ -39,10 +52,329 @@ export class PaymentsService {
   }
 
   async isProcessed(eventId: string): Promise<boolean> {
-    const event = await this.prisma.webhookEvent.findUnique({
+    const event = await (this.prisma as any).paymentWebhookEvent.findUnique({
       where: { id: eventId },
     });
     return !!event;
+  }
+
+  private async claimWebhookEvent(eventId: string, provider: string, eventType: string) {
+    try {
+      await (this.prisma as any).paymentWebhookEvent.create({
+        data: {
+          id: eventId,
+          provider,
+          eventType,
+          status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
+        },
+      });
+      return true;
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  private async markWebhookEventStatus(
+    eventId: string,
+    status: string,
+    processedAt?: Date,
+  ) {
+    await (this.prisma as any).paymentWebhookEvent.update({
+      where: { id: eventId },
+      data: {
+        status,
+        ...(processedAt ? { processedAt } : {}),
+      },
+    });
+  }
+
+  async upsertPaymentAccount(
+    ownerType: PaymentAccountOwnerType,
+    ownerId: string,
+    provider: PaymentAccountProvider,
+    externalAccountId: string,
+  ) {
+    return this.prisma.paymentAccount.upsert({
+      where: {
+        ownerType_ownerId_provider: {
+          ownerType,
+          ownerId,
+          provider,
+        },
+      },
+      update: {
+        externalAccountId,
+        isActive: true,
+      },
+      create: {
+        ownerType,
+        ownerId,
+        provider,
+        externalAccountId,
+        isActive: true,
+      },
+    });
+  }
+
+  async getActivePaymentAccount(
+    ownerType: PaymentAccountOwnerType,
+    ownerId: string,
+    provider: PaymentAccountProvider,
+  ) {
+    return this.prisma.paymentAccount.findFirst({
+      where: {
+        ownerType,
+        ownerId,
+        provider,
+        isActive: true,
+      },
+    });
+  }
+
+  private async resolveActiveStripePaymentAccount(
+    ownerType: PaymentAccountOwnerType,
+    ownerId: string,
+  ) {
+    const existing = await this.getActivePaymentAccount(
+      ownerType,
+      ownerId,
+      PaymentAccountProvider.STRIPE,
+    );
+
+    if (existing) {
+      return existing;
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      select: {
+        stripeAccountId: true,
+      },
+    });
+
+    if (!user?.stripeAccountId) {
+      return null;
+    }
+
+    return this.upsertPaymentAccount(
+      ownerType,
+      ownerId,
+      PaymentAccountProvider.STRIPE,
+      user.stripeAccountId,
+    );
+  }
+
+  private resolvePaymentAccountOwnerType(roles: Role[]) {
+    if (roles.includes(Role.PROVIDER)) {
+      return PaymentAccountOwnerType.PROVIDER;
+    }
+
+    if (roles.includes(Role.RUNNER)) {
+      return PaymentAccountOwnerType.RUNNER;
+    }
+
+    return null;
+  }
+
+  async prepareProviderOrderPayment(providerOrderId: string, clientId: string) {
+    const now = new Date();
+    const eligibleStatuses: ProviderOrderStatus[] = [
+      ProviderOrderStatus.PENDING,
+      ProviderOrderStatus.PAYMENT_PENDING,
+      ProviderOrderStatus.PAYMENT_READY,
+    ];
+
+    return this.prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${providerOrderId}::uuid FOR UPDATE`,
+      );
+
+      const providerOrder = await tx.providerOrder.findUnique({
+        where: { id: providerOrderId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              clientId: true,
+            },
+          },
+          reservations: {
+            where: {
+              status: 'ACTIVE',
+              expiresAt: { gt: now },
+            },
+            select: {
+              expiresAt: true,
+            },
+          },
+          paymentSessions: {
+            where: {
+              status: {
+                in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      });
+      const paymentSessions: any[] = providerOrder?.paymentSessions ?? [];
+
+      if (!providerOrder || providerOrder.order.clientId !== clientId) {
+        throw new NotFoundException('ProviderOrder not found');
+      }
+
+      if (!eligibleStatuses.includes(providerOrder.status)) {
+        throw new ConflictException(
+          'ProviderOrder is not eligible for payment preparation',
+        );
+      }
+
+      if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
+        throw new ConflictException('ProviderOrder is already paid');
+      }
+
+      const reservationExpiresAt =
+        providerOrder.reservations.length > 0
+          ? providerOrder.reservations.reduce(
+              (earliest: Date, reservation: { expiresAt: Date }) =>
+                reservation.expiresAt < earliest ? reservation.expiresAt : earliest,
+              providerOrder.reservations[0].expiresAt,
+            )
+          : null;
+
+      if (!reservationExpiresAt) {
+        throw new ConflictException(
+          'ProviderOrder has no active stock reservation for payment',
+        );
+      }
+
+      const expiredSessionIds = paymentSessions
+        .filter(
+          (session) => session.expiresAt && session.expiresAt.getTime() <= now.getTime(),
+        )
+        .map((session) => session.id);
+
+      if (expiredSessionIds.length > 0) {
+        await tx.providerPaymentSession.updateMany({
+          where: {
+            id: { in: expiredSessionIds },
+            status: { in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY] },
+          },
+          data: {
+            status: PaymentSessionStatus.EXPIRED,
+          },
+        });
+      }
+
+      const activeSession = paymentSessions.find(
+        (session) =>
+          session.status === PaymentSessionStatus.READY &&
+          session.externalSessionId &&
+          (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
+      );
+
+      const paymentAccount = await this.resolveActiveStripePaymentAccount(
+        PaymentAccountOwnerType.PROVIDER,
+        providerOrder.providerId,
+      );
+
+      if (!paymentAccount?.isActive) {
+        throw new ConflictException(
+          'Provider payment account is not active for this provider order',
+        );
+      }
+
+      if (activeSession) {
+        const existingIntent = await this.stripe.paymentIntents.retrieve(
+          activeSession.externalSessionId,
+          {
+            stripeAccount: paymentAccount.externalAccountId,
+          },
+        );
+
+        await tx.providerOrder.update({
+          where: { id: providerOrderId },
+          data: {
+            paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+            paymentReadyAt: providerOrder.paymentReadyAt ?? now,
+            paymentExpiresAt: reservationExpiresAt,
+            paymentRef: activeSession.externalSessionId,
+            status:
+              providerOrder.status === ProviderOrderStatus.PENDING
+                ? ProviderOrderStatus.PAYMENT_READY
+                : providerOrder.status,
+          },
+        });
+
+        return {
+          providerOrderId: providerOrder.id,
+          paymentSessionId: activeSession.id,
+          externalSessionId: activeSession.externalSessionId,
+          clientSecret: existingIntent.client_secret,
+          stripeAccountId: paymentAccount.externalAccountId,
+          expiresAt: activeSession.expiresAt,
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+        };
+      }
+
+      const intent = await this.stripe.paymentIntents.create(
+        {
+          amount: Math.round(Number(providerOrder.subtotalAmount) * 100),
+          currency: 'eur',
+          automatic_payment_methods: { enabled: true },
+          metadata: {
+            orderId: providerOrder.order.id,
+            providerOrderId: providerOrder.id,
+          },
+        },
+        {
+          stripeAccount: paymentAccount.externalAccountId,
+        },
+      );
+
+      const session = await tx.providerPaymentSession.create({
+        data: {
+          providerOrderId: providerOrder.id,
+          paymentProvider: PaymentAccountProvider.STRIPE,
+          externalSessionId: intent.id,
+          paymentUrl: null,
+          status: PaymentSessionStatus.READY,
+          expiresAt: reservationExpiresAt,
+          providerResponsePayload: {
+            stripeAccountId: paymentAccount.externalAccountId,
+            paymentIntentId: intent.id,
+            livemode: Boolean((intent as any).livemode ?? false),
+          },
+        } as any,
+      });
+
+      await tx.providerOrder.update({
+        where: { id: providerOrderId },
+        data: {
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+          paymentReadyAt: now,
+          paymentExpiresAt: reservationExpiresAt,
+          paymentRef: intent.id,
+          status:
+            providerOrder.status === ProviderOrderStatus.PENDING
+              ? ProviderOrderStatus.PAYMENT_READY
+              : providerOrder.status,
+        },
+      });
+
+      return {
+        providerOrderId: providerOrder.id,
+        paymentSessionId: session.id,
+        externalSessionId: intent.id,
+        clientSecret: intent.client_secret,
+        stripeAccountId: paymentAccount.externalAccountId,
+        expiresAt: reservationExpiresAt,
+        paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+      };
+    });
   }
   /**
    * Generates a Stripe Onboarding Link for Providers/Runners.
@@ -73,6 +405,16 @@ export class PaymentsService {
         where: { id: userId },
         data: { stripeAccountId: accountId },
       });
+
+      const ownerType = this.resolvePaymentAccountOwnerType(user.roles);
+      if (ownerType) {
+        await this.upsertPaymentAccount(
+          ownerType,
+          userId,
+          PaymentAccountProvider.STRIPE,
+          accountId,
+        );
+      }
     }
 
     const frontendUrl =
@@ -109,6 +451,16 @@ export class PaymentsService {
       );
     }
 
+    const ownerType = this.resolvePaymentAccountOwnerType(user.roles);
+    if (ownerType) {
+      await this.upsertPaymentAccount(
+        ownerType,
+        userId,
+        PaymentAccountProvider.STRIPE,
+        accountId,
+      );
+    }
+
     return true; // DB already has the ID, we just confirmed its active status
   }
 
@@ -120,7 +472,7 @@ export class PaymentsService {
   async createTripartitePaymentIntent(orderId: string, clientId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId, clientId },
-      include: { providerOrders: { include: { provider: true, items: true } } },
+      include: { providerOrders: true },
     });
 
     if (!order || order.status !== DeliveryStatus.PENDING) {
@@ -136,71 +488,7 @@ export class PaymentsService {
     const po = order.providerOrders[0];
     if (!po) throw new ConflictException('Order has no provider items');
 
-    const providerStripeId = po.provider.stripeAccountId;
-    if (!providerStripeId) {
-      throw new ConflictException(
-        'El proveedor de este pedido aún no ha verificado su cuenta bancaria. No puede recibir pagos.',
-      );
-    }
-
-    // 1. Calculate Base Amounts
-    const productsTotalCents = po.items.reduce(
-      (acc, item) =>
-        acc + Math.round(Number(item.priceAtPurchase) * 100) * item.quantity,
-      0,
-    );
-
-    // 2. Logistics Business Rule: 50/50 Split (e.g. 6.00 EUR delivery = 3.00 Client, 3.00 Provider)
-    const totalLogisticsCents = 600; // Fixed for MVP. Total runner cost.
-    const clientLogisticsBurdenCents = totalLogisticsCents / 2; // 300 cents
-    const providerLogisticsBurdenCents = totalLogisticsCents / 2; // 300 cents
-
-    // 3. Final Amounts
-    // What the client actually pays on the Checkout screen (Products + their half of delivery)
-    const finalChargeToClientCents =
-      productsTotalCents + clientLogisticsBurdenCents;
-
-    // The "Application Fee" is the conduit to extract the Runner's money from the charge
-    // It's the Client's half + The Provider's half.
-    const applicationFeeCents =
-      clientLogisticsBurdenCents + providerLogisticsBurdenCents; // 600 cents
-
-    // 4. Create Direct Charge Intent onto Provider Account
-    const session = await this.stripe.paymentIntents.create(
-      {
-        amount: finalChargeToClientCents,
-        currency: 'eur',
-        application_fee_amount: applicationFeeCents,
-        transfer_group: `ORDER_${order.id}`,
-        metadata: {
-          orderId: order.id,
-          logisticsTotal: totalLogisticsCents,
-        },
-        automatic_payment_methods: { enabled: true },
-      },
-      {
-        stripeAccount: providerStripeId, // Directly onto the Provider's Connected Account
-      },
-    );
-
-    // 5. Save the Payment Intent ID (so webhooks can find order)
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { paymentRef: session.id },
-    });
-
-    return {
-      clientSecret: session.client_secret,
-      stripeAccountId: providerStripeId, // Frontend needs this to mount the Elements widget
-      breakdown: {
-        totalCharge: finalChargeToClientCents / 100,
-        products: productsTotalCents / 100,
-        logisticsFeeClient: clientLogisticsBurdenCents / 100,
-        logisticsFeeProvider: providerLogisticsBurdenCents / 100,
-        providerNetRevenue:
-          (productsTotalCents - providerLogisticsBurdenCents) / 100,
-      },
-    };
+    return this.prepareProviderOrderPayment(po.id, clientId);
   }
 
   /**
@@ -325,116 +613,230 @@ export class PaymentsService {
    * Completes the payment process idempotently using a webhook event ID.
    * Handles partial fulfillment if stock runs out concurrently.
    */
+  async confirmProviderOrderPayment(
+    externalSessionId: string,
+    eventId: string,
+    eventType: string,
+  ) {
+    const claimed = await this.claimWebhookEvent(eventId, 'STRIPE', eventType);
+    if (!claimed) {
+      return { message: 'Webhook already processed' };
+    }
+
+    try {
+      const result = await this.prisma.$transaction(async (tx: any) => {
+        const now = new Date();
+
+        const paymentSession = await tx.providerPaymentSession.findUnique({
+          where: { externalSessionId },
+          include: {
+            providerOrder: {
+              include: { items: true },
+            },
+          },
+        });
+
+        if (!paymentSession) {
+          throw new NotFoundException('Payment session not found');
+        }
+
+        const providerOrder = await tx.providerOrder.findUnique({
+          where: { id: paymentSession.providerOrderId },
+          include: {
+            order: {
+              include: {
+                providerOrders: {
+                  select: {
+                    id: true,
+                    paymentStatus: true,
+                  },
+                },
+              },
+            },
+            reservations: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                productId: true,
+                quantity: true,
+                expiresAt: true,
+              },
+            },
+            items: true,
+          },
+        });
+
+        if (!providerOrder) {
+          throw new NotFoundException('ProviderOrder not found');
+        }
+
+        if (paymentSession.status === PaymentSessionStatus.COMPLETED) {
+          return {
+            message: 'Provider payment session already completed',
+            status: providerOrder.status,
+          };
+        }
+
+        if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
+          return { message: 'ProviderOrder already paid', status: providerOrder.status };
+        }
+
+        if (providerOrder.reservations.length === 0) {
+          throw new ConflictException(
+            'ProviderOrder has no active reservations to consume',
+          );
+        }
+
+        const hasExpiredReservations = providerOrder.reservations.some(
+          (reservation: { expiresAt?: Date | null }) =>
+            reservation.expiresAt instanceof Date &&
+            reservation.expiresAt.getTime() <= now.getTime(),
+        );
+        if (hasExpiredReservations) {
+          this.logger.warn(
+            `Stripe webhook ${eventId} confirmed expired reservation for providerOrder ${providerOrder.id} and session ${externalSessionId}`,
+          );
+        }
+
+        const productIds = [
+          ...new Set(
+            providerOrder.reservations.map((reservation: any) => reservation.productId),
+          ),
+        ];
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
+            productIds.map((id) => Prisma.sql`${id}::uuid`),
+          )}) FOR UPDATE`,
+        );
+
+        for (const reservation of providerOrder.reservations) {
+          const updated = await tx.product.updateMany({
+            where: {
+              id: reservation.productId,
+              stock: { gte: reservation.quantity },
+            },
+            data: {
+              stock: { decrement: reservation.quantity },
+            },
+          });
+
+          if (updated.count !== 1) {
+            throw new ConflictException(
+              'Concurrent stock update detected during payment confirmation',
+            );
+          }
+        }
+
+        await tx.stockReservation.updateMany({
+          where: {
+            providerOrderId: providerOrder.id,
+            status: 'ACTIVE',
+          },
+          data: {
+            status: 'CONSUMED',
+          },
+        });
+
+        await tx.providerPaymentSession.update({
+          where: { id: paymentSession.id },
+          data: {
+            status: PaymentSessionStatus.COMPLETED,
+          },
+        });
+
+        const siblingProviderOrders = providerOrder.order.providerOrders.map((sibling: any) =>
+          sibling.id === providerOrder.id
+            ? { ...sibling, paymentStatus: ProviderPaymentStatus.PAID }
+            : sibling,
+        );
+        const allProviderOrdersPaid = siblingProviderOrders.every(
+          (sibling: any) => sibling.paymentStatus === ProviderPaymentStatus.PAID,
+        );
+
+        await tx.providerOrder.update({
+          where: { id: providerOrder.id },
+          data: {
+            paymentStatus: ProviderPaymentStatus.PAID,
+            status: ProviderOrderStatus.PAID,
+            paidAt: now,
+          },
+        });
+
+        let updatedOrderStatus = providerOrder.order.status;
+        if (
+          allProviderOrdersPaid &&
+          providerOrder.order.status === DeliveryStatus.PENDING
+        ) {
+          updatedOrderStatus = DeliveryStatus.CONFIRMED;
+          await tx.order.update({
+            where: { id: providerOrder.order.id },
+            data: {
+              status: DeliveryStatus.CONFIRMED,
+              confirmedAt: now,
+            },
+          });
+        }
+
+        return {
+          success: true,
+          orderId: providerOrder.order.id,
+          providerOrderId: providerOrder.id,
+          status: updatedOrderStatus,
+          paymentStatus: ProviderPaymentStatus.PAID,
+          paymentRef: externalSessionId,
+          _events: {
+            stateChanged: {
+              orderId: providerOrder.order.id,
+              status: updatedOrderStatus,
+              paymentRef: externalSessionId,
+            },
+            partialCancelled: null,
+          },
+        };
+      });
+
+      if (result?._events) {
+        this.eventEmitter.emit('order.stateChanged', result._events.stateChanged);
+        if (result._events.partialCancelled) {
+          this.eventEmitter.emit(
+            'order.partialCancelled',
+            result._events.partialCancelled,
+          );
+        }
+        delete (result as any)._events;
+      }
+
+      await this.markWebhookEventStatus(
+        eventId,
+        result?.message
+          ? PaymentsService.WEBHOOK_STATUS_IGNORED
+          : PaymentsService.WEBHOOK_STATUS_PROCESSED,
+        new Date(),
+      );
+
+      return result;
+    } catch (error) {
+      await this.markWebhookEventStatus(
+        eventId,
+        PaymentsService.WEBHOOK_STATUS_FAILED,
+        new Date(),
+      );
+      throw error;
+    }
+  }
+
   async confirmPayment(orderId: string, paymentRef: string, eventId: string) {
-    // 1. Early idempotency check
+    void orderId;
+
     if (await this.isProcessed(eventId)) {
       return { message: 'Webhook already processed' };
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 2. Atomic Event Registration
-      try {
-        await tx.webhookEvent.create({
-          data: { id: eventId },
-        });
-      } catch (e: any) {
-        if (e.code === 'P2002')
-          return { message: 'Webhook already processed concurrently' };
-        throw e;
-      }
-
-      // 3. Fetch Order with pending state
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: {
-          providerOrders: {
-            include: { items: true },
-          },
-        },
-      });
-
-      if (!order) {
-        throw new NotFoundException('Order not found');
-      }
-
-      if (order.status !== DeliveryStatus.PENDING) {
-        return { message: 'Order is no longer PENDING', status: order.status };
-      }
-
-      const confirmedProviderOrders: string[] = [];
-      const rejectedProviderOrders: string[] = [];
-
-      // 4. Optimistic Stock Deduction & Partial Fulfillment Logic
-      for (const po of order.providerOrders) {
-        const providerHasStock = await this.attemptStockDeduction(tx, po.items);
-
-        if (providerHasStock) {
-          confirmedProviderOrders.push(po.id);
-          // ProviderOrder remains PENDING until the store manually accepts it
-        } else {
-          rejectedProviderOrders.push(po.id);
-          await tx.providerOrder.update({
-            where: { id: po.id },
-            data: { status: ProviderOrderStatus.REJECTED_BY_STORE },
-          });
-        }
-      }
-
-      // 5. Update Order to final state using optimistic concurrency
-      const allRejected = confirmedProviderOrders.length === 0;
-      const finalStatus = allRejected
-        ? DeliveryStatus.CANCELLED
-        : DeliveryStatus.CONFIRMED;
-
-      const updatedOrder = await tx.order.updateMany({
-        where: { id: orderId, status: DeliveryStatus.PENDING },
-        data: {
-          status: finalStatus,
-          paymentRef,
-          confirmedAt: new Date(),
-        },
-      });
-
-      if (updatedOrder.count === 0) {
-        throw new ConflictException(
-          'Order status changed concurrently during payment confirmation',
-        );
-      }
-
-      // 6. Return events to decouple downstream logic from transaction
-      return {
-        success: true,
-        orderId: order.id,
-        status: finalStatus,
-        paymentRef,
-        _events: {
-          stateChanged: {
-            orderId: order.id,
-            status: finalStatus,
-            paymentRef,
-          },
-          partialCancelled:
-            !allRejected && rejectedProviderOrders.length > 0
-              ? {
-                  orderId: order.id,
-                  rejectedProviderOrderIds: rejectedProviderOrders,
-                }
-              : null,
-        },
-      };
-    });
-
-    if (result?._events) {
-      this.eventEmitter.emit('order.stateChanged', result._events.stateChanged);
-      if (result._events.partialCancelled) {
-        this.eventEmitter.emit(
-          'order.partialCancelled',
-          result._events.partialCancelled,
-        );
-      }
-      delete (result as any)._events;
-    }
-
-    return result;
+    return this.confirmProviderOrderPayment(
+      paymentRef,
+      eventId,
+      'payment_intent.succeeded',
+    );
   }
 }
