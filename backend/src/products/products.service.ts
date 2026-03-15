@@ -16,6 +16,41 @@ import {
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async attachAvailableStock<T extends { id: string; stock: number }>(
+    products: T[],
+  ): Promise<Array<T & { availableStock: number }>> {
+    if (products.length === 0) {
+      return [];
+    }
+
+    const reservations = await (this.prisma as any).stockReservation.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: products.map((product) => product.id) },
+        status: 'ACTIVE',
+        expiresAt: { gt: new Date() },
+      },
+      _sum: {
+        quantity: true,
+      },
+    });
+
+    const reservedByProductId = new Map<string, number>(
+      reservations.map((reservation: any) => [
+        reservation.productId,
+        Number(reservation._sum.quantity ?? 0),
+      ]),
+    );
+
+    return products.map((product) => ({
+      ...product,
+      availableStock: Math.max(
+        Number(product.stock) - Number(reservedByProductId.get(product.id) ?? 0),
+        0,
+      ),
+    }));
+  }
+
   private async ensureUniqueReference(
     providerId: string,
     requestedReference: string,
@@ -106,8 +141,8 @@ export class ProductsService {
     });
   }
 
-  findAll() {
-    return this.prisma.product.findMany({
+  async findAll() {
+    const products = await this.prisma.product.findMany({
       where: {
         isActive: true,
         provider: { stripeAccountId: { not: null } },
@@ -120,10 +155,12 @@ export class ProductsService {
         },
       },
     });
+
+    return this.attachAvailableStock(products);
   }
 
-  findMyProducts(providerId: string) {
-    return this.prisma.product.findMany({
+  async findMyProducts(providerId: string) {
+    const products = await this.prisma.product.findMany({
       where: { providerId },
       include: {
         city: true,
@@ -133,6 +170,8 @@ export class ProductsService {
         },
       },
     });
+
+    return this.attachAvailableStock(products);
   }
 
   async findOne(id: string) {
@@ -155,7 +194,9 @@ export class ProductsService {
         `Product with ID ${id} not found or inactive`,
       );
     }
-    return product;
+
+    const [productWithAvailability] = await this.attachAvailableStock([product]);
+    return productWithAvailability;
   }
 
   async update(
