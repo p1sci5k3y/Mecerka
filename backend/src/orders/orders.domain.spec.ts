@@ -103,6 +103,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
       data: {
         clientId: data.client.id,
         cityId: data.city.id,
+        checkoutIdempotencyKey: `domain-order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         totalPrice: qtyA * 10 + qtyB * 15,
         deliveryFee: 5,
         status: DeliveryStatus.PENDING,
@@ -111,7 +112,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
             {
               providerId: data.provA.id,
               status: ProviderOrderStatus.PENDING,
-              subtotal: qtyA * 10,
+              subtotalAmount: qtyA * 10,
               items: {
                 create: [
                   {
@@ -125,7 +126,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
             {
               providerId: data.provB.id,
               status: ProviderOrderStatus.PENDING,
-              subtotal: qtyB * 15,
+              subtotalAmount: qtyB * 15,
               items: {
                 create: [
                   {

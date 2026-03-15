@@ -32,6 +32,18 @@ export class PaymentsController {
     );
   }
 
+  @Post('provider-order/:providerOrderId/session')
+  @Roles(Role.CLIENT)
+  async prepareProviderOrderPayment(
+    @Param('providerOrderId', ParseUUIDPipe) providerOrderId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.paymentsService.prepareProviderOrderPayment(
+      providerOrderId,
+      req.user.userId,
+    );
+  }
+
   @Post('cash/:orderId')
   @Roles(Role.CLIENT)
   async processCash(

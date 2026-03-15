@@ -27,7 +27,7 @@ async function main() {
         await prisma.providerOrder.create({
             data: {
                 providerId,
-                subtotal: 10,
+                subtotalAmount: 10,
                 orderId: '00000000-0000-0000-0000-000000000000', // Invalid UUID / non-existent
             }
         });
@@ -56,13 +56,14 @@ async function main() {
         data: {
             clientId,
             cityId,
+            checkoutIdempotencyKey: `test-domain-${Date.now()}`,
             totalPrice: 20,
 
             providerOrders: {
                 create: [
                     {
                         providerId,
-                        subtotal: 10,
+                        subtotalAmount: 10,
                         items: {
                             create: [
                                 { productId, quantity: 1, priceAtPurchase: 5 },
@@ -72,7 +73,7 @@ async function main() {
                     },
                     {
                         providerId,
-                        subtotal: 10,
+                        subtotalAmount: 10,
                         items: {
                             create: [
                                 { productId, quantity: 2, priceAtPurchase: 5 }

@@ -23,7 +23,9 @@ describe('WebhooksController', () => {
     }));
 
     paymentsServiceMock = {
-      confirmPayment: jest.fn().mockResolvedValue({ finalStatus: 'CONFIRMED' }),
+      confirmProviderOrderPayment: jest
+        .fn()
+        .mockResolvedValue({ status: 'CONFIRMED' }),
       isProcessed: jest.fn().mockResolvedValue(false),
     };
 
@@ -82,6 +84,7 @@ describe('WebhooksController', () => {
   it('4. Processes valid signature + payment_intent.succeeded calling confirmPayment', async () => {
     const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as unknown as any;
+    const logSpy = jest.spyOn((controller as any).logger, 'log');
 
     mockConstructEvent.mockReturnValue({
       id: 'evt_123',
@@ -89,18 +92,22 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
-          metadata: { orderId: 'ord_123' },
         },
       },
     });
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmPayment).toHaveBeenCalledWith(
-      'ord_123',
+    expect(paymentsServiceMock.confirmProviderOrderPayment).toHaveBeenCalledWith(
       'pi_123',
       'evt_123',
+      'payment_intent.succeeded',
     );
+    expect(logSpy).toHaveBeenCalledWith(
+      'Provider payment confirmed via Webhook. Session: pi_123. Status: CONFIRMED',
+    );
+    expect(logSpy.mock.calls[0]?.[0]).not.toContain('valid_payload');
+    expect(logSpy.mock.calls[0]?.[0]).not.toContain('client_secret');
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -115,7 +122,6 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
-          metadata: { orderId: 'ord_123' },
         },
       },
     });
@@ -123,7 +129,7 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmPayment).not.toHaveBeenCalled();
+    expect(paymentsServiceMock.confirmProviderOrderPayment).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -139,7 +145,7 @@ describe('WebhooksController', () => {
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmPayment).not.toHaveBeenCalled();
+    expect(paymentsServiceMock.confirmProviderOrderPayment).not.toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -154,22 +160,21 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
-          metadata: { orderId: 'ord_123' },
         },
       },
     });
 
     // Simulate DB failure or concurrency panic
-    (paymentsServiceMock.confirmPayment as jest.Mock).mockRejectedValueOnce(
+    (paymentsServiceMock.confirmProviderOrderPayment as jest.Mock).mockRejectedValueOnce(
       new Error('DB Timeout'),
     );
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
-    expect(paymentsServiceMock.confirmPayment).toHaveBeenCalledWith(
-      'ord_123',
+    expect(paymentsServiceMock.confirmProviderOrderPayment).toHaveBeenCalledWith(
       'pi_123',
       'evt_123',
+      'payment_intent.succeeded',
     );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.send).toHaveBeenCalledWith(

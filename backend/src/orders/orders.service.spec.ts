@@ -2,7 +2,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
+import {
+  DeliveryStatus,
+  PaymentSessionStatus,
+  ProviderOrderStatus,
+  ProviderPaymentStatus,
+  Role,
+} from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
@@ -15,14 +21,31 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       order: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+      },
+      orderSummaryDocument: {
+        create: jest.fn(),
+      },
+      cartGroup: {
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      stockReservation: {
+        findMany: jest.fn(),
       },
       product: {
         findMany: jest.fn(),
       },
       providerOrder: {
+        findUnique: jest.fn(),
+        update: jest.fn(),
         updateMany: jest.fn(),
+      },
+      providerPaymentSession: {
+        create: jest.fn(),
+        update: jest.fn(),
       },
       user: {
         findUnique: jest.fn(),
@@ -133,6 +156,457 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       ).rejects.toThrow(
         'El flujo de pago actual solo admite pedidos de un único proveedor.',
       );
+    });
+  });
+
+  describe('Checkout idempotency', () => {
+    it('fails checkout when the idempotency key header is missing', async () => {
+      await expect(service.checkoutFromCart('client-1')).rejects.toThrow(
+        'Idempotency-Key header is required',
+      );
+    });
+
+    it('fails checkout when the active cart is empty', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        status: 'ACTIVE',
+        providers: [],
+      });
+
+      await expect(service.checkoutFromCart('client-1', 'idem-empty')).rejects.toThrow(
+        'Active cart is empty',
+      );
+    });
+
+    it('returns the existing order when the same checkout key is retried', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 'ord-existing',
+        clientId: 'client-1',
+        checkoutIdempotencyKey: 'idem-1',
+        providerOrders: [],
+      });
+
+      const result = await service.checkoutFromCart('client-1', 'idem-1');
+
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'ord-existing',
+          checkoutIdempotencyKey: 'idem-1',
+        }),
+      );
+    });
+
+    it('returns the same order when a concurrent checkout collides on the unique idempotency key', async () => {
+      prismaMock.order.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'ord-race',
+          clientId: 'client-1',
+          checkoutIdempotencyKey: 'idem-race',
+          providerOrders: [],
+        });
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 2,
+                effectiveUnitPriceSnapshot: 12.5,
+              },
+            ],
+          },
+        ],
+      });
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest.fn().mockResolvedValue([{ id: 'product-1', stock: 10 }]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+          },
+          order: {
+            create: jest.fn().mockRejectedValue({ code: 'P2002' }),
+          },
+          cartGroup: {
+            update: jest.fn(),
+          },
+        }),
+      );
+
+      const result = await service.checkoutFromCart('client-1', 'idem-race');
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'ord-race',
+          checkoutIdempotencyKey: 'idem-race',
+        }),
+      );
+    });
+
+    it('creates one provider order per cart provider and keeps root order payment fields empty', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 2,
+                effectiveUnitPriceSnapshot: 12.5,
+              },
+            ],
+          },
+          {
+            providerId: 'provider-2',
+            subtotalAmount: 20,
+            items: [
+              {
+                productId: 'product-2',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 20,
+              },
+            ],
+          },
+        ],
+      });
+
+      const transactionOrderCreate = jest.fn().mockResolvedValue({
+        id: 'ord-new',
+        clientId: 'client-1',
+        checkoutIdempotencyKey: 'idem-new',
+        paymentRef: null,
+        providerOrders: [
+          {
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            paymentStatus: 'PENDING',
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [{ productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 }],
+          },
+          {
+            id: 'po-2',
+            providerId: 'provider-2',
+            subtotalAmount: 20,
+            paymentStatus: 'PENDING',
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [{ productId: 'product-2', quantity: 1, priceAtPurchase: 20 }],
+          },
+        ],
+      });
+      const transactionFindUniqueOrThrow = jest.fn().mockResolvedValue({
+        id: 'ord-new',
+        clientId: 'client-1',
+        paymentRef: null,
+        summaryDocument: {
+          id: 'summary-1',
+          orderId: 'ord-new',
+          displayNumber: 'SUM-ORD-NEW',
+          totalAmount: 45,
+          currency: 'EUR',
+        },
+        providerOrders: [
+          {
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            paymentStatus: 'PENDING',
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [{ productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 }],
+          },
+          {
+            id: 'po-2',
+            providerId: 'provider-2',
+            subtotalAmount: 20,
+            paymentStatus: 'PENDING',
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [{ productId: 'product-2', quantity: 1, priceAtPurchase: 20 }],
+          },
+        ],
+      });
+      const transactionReservationCreateMany = jest.fn().mockResolvedValue({ count: 2 });
+      const transactionSummaryCreate = jest.fn().mockResolvedValue({
+        id: 'summary-1',
+      });
+
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest.fn().mockResolvedValue([
+              { id: 'product-1', stock: 5 },
+              { id: 'product-2', stock: 5 },
+            ]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+            createMany: transactionReservationCreateMany,
+          },
+          order: {
+            create: transactionOrderCreate,
+            findUniqueOrThrow: transactionFindUniqueOrThrow,
+          },
+          orderSummaryDocument: {
+            create: transactionSummaryCreate,
+          },
+          cartGroup: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        }),
+      );
+
+      const result = await service.checkoutFromCart('client-1', 'idem-new');
+
+      expect(transactionOrderCreate).toHaveBeenCalledWith({
+        data: {
+          clientId: 'client-1',
+          cityId: 'city-1',
+          totalPrice: 45,
+          status: DeliveryStatus.PENDING,
+          checkoutIdempotencyKey: 'idem-new',
+          providerOrders: {
+            create: [
+              {
+                providerId: 'provider-1',
+                status: ProviderOrderStatus.PENDING,
+                subtotalAmount: 25,
+                paymentStatus: 'PENDING',
+                items: {
+                  create: [
+                    {
+                      productId: 'product-1',
+                      quantity: 2,
+                      priceAtPurchase: 12.5,
+                    },
+                  ],
+                },
+              },
+              {
+                providerId: 'provider-2',
+                status: ProviderOrderStatus.PENDING,
+                subtotalAmount: 20,
+                paymentStatus: 'PENDING',
+                items: {
+                  create: [
+                    {
+                      productId: 'product-2',
+                      quantity: 1,
+                      priceAtPurchase: 20,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+        include: {
+          providerOrders: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      });
+      expect(transactionSummaryCreate).toHaveBeenCalledWith({
+        data: {
+          orderId: 'ord-new',
+          displayNumber: 'SUM-ORD-NEW',
+          totalAmount: 45,
+          currency: 'EUR',
+        },
+      });
+      expect(result.providerOrders).toHaveLength(2);
+      expect(result.summaryDocument).toEqual(
+        expect.objectContaining({
+          orderId: 'ord-new',
+          displayNumber: 'SUM-ORD-NEW',
+          totalAmount: 45,
+          currency: 'EUR',
+        }),
+      );
+      expect((result.summaryDocument as any).externalInvoiceNumber).toBeUndefined();
+      expect(result.providerOrders[0].items[0]).toEqual(
+        expect.objectContaining({
+          productId: 'product-1',
+          quantity: 2,
+          priceAtPurchase: 12.5,
+        }),
+      );
+      expect(result.providerOrders[0].reservationExpiresAt).toEqual(
+        new Date('2026-03-15T12:15:00.000Z'),
+      );
+      expect(result.paymentRef).toBeNull();
+    });
+
+    it('fails checkout with STOCK_UNAVAILABLE when active reservations exhaust stock', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 2,
+                effectiveUnitPriceSnapshot: 12.5,
+              },
+            ],
+          },
+        ],
+      });
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest.fn().mockResolvedValue([{ id: 'product-1', stock: 2 }]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([
+              {
+                productId: 'product-1',
+                _sum: { quantity: 1 },
+              },
+            ]),
+          },
+        }),
+      );
+
+      await expect(service.checkoutFromCart('client-1', 'idem-stock')).rejects.toThrow(
+        'STOCK_UNAVAILABLE',
+      );
+    });
+  });
+
+  describe('ProviderOrder payment sessions', () => {
+    it('creates a payment session and marks the provider order as payment ready', async () => {
+      const transactionCreate = jest.fn().mockResolvedValue({
+        id: 'session-1',
+        providerOrderId: 'po-1',
+        status: PaymentSessionStatus.READY,
+        expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+      });
+      const transactionUpdateSession = jest.fn().mockResolvedValue({
+        id: 'session-1',
+        providerOrderId: 'po-1',
+        paymentProvider: 'internal-mvp',
+        paymentUrl: '/provider-orders/po-1/payment-sessions/session-1',
+        status: PaymentSessionStatus.READY,
+        expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+      });
+      const transactionUpdateProviderOrder = jest.fn().mockResolvedValue({});
+
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          providerOrder: {
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'po-1',
+              status: ProviderOrderStatus.PENDING,
+              paymentStatus: ProviderPaymentStatus.PENDING,
+              paymentReadyAt: null,
+              reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+              paymentSessions: [],
+            }),
+            update: transactionUpdateProviderOrder,
+          },
+          providerPaymentSession: {
+            create: transactionCreate,
+            update: transactionUpdateSession,
+          },
+        }),
+      );
+
+      const result = await service.prepareProviderOrderPayment('po-1');
+
+      expect(transactionCreate).toHaveBeenCalledWith({
+        data: {
+          providerOrderId: 'po-1',
+          paymentProvider: 'internal-mvp',
+          status: PaymentSessionStatus.READY,
+          expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+        },
+      });
+      expect(transactionUpdateProviderOrder).toHaveBeenCalledWith({
+        where: { id: 'po-1' },
+        data: {
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+          paymentReadyAt: expect.any(Date),
+          paymentExpiresAt: new Date('2026-03-15T12:15:00.000Z'),
+          status: ProviderOrderStatus.PAYMENT_READY,
+        },
+      });
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'session-1',
+          paymentUrl: '/provider-orders/po-1/payment-sessions/session-1',
+          status: PaymentSessionStatus.READY,
+        }),
+      );
+    });
+
+    it('returns the existing non-expired payment session without creating a new one', async () => {
+      const existingSession = {
+        id: 'session-existing',
+        providerOrderId: 'po-1',
+        paymentProvider: 'internal-mvp',
+        paymentUrl: '/provider-orders/po-1/payment-sessions/session-existing',
+        status: PaymentSessionStatus.READY,
+        expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+      };
+      const transactionUpdateProviderOrder = jest.fn().mockResolvedValue({});
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          providerOrder: {
+            findUnique: jest.fn().mockResolvedValue({
+              id: 'po-1',
+              status: ProviderOrderStatus.PAYMENT_READY,
+              paymentStatus: ProviderPaymentStatus.PENDING,
+              paymentReadyAt: null,
+              reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+              paymentSessions: [existingSession],
+            }),
+            update: transactionUpdateProviderOrder,
+          },
+        }),
+      );
+
+      const result = await service.prepareProviderOrderPayment('po-1');
+
+      expect(transactionUpdateProviderOrder).toHaveBeenCalledWith({
+        where: { id: 'po-1' },
+        data: {
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+          paymentReadyAt: expect.any(Date),
+          paymentExpiresAt: new Date('2026-03-15T12:15:00.000Z'),
+          status: ProviderOrderStatus.PAYMENT_READY,
+        },
+      });
+      expect(result).toBe(existingSession);
     });
   });
 
