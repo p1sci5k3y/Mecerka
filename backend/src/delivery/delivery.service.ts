@@ -1094,6 +1094,8 @@ export class DeliveryService {
           data: {
             paymentStatus: RunnerPaymentStatus.PAID,
             status: nextStatus,
+            paymentRef: externalSessionId,
+            paidAt: new Date(),
           },
         });
 

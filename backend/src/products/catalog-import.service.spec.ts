@@ -1,7 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductImportFormat, ProductImportJobStatus } from '@prisma/client';
-import XLSX from 'xlsx';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogFileParser } from './catalog-file.parser';
 import { CatalogImportService } from './catalog-import.service';
@@ -207,7 +206,7 @@ describe('CatalogImportService', () => {
       },
     ]);
 
-    const file = await service.exportCatalog('provider-1', 'csv');
+    const file = await service.exportCatalog('provider-1');
     const body = file.buffer.toString('utf8');
 
     expect(file.filename).toBe('catalog-export.csv');
@@ -251,14 +250,16 @@ describe('CatalogImportService', () => {
         originalname: 'catalog.csv',
         mimetype: 'text/csv',
         size: 5 * 1024 * 1024 + 1,
-        buffer: Buffer.from('reference,name,category,price,stock\nA,Chair,furniture,10,1'),
+        buffer: Buffer.from(
+          'reference,name,category,price,stock\nA,Chair,furniture,10,1',
+        ),
       }),
     ).rejects.toThrow(BadRequestException);
 
     expect(prismaMock.productImportJob.create).not.toHaveBeenCalled();
   });
 
-  it('rejects malformed XLSX uploads', async () => {
+  it('rejects non-CSV uploads', async () => {
     prismaMock.provider.findUnique.mockResolvedValue({
       userId: 'provider-1',
       cityId: 'city-1',
@@ -267,8 +268,7 @@ describe('CatalogImportService', () => {
     await expect(
       service.validateImport('provider-1', {
         originalname: 'catalog.xlsx',
-        mimetype:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimetype: 'application/octet-stream',
         buffer: Buffer.from('not-a-real-xlsx'),
       }),
     ).rejects.toThrow(BadRequestException);
@@ -276,36 +276,64 @@ describe('CatalogImportService', () => {
     expect(prismaMock.productImportJob.create).not.toHaveBeenCalled();
   });
 
-  it('rejects workbooks with more than one worksheet', async () => {
+  it('rejects CSV files with inconsistent column counts', async () => {
     prismaMock.provider.findUnique.mockResolvedValue({
       userId: 'provider-1',
       cityId: 'city-1',
     });
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['reference', 'name', 'category', 'price', 'stock'],
-        ['A-1', 'Chair', 'furniture', '10', '1'],
-      ]),
-      'catalog',
-    );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['reference', 'name', 'category', 'price', 'stock'],
-        ['B-1', 'Table', 'furniture', '20', '2'],
-      ]),
-      'extra',
-    );
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.csv',
+        mimetype: 'text/csv',
+        buffer: Buffer.from(
+          [
+            'reference,name,category,price,stock',
+            'A-1,Chair,furniture,10,1',
+            'B-1,Table,furniture,20',
+          ].join('\n'),
+        ),
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects CSV files with more than 1000 rows', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    const rows = [
+      'reference,name,category,price,stock',
+      ...Array.from(
+        { length: 1001 },
+        (_, index) => `REF-${index},Chair ${index},furniture,10,1`,
+      ),
+    ];
 
     await expect(
       service.validateImport('provider-1', {
-        originalname: 'catalog.xlsx',
-        mimetype:
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        buffer: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }),
+        originalname: 'catalog.csv',
+        mimetype: 'text/csv',
+        buffer: Buffer.from(rows.join('\n')),
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects CSV files with more than 50 columns', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    const headers = Array.from({ length: 51 }, (_, index) => `col_${index}`);
+    const row = Array.from({ length: 51 }, (_, index) => `value_${index}`);
+
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.csv',
+        mimetype: 'text/csv',
+        buffer: Buffer.from([headers.join(','), row.join(',')].join('\n')),
       }),
     ).rejects.toThrow(BadRequestException);
   });
