@@ -337,4 +337,81 @@ describe('CatalogImportService', () => {
       }),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it('rejects CSV files with oversized cells', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    const oversizedName = 'A'.repeat(2001);
+
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.csv',
+        mimetype: 'text/csv',
+        buffer: Buffer.from(
+          [
+            'reference,name,category,price,stock',
+            `A-1,${oversizedName},furniture,10,1`,
+          ].join('\n'),
+        ),
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects formula-like values in free-text catalog fields', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+    prismaMock.category.findMany.mockResolvedValue([
+      { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+    ]);
+    prismaMock.productImportJob.create.mockImplementation(
+      ({ data }: any) => data,
+    );
+
+    const result = await service.validateImport('provider-1', {
+      originalname: 'catalog.csv',
+      mimetype: 'text/csv',
+      buffer: Buffer.from(
+        [
+          'reference,name,description,category,price,stock,image_url',
+          'A-1,"=HYPERLINK(""https://bad.example"")",desc,furniture,10,1,https://cdn.example.com/a.jpg',
+        ].join('\n'),
+      ),
+    });
+
+    expect(result.status).toBe(ProductImportJobStatus.FAILED);
+    expect(result.validationErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'name',
+          message: 'name must not start with spreadsheet formula characters',
+        }),
+      ]),
+    );
+  });
+
+  it('sanitizes export cells that could trigger spreadsheet formulas', async () => {
+    prismaMock.product.findMany.mockResolvedValue([
+      {
+        reference: 'CHAIR-001',
+        name: '=Unsafe Name',
+        description: '+Potential formula',
+        price: 149,
+        discountPrice: null,
+        stock: 12,
+        imageUrl: 'https://cdn.example.com/chair.jpg',
+        category: { slug: 'furniture', name: 'Furniture' },
+      },
+    ]);
+
+    const file = await service.exportCatalog('provider-1');
+    const body = file.buffer.toString('utf8');
+
+    expect(body).toContain("'=Unsafe Name");
+    expect(body).toContain("'+Potential formula");
+  });
 });

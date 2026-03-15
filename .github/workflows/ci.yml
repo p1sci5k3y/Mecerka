@@ -43,23 +43,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
 
-      - run: npm install
+      - name: Install backend dependencies
+        run: npm ci
       - run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           echo "Waiting for PostgreSQL to be ready..."
           timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
           echo "PostgreSQL is up!"
-      - run: npx prisma -v
-      - run: npx prisma generate
-      - run: npm run lint
-        continue-on-error: true
-      - run: npm run build
+      - name: Validate Prisma schema
+        run: npx prisma validate
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Type-check backend
+        run: npm run type-check
+      - name: Lint backend
+        run: npm run lint
+      - name: Build backend
+        run: npm run build
       - name: Sync Database Schema
         run: npx prisma db push --accept-data-loss
         env:
           DEBUG: "prisma*"
-      - run: npm run test
+      - name: Run backend tests
+        run: npm test -- --runInBand
       - run: npm audit --audit-level=high
         continue-on-error: true
 
