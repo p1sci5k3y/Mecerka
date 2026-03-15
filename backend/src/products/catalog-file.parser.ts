@@ -13,6 +13,20 @@ export type ParsedCatalogRecord = Record<string, string>;
 
 @Injectable()
 export class CatalogFileParser {
+  private static readonly MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+  private static readonly MAX_ROW_COUNT = 1000;
+  private static readonly MAX_WORKSHEET_COUNT = 1;
+  private static readonly ALLOWED_CSV_MIME_TYPES = new Set([
+    'text/csv',
+    'application/csv',
+    'application/vnd.ms-excel',
+    'text/plain',
+  ]);
+  private static readonly ALLOWED_XLSX_MIME_TYPES = new Set([
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/octet-stream',
+  ]);
+
   detectFormat(file: UploadedCatalogFile): ProductImportFormat {
     const normalizedName = file.originalname.toLowerCase();
 
@@ -31,7 +45,10 @@ export class CatalogFileParser {
     format: ProductImportFormat;
     rows: ParsedCatalogRecord[];
   } {
+    this.validateUploadEnvelope(file);
+
     const format = this.detectFormat(file);
+    this.validateMimeType(file, format);
     const rows =
       format === ProductImportFormat.CSV
         ? this.parseCsv(file.buffer)
@@ -44,6 +61,40 @@ export class CatalogFileParser {
     return { format, rows };
   }
 
+  private validateUploadEnvelope(file: UploadedCatalogFile) {
+    const declaredSize = file.size ?? file.buffer.length;
+    const effectiveSize = Math.max(file.buffer.length, declaredSize);
+
+    if (effectiveSize > CatalogFileParser.MAX_UPLOAD_BYTES) {
+      throw new BadRequestException('Catalog file exceeds the 5 MB size limit');
+    }
+  }
+
+  private validateMimeType(
+    file: UploadedCatalogFile,
+    format: ProductImportFormat,
+  ) {
+    const mimetype = file.mimetype?.trim().toLowerCase();
+
+    if (!mimetype) {
+      return;
+    }
+
+    if (
+      format === ProductImportFormat.CSV &&
+      !CatalogFileParser.ALLOWED_CSV_MIME_TYPES.has(mimetype)
+    ) {
+      throw new BadRequestException('Invalid CSV content type');
+    }
+
+    if (
+      format === ProductImportFormat.XLSX &&
+      !CatalogFileParser.ALLOWED_XLSX_MIME_TYPES.has(mimetype)
+    ) {
+      throw new BadRequestException('Invalid XLSX content type');
+    }
+  }
+
   private parseCsv(buffer: Buffer): ParsedCatalogRecord[] {
     const text = buffer.toString('utf8').replace(/^\uFEFF/, '');
     const matrix = this.parseDelimitedText(text);
@@ -51,7 +102,31 @@ export class CatalogFileParser {
   }
 
   private parseXlsx(buffer: Buffer): ParsedCatalogRecord[] {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    if (!this.isZipLike(buffer)) {
+      throw new BadRequestException('Malformed XLSX file');
+    }
+
+    let workbook: XLSX.WorkBook;
+
+    try {
+      workbook = XLSX.read(buffer, {
+        type: 'buffer',
+        dense: true,
+        raw: false,
+      });
+    } catch {
+      throw new BadRequestException('Malformed XLSX file');
+    }
+
+    if (
+      workbook.SheetNames.length === 0 ||
+      workbook.SheetNames.length > CatalogFileParser.MAX_WORKSHEET_COUNT
+    ) {
+      throw new BadRequestException(
+        'The uploaded workbook must contain exactly one worksheet',
+      );
+    }
+
     const firstSheetName = workbook.SheetNames[0];
 
     if (!firstSheetName) {
@@ -146,6 +221,12 @@ export class CatalogFileParser {
       }
     }
 
+    if (dataRows.length > CatalogFileParser.MAX_ROW_COUNT) {
+      throw new BadRequestException(
+        `Catalog file exceeds the ${CatalogFileParser.MAX_ROW_COUNT} row limit`,
+      );
+    }
+
     return dataRows.map((row) => {
       const record: ParsedCatalogRecord = {};
 
@@ -159,5 +240,15 @@ export class CatalogFileParser {
 
   private normalizeHeader(header: string): string {
     return header.trim().toLowerCase().replace(/\s+/g, '_');
+  }
+
+  private isZipLike(buffer: Buffer): boolean {
+    return (
+      buffer.length >= 4 &&
+      buffer[0] === 0x50 &&
+      buffer[1] === 0x4b &&
+      buffer[2] === 0x03 &&
+      buffer[3] === 0x04
+    );
   }
 }

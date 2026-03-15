@@ -58,7 +58,11 @@ export class PaymentsService {
     return !!event;
   }
 
-  private async claimWebhookEvent(eventId: string, provider: string, eventType: string) {
+  private async claimWebhookEvent(
+    eventId: string,
+    provider: string,
+    eventType: string,
+  ) {
     try {
       await (this.prisma as any).paymentWebhookEvent.create({
         data: {
@@ -240,7 +244,9 @@ export class PaymentsService {
         providerOrder.reservations.length > 0
           ? providerOrder.reservations.reduce(
               (earliest: Date, reservation: { expiresAt: Date }) =>
-                reservation.expiresAt < earliest ? reservation.expiresAt : earliest,
+                reservation.expiresAt < earliest
+                  ? reservation.expiresAt
+                  : earliest,
               providerOrder.reservations[0].expiresAt,
             )
           : null;
@@ -253,7 +259,8 @@ export class PaymentsService {
 
       const expiredSessionIds = paymentSessions
         .filter(
-          (session) => session.expiresAt && session.expiresAt.getTime() <= now.getTime(),
+          (session) =>
+            session.expiresAt && session.expiresAt.getTime() <= now.getTime(),
         )
         .map((session) => session.id);
 
@@ -261,7 +268,9 @@ export class PaymentsService {
         await tx.providerPaymentSession.updateMany({
           where: {
             id: { in: expiredSessionIds },
-            status: { in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY] },
+            status: {
+              in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+            },
           },
           data: {
             status: PaymentSessionStatus.EXPIRED,
@@ -678,7 +687,10 @@ export class PaymentsService {
         }
 
         if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
-          return { message: 'ProviderOrder already paid', status: providerOrder.status };
+          return {
+            message: 'ProviderOrder already paid',
+            status: providerOrder.status,
+          };
         }
 
         if (providerOrder.reservations.length === 0) {
@@ -700,7 +712,9 @@ export class PaymentsService {
 
         const productIds = [
           ...new Set(
-            providerOrder.reservations.map((reservation: any) => reservation.productId),
+            providerOrder.reservations.map(
+              (reservation: any) => reservation.productId,
+            ),
           ),
         ];
 
@@ -745,13 +759,15 @@ export class PaymentsService {
           },
         });
 
-        const siblingProviderOrders = providerOrder.order.providerOrders.map((sibling: any) =>
-          sibling.id === providerOrder.id
-            ? { ...sibling, paymentStatus: ProviderPaymentStatus.PAID }
-            : sibling,
+        const siblingProviderOrders = providerOrder.order.providerOrders.map(
+          (sibling: any) =>
+            sibling.id === providerOrder.id
+              ? { ...sibling, paymentStatus: ProviderPaymentStatus.PAID }
+              : sibling,
         );
         const allProviderOrdersPaid = siblingProviderOrders.every(
-          (sibling: any) => sibling.paymentStatus === ProviderPaymentStatus.PAID,
+          (sibling: any) =>
+            sibling.paymentStatus === ProviderPaymentStatus.PAID,
         );
 
         await tx.providerOrder.update({
@@ -797,7 +813,10 @@ export class PaymentsService {
       });
 
       if (result?._events) {
-        this.eventEmitter.emit('order.stateChanged', result._events.stateChanged);
+        this.eventEmitter.emit(
+          'order.stateChanged',
+          result._events.stateChanged,
+        );
         if (result._events.partialCancelled) {
           this.eventEmitter.emit(
             'order.partialCancelled',

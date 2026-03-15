@@ -45,7 +45,8 @@ export class ProductsService {
     return products.map((product) => ({
       ...product,
       availableStock: Math.max(
-        Number(product.stock) - Number(reservedByProductId.get(product.id) ?? 0),
+        Number(product.stock) -
+          Number(reservedByProductId.get(product.id) ?? 0),
         0,
       ),
     }));
@@ -195,7 +196,9 @@ export class ProductsService {
       );
     }
 
-    const [productWithAvailability] = await this.attachAvailableStock([product]);
+    const [productWithAvailability] = await this.attachAvailableStock([
+      product,
+    ]);
     return productWithAvailability;
   }
 

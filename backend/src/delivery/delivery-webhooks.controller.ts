@@ -60,7 +60,11 @@ export class DeliveryWebhooksController {
 
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        webhookSecret,
+      );
     } catch {
       this.logger.error('Delivery webhook signature verification failed');
       return res
@@ -77,7 +81,8 @@ export class DeliveryWebhooksController {
           externalSessionId,
           event.id,
         );
-        const status = 'paymentStatus' in result ? result.paymentStatus : 'IGNORED';
+        const status =
+          'paymentStatus' in result ? result.paymentStatus : 'IGNORED';
         this.logger.log(
           `Delivery webhook processed: event=${event.id} session=${externalSessionId} status=${status}`,
         );
@@ -86,7 +91,8 @@ export class DeliveryWebhooksController {
           externalSessionId,
           event.id,
         );
-        const status = 'paymentStatus' in result ? result.paymentStatus : 'IGNORED';
+        const status =
+          'paymentStatus' in result ? result.paymentStatus : 'IGNORED';
         this.logger.log(
           `Delivery webhook processed: event=${event.id} session=${externalSessionId} status=${status}`,
         );

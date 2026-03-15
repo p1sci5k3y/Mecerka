@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductImportFormat, ProductImportJobStatus } from '@prisma/client';
+import XLSX from 'xlsx';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogFileParser } from './catalog-file.parser';
 import { CatalogImportService } from './catalog-import.service';
@@ -237,5 +238,75 @@ describe('CatalogImportService', () => {
     await expect(service.applyImport('provider-1', 'job-1')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('rejects oversized catalog uploads before job creation', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.csv',
+        mimetype: 'text/csv',
+        size: 5 * 1024 * 1024 + 1,
+        buffer: Buffer.from('reference,name,category,price,stock\nA,Chair,furniture,10,1'),
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaMock.productImportJob.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed XLSX uploads', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.xlsx',
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer: Buffer.from('not-a-real-xlsx'),
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(prismaMock.productImportJob.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects workbooks with more than one worksheet', async () => {
+    prismaMock.provider.findUnique.mockResolvedValue({
+      userId: 'provider-1',
+      cityId: 'city-1',
+    });
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['reference', 'name', 'category', 'price', 'stock'],
+        ['A-1', 'Chair', 'furniture', '10', '1'],
+      ]),
+      'catalog',
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['reference', 'name', 'category', 'price', 'stock'],
+        ['B-1', 'Table', 'furniture', '20', '2'],
+      ]),
+      'extra',
+    );
+
+    await expect(
+      service.validateImport('provider-1', {
+        originalname: 'catalog.xlsx',
+        mimetype:
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        buffer: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }),
+      }),
+    ).rejects.toThrow(BadRequestException);
   });
 });

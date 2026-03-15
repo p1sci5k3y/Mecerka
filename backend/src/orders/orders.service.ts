@@ -46,9 +46,13 @@ export class OrdersService {
       providerOrders: order.providerOrders.map((providerOrder: any) => {
         const reservationExpiresAt =
           providerOrder.reservations?.length > 0
-            ? providerOrder.reservations.reduce((earliest: Date, reservation: any) =>
-                reservation.expiresAt < earliest ? reservation.expiresAt : earliest,
-              providerOrder.reservations[0].expiresAt)
+            ? providerOrder.reservations.reduce(
+                (earliest: Date, reservation: any) =>
+                  reservation.expiresAt < earliest
+                    ? reservation.expiresAt
+                    : earliest,
+                providerOrder.reservations[0].expiresAt,
+              )
             : null;
         const { reservations, ...rest } = providerOrder;
         return {
@@ -115,7 +119,9 @@ export class OrdersService {
         providerOrder.reservations.length > 0
           ? providerOrder.reservations.reduce(
               (earliest: Date, reservation: { expiresAt: Date }) =>
-                reservation.expiresAt < earliest ? reservation.expiresAt : earliest,
+                reservation.expiresAt < earliest
+                  ? reservation.expiresAt
+                  : earliest,
               providerOrder.reservations[0].expiresAt,
             )
           : null;
@@ -183,7 +189,9 @@ export class OrdersService {
   }
 
   async expireReservations(now = new Date()) {
-    const expiredReservations = await (this.prisma as any).stockReservation.findMany({
+    const expiredReservations = await (
+      this.prisma as any
+    ).stockReservation.findMany({
       where: {
         status: 'ACTIVE',
         expiresAt: {
@@ -203,7 +211,8 @@ export class OrdersService {
     const providerOrderIds = [
       ...new Set(
         expiredReservations.map(
-          (reservation: { providerOrderId: string }) => reservation.providerOrderId,
+          (reservation: { providerOrderId: string }) =>
+            reservation.providerOrderId,
         ),
       ),
     ];
@@ -212,7 +221,9 @@ export class OrdersService {
       const reservationResult = await tx.stockReservation.updateMany({
         where: {
           id: {
-            in: expiredReservations.map((reservation: { id: string }) => reservation.id),
+            in: expiredReservations.map(
+              (reservation: { id: string }) => reservation.id,
+            ),
           },
         },
         data: {
@@ -331,8 +342,12 @@ export class OrdersService {
 
     try {
       return await this.prisma.$transaction(async (tx: any) => {
-        const requestedItems = providerOrders.flatMap((provider) => provider.items);
-        const productIds = [...new Set(requestedItems.map((item) => item.productId))];
+        const requestedItems = providerOrders.flatMap(
+          (provider) => provider.items,
+        );
+        const productIds = [
+          ...new Set(requestedItems.map((item) => item.productId)),
+        ];
 
         if (productIds.length === 0) {
           throw new BadRequestException('Active cart has no items to checkout');
@@ -382,7 +397,9 @@ export class OrdersService {
         );
 
         for (const item of requestedItems) {
-          const currentStock = Number(productStock.get(item.productId) ?? Number.NaN);
+          const currentStock = Number(
+            productStock.get(item.productId) ?? Number.NaN,
+          );
           if (Number.isNaN(currentStock)) {
             throw new ConflictException('STOCK_UNAVAILABLE');
           }
@@ -688,15 +705,15 @@ export class OrdersService {
     if (roles.includes(Role.PROVIDER)) {
       return this.prisma.order
         .findMany({
-        where: { providerOrders: { some: { providerId: userId } } },
-        include: {
-          providerOrders: {
-            where: { providerId: userId },
-            include: { items: { include: { product: true } } },
+          where: { providerOrders: { some: { providerId: userId } } },
+          include: {
+            providerOrders: {
+              where: { providerId: userId },
+              include: { items: { include: { product: true } } },
+            },
+            city: true,
           },
-          city: true,
-        },
-        orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: 'desc' },
         })
         .then((orders) =>
           orders.map((order) => this.toProviderScopedOrderView(order, userId)),

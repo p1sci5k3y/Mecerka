@@ -15,6 +15,11 @@ import {
 } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  DeliveryIncidentStatusValues,
+  DeliveryIncidentTypeValues,
+  IncidentReporterRoleValues,
+} from './delivery-incident.constants';
 import { DeliveryService } from './delivery.service';
 
 jest.mock('stripe');
@@ -87,6 +92,13 @@ describe('DeliveryService', () => {
         findMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      deliveryIncident: {
+        count: jest.fn(),
+        create: jest.fn(),
+        findUnique: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+      },
       runnerPaymentSession: {
         create: jest.fn(),
         update: jest.fn(),
@@ -115,7 +127,8 @@ describe('DeliveryService', () => {
           useValue: {
             get: jest.fn((key: string) => {
               if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
-              if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET') return 'whsec_runner';
+              if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET')
+                return 'whsec_runner';
               return undefined;
             }),
           },
@@ -346,7 +359,9 @@ describe('DeliveryService', () => {
   });
 
   it('confirms runner payment without touching provider orders or stock reservations', async () => {
-    prismaMock.runnerWebhookEvent.create.mockResolvedValue({ id: 'evt_runner_1' });
+    prismaMock.runnerWebhookEvent.create.mockResolvedValue({
+      id: 'evt_runner_1',
+    });
     prismaMock.runnerWebhookEvent.update.mockResolvedValue({});
 
     prismaMock.$transaction.mockImplementation(async (callback: any) =>
@@ -519,9 +534,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    await expect(service.acceptDeliveryJob('job-1', 'runner-1')).rejects.toThrow(
-      ConflictException,
-    );
+    await expect(
+      service.acceptDeliveryJob('job-1', 'runner-1'),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('rejects expired jobs and marks them expired', async () => {
@@ -551,9 +566,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    await expect(service.acceptDeliveryJob('job-expired', 'runner-1')).rejects.toThrow(
-      'Delivery job has expired',
-    );
+    await expect(
+      service.acceptDeliveryJob('job-expired', 'runner-1'),
+    ).rejects.toThrow('Delivery job has expired');
     expect(txJobUpdate).toHaveBeenCalledWith({
       where: { id: 'job-expired' },
       data: {
@@ -642,9 +657,9 @@ describe('DeliveryService', () => {
     );
 
     const first = await service.acceptDeliveryJob('job-1', 'runner-1');
-    await expect(service.acceptDeliveryJob('job-1', 'runner-2')).rejects.toThrow(
-      'Delivery job is no longer available',
-    );
+    await expect(
+      service.acceptDeliveryJob('job-1', 'runner-2'),
+    ).rejects.toThrow('Delivery job is no longer available');
 
     expect(first.status).toBe(DeliveryJobStatus.ASSIGNED);
   });
@@ -725,11 +740,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    const result = await service.markPickupPending(
-      'delivery-1',
-      'runner-1',
-      [Role.RUNNER],
-    );
+    const result = await service.markPickupPending('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
 
     expect(txUpdate).toHaveBeenCalledWith({
       where: { id: 'delivery-1' },
@@ -769,7 +782,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    const first = await service.confirmPickup('delivery-1', 'runner-1', [Role.RUNNER]);
+    const first = await service.confirmPickup('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
     expect(first.status).toBe(DeliveryOrderStatus.PICKED_UP);
     expect(txUpdate.mock.calls[0][0].data).toEqual({
       status: DeliveryOrderStatus.PICKED_UP,
@@ -795,7 +810,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    const second = await service.confirmPickup('delivery-1', 'runner-1', [Role.RUNNER]);
+    const second = await service.confirmPickup('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
     expect(second.pickupAt).toEqual(firstPickupAt);
   });
 
@@ -826,7 +843,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    const result = await service.startTransit('delivery-1', 'runner-1', [Role.RUNNER]);
+    const result = await service.startTransit('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
     expect(result.status).toBe(DeliveryOrderStatus.IN_TRANSIT);
     expect(txUpdate.mock.calls[0][0].data).toEqual({
       status: DeliveryOrderStatus.IN_TRANSIT,
@@ -980,7 +999,9 @@ describe('DeliveryService', () => {
       }),
     );
 
-    const first = await service.confirmPickup('delivery-1', 'runner-1', [Role.RUNNER]);
+    const first = await service.confirmPickup('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
     expect(first.status).toBe(DeliveryOrderStatus.PICKED_UP);
 
     await expect(
@@ -1009,12 +1030,10 @@ describe('DeliveryService', () => {
     );
 
     await expect(
-      service.updateRunnerLocation(
-        'delivery-1',
-        'runner-1',
-        [Role.RUNNER],
-        { latitude: 40.4168, longitude: -3.7038 },
-      ),
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4168,
+        longitude: -3.7038,
+      }),
     ).rejects.toThrow(
       'Runner location updates are not allowed for the current delivery status',
     );
@@ -1039,12 +1058,10 @@ describe('DeliveryService', () => {
     );
 
     await expect(
-      service.updateRunnerLocation(
-        'delivery-1',
-        'runner-1',
-        [Role.RUNNER],
-        { latitude: 40.4168, longitude: -3.7038 },
-      ),
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4168,
+        longitude: -3.7038,
+      }),
     ).rejects.toThrow(
       'Runner location updates are not allowed for the current delivery status',
     );
@@ -1074,12 +1091,10 @@ describe('DeliveryService', () => {
     );
 
     await expect(
-      service.updateRunnerLocation(
-        'delivery-1',
-        'runner-1',
-        [Role.RUNNER],
-        { latitude: 40.4168, longitude: -3.7038 },
-      ),
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4168,
+        longitude: -3.7038,
+      }),
     ).rejects.toThrow('Runner location updates are too frequent');
   });
 
@@ -1159,11 +1174,9 @@ describe('DeliveryService', () => {
       },
     });
 
-    const result = await service.getDeliveryTracking(
-      'delivery-1',
-      'client-1',
-      [Role.CLIENT],
-    );
+    const result = await service.getDeliveryTracking('delivery-1', 'client-1', [
+      Role.CLIENT,
+    ]);
 
     expect(result).toEqual({
       deliveryOrderId: 'delivery-1',
@@ -1195,11 +1208,9 @@ describe('DeliveryService', () => {
       },
     });
 
-    const result = await service.getDeliveryTracking(
-      'delivery-1',
-      'client-1',
-      [Role.CLIENT],
-    );
+    const result = await service.getDeliveryTracking('delivery-1', 'client-1', [
+      Role.CLIENT,
+    ]);
 
     expect(result.currentLocation).toBeNull();
   });
@@ -1281,12 +1292,10 @@ describe('DeliveryService', () => {
     );
 
     await expect(
-      service.updateRunnerLocation(
-        'delivery-1',
-        'runner-1',
-        [Role.RUNNER],
-        { latitude: 41.3874, longitude: 2.1686 },
-      ),
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 41.3874,
+        longitude: 2.1686,
+      }),
     ).rejects.toThrow('Runner location jump exceeds allowed threshold');
   });
 
@@ -1316,12 +1325,10 @@ describe('DeliveryService', () => {
     );
 
     await expect(
-      service.updateRunnerLocation(
-        'delivery-2',
-        'runner-1',
-        [Role.RUNNER],
-        { latitude: 40.4168, longitude: -3.7038 },
-      ),
+      service.updateRunnerLocation('delivery-2', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4168,
+        longitude: -3.7038,
+      }),
     ).rejects.toThrow('Runner location updates are too frequent');
   });
 
@@ -1338,5 +1345,298 @@ describe('DeliveryService', () => {
     await expect(
       service.getDeliveryTracking('delivery-1', 'client-other', [Role.CLIENT]),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('creates an incident for the client on their own delivery', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            order: {
+              clientId: 'client-1',
+              providerOrders: [],
+            },
+          }),
+        },
+        deliveryIncident: {
+          count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(0),
+          create: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            reporterId: 'client-1',
+            reporterRole: IncidentReporterRoleValues.CLIENT,
+            type: DeliveryIncidentTypeValues.MISSING_ITEMS,
+            status: DeliveryIncidentStatusValues.OPEN,
+            description: 'Missing item in the bag',
+            evidenceUrl: 'https://cdn.example.com/photo.jpg',
+            createdAt: new Date('2099-01-01T00:00:00.000Z'),
+            resolvedAt: null,
+          }),
+        },
+      }),
+    );
+
+    const result = await service.createIncident(
+      {
+        deliveryOrderId: 'delivery-1',
+        type: DeliveryIncidentTypeValues.MISSING_ITEMS,
+        description: 'Missing item in the bag',
+        evidenceUrl: 'https://cdn.example.com/photo.jpg',
+      },
+      'client-1',
+      [Role.CLIENT],
+    );
+
+    expect(result).toEqual({
+      id: 'incident-1',
+      deliveryOrderId: 'delivery-1',
+      reporterRole: IncidentReporterRoleValues.CLIENT,
+      type: DeliveryIncidentTypeValues.MISSING_ITEMS,
+      status: DeliveryIncidentStatusValues.OPEN,
+      description: 'Missing item in the bag',
+      evidenceUrl: 'https://cdn.example.com/photo.jpg',
+      createdAt: new Date('2099-01-01T00:00:00.000Z'),
+      resolvedAt: null,
+    });
+  });
+
+  it('rejects runner incident creation on unrelated delivery', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: 'runner-assigned',
+            order: {
+              clientId: 'client-1',
+              providerOrders: [],
+            },
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.createIncident(
+        {
+          deliveryOrderId: 'delivery-1',
+          type: DeliveryIncidentTypeValues.SAFETY_CONCERN,
+          description: 'Unsafe situation',
+        },
+        'runner-other',
+        [Role.RUNNER],
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('rejects provider incident creation on unrelated order', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            order: {
+              clientId: 'client-1',
+              providerOrders: [{ providerId: 'provider-owner' }],
+            },
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.createIncident(
+        {
+          deliveryOrderId: 'delivery-1',
+          type: DeliveryIncidentTypeValues.OTHER,
+          description: 'Packaging issue',
+        },
+        'provider-other',
+        [Role.PROVIDER],
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('enforces incident limit per delivery per reporter', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            order: {
+              clientId: 'client-1',
+              providerOrders: [],
+            },
+          }),
+        },
+        deliveryIncident: {
+          count: jest.fn().mockResolvedValueOnce(0).mockResolvedValueOnce(3),
+        },
+      }),
+    );
+
+    await expect(
+      service.createIncident(
+        {
+          deliveryOrderId: 'delivery-1',
+          type: DeliveryIncidentTypeValues.OTHER,
+          description: 'Third duplicate issue',
+        },
+        'client-1',
+        [Role.CLIENT],
+      ),
+    ).rejects.toThrow('Incident limit exceeded for this delivery order');
+  });
+
+  it('enforces incident daily rate limiting', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            order: {
+              clientId: 'client-1',
+              providerOrders: [],
+            },
+          }),
+        },
+        deliveryIncident: {
+          count: jest.fn().mockResolvedValueOnce(10),
+        },
+      }),
+    );
+
+    await expect(
+      service.createIncident(
+        {
+          deliveryOrderId: 'delivery-1',
+          type: DeliveryIncidentTypeValues.OTHER,
+          description: 'Too many reports',
+        },
+        'client-1',
+        [Role.CLIENT],
+      ),
+    ).rejects.toThrow('Daily incident limit exceeded');
+  });
+
+  it('moves incidents through a valid lifecycle and sets resolvedAt', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryIncident: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            status: DeliveryIncidentStatusValues.OPEN,
+            resolvedAt: null,
+          }),
+          update: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            reporterRole: IncidentReporterRoleValues.CLIENT,
+            type: DeliveryIncidentTypeValues.OTHER,
+            status: DeliveryIncidentStatusValues.UNDER_REVIEW,
+            description: 'Investigating',
+            evidenceUrl: null,
+            createdAt: new Date('2099-01-01T00:00:00.000Z'),
+            resolvedAt: null,
+          }),
+        },
+      }),
+    );
+
+    const underReview = await service.reviewIncident('incident-1', 'admin-1');
+    expect(underReview.status).toBe(DeliveryIncidentStatusValues.UNDER_REVIEW);
+
+    prismaMock.$transaction.mockImplementationOnce(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryIncident: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            status: DeliveryIncidentStatusValues.UNDER_REVIEW,
+            resolvedAt: null,
+          }),
+          update: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            reporterRole: IncidentReporterRoleValues.CLIENT,
+            type: DeliveryIncidentTypeValues.OTHER,
+            status: DeliveryIncidentStatusValues.RESOLVED,
+            description: 'Resolved',
+            evidenceUrl: null,
+            createdAt: new Date('2099-01-01T00:00:00.000Z'),
+            resolvedAt: new Date('2099-01-01T01:00:00.000Z'),
+          }),
+        },
+      }),
+    );
+
+    const resolved = await service.resolveIncident('incident-1', 'admin-1');
+    expect(resolved.status).toBe(DeliveryIncidentStatusValues.RESOLVED);
+    expect(resolved.resolvedAt).toEqual(new Date('2099-01-01T01:00:00.000Z'));
+  });
+
+  it('does not allow changing resolved incidents again', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryIncident: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-1',
+            status: DeliveryIncidentStatusValues.RESOLVED,
+            resolvedAt: new Date('2099-01-01T01:00:00.000Z'),
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.rejectIncident('incident-1', 'admin-1'),
+    ).rejects.toThrow('Invalid incident transition from RESOLVED to REJECTED');
+  });
+
+  it('rejects non-https incident evidence', async () => {
+    await expect(
+      service.createIncident(
+        {
+          deliveryOrderId: 'delivery-1',
+          type: DeliveryIncidentTypeValues.OTHER,
+          description: 'Bad evidence',
+          evidenceUrl: 'http://cdn.example.com/file.jpg',
+        },
+        'client-1',
+        [Role.CLIENT],
+      ),
+    ).rejects.toThrow('Incident evidenceUrl must use HTTPS');
+  });
+
+  it('allows authorized users to read incident details', async () => {
+    prismaMock.deliveryIncident.findUnique.mockResolvedValue({
+      id: 'incident-1',
+      deliveryOrderId: 'delivery-1',
+      reporterId: 'client-1',
+      reporterRole: IncidentReporterRoleValues.CLIENT,
+      type: DeliveryIncidentTypeValues.OTHER,
+      status: DeliveryIncidentStatusValues.OPEN,
+      description: 'Issue',
+      evidenceUrl: null,
+      createdAt: new Date('2099-01-01T00:00:00.000Z'),
+      resolvedAt: null,
+      deliveryOrder: {
+        order: {
+          clientId: 'client-1',
+          providerOrders: [],
+        },
+      },
+    });
+
+    const result = await service.getIncident('incident-1', 'client-1', [
+      Role.CLIENT,
+    ]);
+    expect(result.id).toBe('incident-1');
   });
 });

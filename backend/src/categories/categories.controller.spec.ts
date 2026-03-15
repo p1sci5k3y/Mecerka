@@ -14,7 +14,8 @@ describe('CategoriesController security metadata', () => {
         CategoriesController.prototype.create,
       ) ?? [];
     const roles =
-      Reflect.getMetadata(ROLES_KEY, CategoriesController.prototype.create) ?? [];
+      Reflect.getMetadata(ROLES_KEY, CategoriesController.prototype.create) ??
+      [];
 
     expect(guards).toEqual([JwtAuthGuard, MfaCompleteGuard, RolesGuard]);
     expect(roles).toEqual([Role.ADMIN]);

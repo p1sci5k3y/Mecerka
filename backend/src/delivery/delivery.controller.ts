@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Patch,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,6 +18,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 import { AssignDeliveryRunnerDto } from './dto/assign-delivery-runner.dto';
 import { ConfirmDeliveryDto } from './dto/confirm-delivery.dto';
+import { CreateDeliveryIncidentDto } from './dto/create-delivery-incident.dto';
 import { CreateDeliveryOrderDto } from './dto/create-delivery-order.dto';
 import { UpdateDeliveryLocationDto } from './dto/update-delivery-location.dto';
 import { DeliveryService } from './delivery.service';
@@ -46,7 +48,12 @@ export class DeliveryController {
     @Body() dto: AssignDeliveryRunnerDto,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.assignRunner(id, dto, req.user.userId, req.user.roles);
+    return this.deliveryService.assignRunner(
+      id,
+      dto,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Post('orders/:id/payment-session')
@@ -68,13 +75,19 @@ export class DeliveryController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.getDeliveryOrder(id, req.user.userId, req.user.roles);
+    return this.deliveryService.getDeliveryOrder(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Get('jobs')
   @Roles(Role.RUNNER, Role.ADMIN)
   listAvailableJobs(@Request() req: { user: UserFromJwt }) {
-    const runnerId = req.user.roles.includes(Role.RUNNER) ? req.user.userId : undefined;
+    const runnerId = req.user.roles.includes(Role.RUNNER)
+      ? req.user.userId
+      : undefined;
     return this.deliveryService.listAvailableJobs(runnerId);
   }
 
@@ -100,7 +113,11 @@ export class DeliveryController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.markPickupPending(id, req.user.userId, req.user.roles);
+    return this.deliveryService.markPickupPending(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Post('orders/:id/pickup')
@@ -109,7 +126,11 @@ export class DeliveryController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.confirmPickup(id, req.user.userId, req.user.roles);
+    return this.deliveryService.confirmPickup(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Post('orders/:id/start-transit')
@@ -118,7 +139,11 @@ export class DeliveryController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.startTransit(id, req.user.userId, req.user.roles);
+    return this.deliveryService.startTransit(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Post('orders/:id/delivered')
@@ -158,12 +183,82 @@ export class DeliveryController {
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: { user: UserFromJwt },
   ) {
-    return this.deliveryService.getDeliveryTracking(id, req.user.userId, req.user.roles);
+    return this.deliveryService.getDeliveryTracking(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
   }
 
   @Get('orders/:id/location-history')
   @Roles(Role.ADMIN)
   getDeliveryLocationHistory(@Param('id', ParseUUIDPipe) id: string) {
     return this.deliveryService.getDeliveryLocationHistory(id);
+  }
+
+  @Post('incidents')
+  @Roles(Role.CLIENT, Role.RUNNER, Role.PROVIDER, Role.ADMIN)
+  createIncident(
+    @Body() dto: CreateDeliveryIncidentDto,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.createIncident(
+      dto,
+      req.user.userId,
+      req.user.roles,
+    );
+  }
+
+  @Get('incidents/:id')
+  @Roles(Role.CLIENT, Role.RUNNER, Role.PROVIDER, Role.ADMIN)
+  getIncident(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.getIncident(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
+  }
+
+  @Get('orders/:id/incidents')
+  @Roles(Role.CLIENT, Role.RUNNER, Role.PROVIDER, Role.ADMIN)
+  listDeliveryIncidents(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.listDeliveryIncidents(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
+  }
+
+  @Patch('incidents/:id/review')
+  @Roles(Role.ADMIN)
+  reviewIncident(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.reviewIncident(id, req.user.userId);
+  }
+
+  @Patch('incidents/:id/resolve')
+  @Roles(Role.ADMIN)
+  resolveIncident(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.resolveIncident(id, req.user.userId);
+  }
+
+  @Patch('incidents/:id/reject')
+  @Roles(Role.ADMIN)
+  rejectIncident(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.deliveryService.rejectIncident(id, req.user.userId);
   }
 }

@@ -182,7 +182,9 @@ describe('CartService', () => {
     prismaMock.$transaction.mockImplementation(async (callback: any) =>
       callback({
         cartGroup: {
-          update: jest.fn().mockResolvedValue({ id: 'cart-1', cityId: 'city-1' }),
+          update: jest
+            .fn()
+            .mockResolvedValue({ id: 'cart-1', cityId: 'city-1' }),
         },
         cartProvider: {
           upsert: jest.fn().mockResolvedValue({ id: 'cart-provider-1' }),
@@ -192,9 +194,11 @@ describe('CartService', () => {
           findUnique: jest.fn().mockResolvedValue(null),
           create: jest.fn().mockResolvedValue({}),
           update: jest.fn(),
-          findMany: jest.fn().mockResolvedValue([
-            { quantity: 2, effectiveUnitPriceSnapshot: 129 },
-          ]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { quantity: 2, effectiveUnitPriceSnapshot: 129 },
+            ]),
         },
       }),
     );
@@ -272,9 +276,11 @@ describe('CartService', () => {
           }),
           create: jest.fn(),
           update: transactionCartItemUpdate,
-          findMany: jest.fn().mockResolvedValue([
-            { quantity: 4, effectiveUnitPriceSnapshot: 139 },
-          ]),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { quantity: 4, effectiveUnitPriceSnapshot: 139 },
+            ]),
         },
       }),
     );
@@ -353,7 +359,9 @@ describe('CartService', () => {
       providers: [],
     });
 
-    await service.updateItemQuantity('client-1', 'cart-item-1', { quantity: 5 });
+    await service.updateItemQuantity('client-1', 'cart-item-1', {
+      quantity: 5,
+    });
 
     expect(transactionCartItemUpdate).toHaveBeenCalledWith({
       where: { id: 'cart-item-1' },
