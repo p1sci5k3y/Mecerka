@@ -60,7 +60,11 @@ export class SupportWebhooksController {
 
     let event: Stripe.Event;
     try {
-      event = stripe.webhooks.constructEvent(req.rawBody, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        webhookSecret,
+      );
     } catch {
       this.logger.error('Donation webhook signature verification failed');
       return res

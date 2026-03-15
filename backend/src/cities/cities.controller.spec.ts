@@ -9,7 +9,8 @@ import { CitiesController } from './cities.controller';
 describe('CitiesController security metadata', () => {
   it('protects city creation behind admin-only guards', () => {
     const guards =
-      Reflect.getMetadata(GUARDS_METADATA, CitiesController.prototype.create) ?? [];
+      Reflect.getMetadata(GUARDS_METADATA, CitiesController.prototype.create) ??
+      [];
     const roles =
       Reflect.getMetadata(ROLES_KEY, CitiesController.prototype.create) ?? [];
 

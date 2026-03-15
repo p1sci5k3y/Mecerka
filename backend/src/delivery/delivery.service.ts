@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -21,6 +23,13 @@ import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssignDeliveryRunnerDto } from './dto/assign-delivery-runner.dto';
 import { ConfirmDeliveryDto } from './dto/confirm-delivery.dto';
+import {
+  DeliveryIncidentStatusValue,
+  DeliveryIncidentStatusValues,
+  IncidentReporterRoleValue,
+  IncidentReporterRoleValues,
+} from './delivery-incident.constants';
+import { CreateDeliveryIncidentDto } from './dto/create-delivery-incident.dto';
 import { CreateDeliveryOrderDto } from './dto/create-delivery-order.dto';
 import { UpdateDeliveryLocationDto } from './dto/update-delivery-location.dto';
 
@@ -42,15 +51,25 @@ export class DeliveryService {
     const configured = Number(
       this.configService.get<string>('DELIVERY_JOB_WINDOW_MINUTES') ?? '5',
     );
-    const minutes = Number.isFinite(configured) && configured > 0 ? configured : 5;
+    const minutes =
+      Number.isFinite(configured) && configured > 0 ? configured : 5;
     return minutes * 60 * 1000;
   }
 
   private getLocationUpdateIntervalMs() {
     const configured = Number(
-      this.configService.get<string>('RUNNER_LOCATION_MIN_INTERVAL_MS') ?? '3000',
+      this.configService.get<string>('RUNNER_LOCATION_MIN_INTERVAL_MS') ??
+        '3000',
     );
     return Number.isFinite(configured) && configured > 0 ? configured : 3000;
+  }
+
+  private getIncidentDailyLimit() {
+    return 10;
+  }
+
+  private getIncidentPerDeliveryLimit() {
+    return 3;
   }
 
   private getMaximumLocationJumpMeters() {
@@ -64,7 +83,8 @@ export class DeliveryService {
     const configured = Number(
       this.configService.get<string>('RUNNER_LOCATION_RETENTION_HOURS') ?? '24',
     );
-    const hours = Number.isFinite(configured) && configured > 0 ? configured : 24;
+    const hours =
+      Number.isFinite(configured) && configured > 0 ? configured : 24;
     return hours * 60 * 60 * 1000;
   }
 
@@ -126,9 +146,14 @@ export class DeliveryService {
     currentStatus: DeliveryOrderStatus,
     nextStatus: DeliveryOrderStatus,
   ) {
-    const allowedTransitions: Record<DeliveryOrderStatus, DeliveryOrderStatus[]> = {
+    const allowedTransitions: Record<
+      DeliveryOrderStatus,
+      DeliveryOrderStatus[]
+    > = {
       [DeliveryOrderStatus.PENDING]: [],
-      [DeliveryOrderStatus.RUNNER_ASSIGNED]: [DeliveryOrderStatus.PICKUP_PENDING],
+      [DeliveryOrderStatus.RUNNER_ASSIGNED]: [
+        DeliveryOrderStatus.PICKUP_PENDING,
+      ],
       [DeliveryOrderStatus.PICKUP_PENDING]: [DeliveryOrderStatus.PICKED_UP],
       [DeliveryOrderStatus.PICKED_UP]: [DeliveryOrderStatus.IN_TRANSIT],
       [DeliveryOrderStatus.IN_TRANSIT]: [DeliveryOrderStatus.DELIVERED],
@@ -175,11 +200,17 @@ export class DeliveryService {
     });
 
     if (!runner || !runner.isActive || !runner.user.active) {
-      throw new ForbiddenException('Runner is not active for lifecycle updates');
+      throw new ForbiddenException(
+        'Runner is not active for lifecycle updates',
+      );
     }
   }
 
-  private buildTrackingResponse(deliveryOrder: any, userId: string, roles: Role[]) {
+  private buildTrackingResponse(
+    deliveryOrder: any,
+    userId: string,
+    roles: Role[],
+  ) {
     const base = {
       deliveryOrderId: deliveryOrder.id,
       status: deliveryOrder.status,
@@ -238,7 +269,11 @@ export class DeliveryService {
     };
   }
 
-  private assertTrackingReadAccess(deliveryOrder: any, userId: string, roles: Role[]) {
+  private assertTrackingReadAccess(
+    deliveryOrder: any,
+    userId: string,
+    roles: Role[],
+  ) {
     if (roles.includes(Role.ADMIN)) {
       return;
     }
@@ -252,6 +287,166 @@ export class DeliveryService {
     }
 
     throw new NotFoundException('DeliveryOrder not found');
+  }
+
+  private validateIncidentTransition(
+    currentStatus: DeliveryIncidentStatusValue,
+    nextStatus: DeliveryIncidentStatusValue,
+  ) {
+    const allowedTransitions: Record<
+      DeliveryIncidentStatusValue,
+      DeliveryIncidentStatusValue[]
+    > = {
+      [DeliveryIncidentStatusValues.OPEN]: [
+        DeliveryIncidentStatusValues.UNDER_REVIEW,
+      ],
+      [DeliveryIncidentStatusValues.UNDER_REVIEW]: [
+        DeliveryIncidentStatusValues.RESOLVED,
+        DeliveryIncidentStatusValues.REJECTED,
+      ],
+      [DeliveryIncidentStatusValues.RESOLVED]: [],
+      [DeliveryIncidentStatusValues.REJECTED]: [],
+    };
+
+    if (currentStatus === nextStatus) {
+      return;
+    }
+
+    if (!allowedTransitions[currentStatus]?.includes(nextStatus)) {
+      throw new ConflictException(
+        `Invalid incident transition from ${currentStatus} to ${nextStatus}`,
+      );
+    }
+  }
+
+  private validateEvidenceUrl(evidenceUrl?: string) {
+    if (!evidenceUrl) {
+      return;
+    }
+
+    if (
+      evidenceUrl.startsWith('data:') ||
+      !evidenceUrl.startsWith('https://')
+    ) {
+      throw new BadRequestException('Incident evidenceUrl must use HTTPS');
+    }
+  }
+
+  private async resolveIncidentReporterRole(
+    deliveryOrder: any,
+    userId: string,
+    roles: Role[],
+  ): Promise<IncidentReporterRoleValue> {
+    if (roles.includes(Role.ADMIN)) {
+      return IncidentReporterRoleValues.ADMIN;
+    }
+
+    if (
+      roles.includes(Role.CLIENT) &&
+      deliveryOrder.order.clientId === userId
+    ) {
+      return IncidentReporterRoleValues.CLIENT;
+    }
+
+    if (roles.includes(Role.RUNNER) && deliveryOrder.runnerId === userId) {
+      return IncidentReporterRoleValues.RUNNER;
+    }
+
+    if (
+      roles.includes(Role.PROVIDER) &&
+      deliveryOrder.order.providerOrders.some(
+        (providerOrder: { providerId: string }) =>
+          providerOrder.providerId === userId,
+      )
+    ) {
+      return IncidentReporterRoleValues.PROVIDER;
+    }
+
+    throw new ForbiddenException(
+      'You are not allowed to create incidents for this delivery order',
+    );
+  }
+
+  private async assertIncidentReadAccess(
+    incident: any,
+    userId: string,
+    roles: Role[],
+  ) {
+    if (roles.includes(Role.ADMIN) || incident.reporterId === userId) {
+      return;
+    }
+
+    await this.resolveIncidentReporterRole(
+      incident.deliveryOrder,
+      userId,
+      roles,
+    );
+  }
+
+  private sanitizeIncident(incident: any) {
+    return {
+      id: incident.id,
+      deliveryOrderId: incident.deliveryOrderId,
+      reporterRole: incident.reporterRole,
+      type: incident.type,
+      status: incident.status,
+      description: incident.description,
+      evidenceUrl: incident.evidenceUrl ?? null,
+      createdAt: incident.createdAt,
+      resolvedAt: incident.resolvedAt ?? null,
+    };
+  }
+
+  private async transitionIncidentStatus(
+    incidentId: string,
+    actorId: string,
+    nextStatus: DeliveryIncidentStatusValue,
+  ) {
+    const now = new Date();
+
+    return this.prisma.$transaction(async (tx: any) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 1 FROM "DeliveryIncident" WHERE "id" = ${incidentId}::uuid FOR UPDATE`,
+      );
+
+      const incident = await tx.deliveryIncident.findUnique({
+        where: { id: incidentId },
+      });
+
+      if (!incident) {
+        throw new NotFoundException('Delivery incident not found');
+      }
+
+      if (incident.status === nextStatus) {
+        return this.sanitizeIncident(incident);
+      }
+
+      this.validateIncidentTransition(incident.status, nextStatus);
+
+      const updated = await tx.deliveryIncident.update({
+        where: { id: incidentId },
+        data: {
+          status: nextStatus,
+          ...(nextStatus === DeliveryIncidentStatusValues.RESOLVED &&
+          incident.resolvedAt == null
+            ? { resolvedAt: now }
+            : {}),
+        },
+      });
+
+      const eventName =
+        nextStatus === DeliveryIncidentStatusValues.UNDER_REVIEW
+          ? 'incident.review_started'
+          : nextStatus === DeliveryIncidentStatusValues.RESOLVED
+            ? 'incident.resolved'
+            : 'incident.rejected';
+
+      this.logger.log(
+        `${eventName} incident=${updated.id} deliveryOrder=${updated.deliveryOrderId} actor=${actorId} timestamp=${now.toISOString()}`,
+      );
+
+      return this.sanitizeIncident(updated);
+    });
   }
 
   private async transitionDeliveryLifecycle(
@@ -279,7 +474,12 @@ export class DeliveryService {
         throw new NotFoundException('DeliveryOrder not found');
       }
 
-      await this.validateAssignedRunnerForLifecycle(tx, deliveryOrder, userId, roles);
+      await this.validateAssignedRunnerForLifecycle(
+        tx,
+        deliveryOrder,
+        userId,
+        roles,
+      );
 
       if (deliveryOrder.status === nextStatus) {
         return deliveryOrder;
@@ -351,7 +551,9 @@ export class DeliveryService {
 
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
-      throw new ConflictException('Stripe is not configured for delivery payments');
+      throw new ConflictException(
+        'Stripe is not configured for delivery payments',
+      );
     }
 
     this.stripe = new Stripe(stripeSecretKey, {
@@ -361,13 +563,23 @@ export class DeliveryService {
     return this.stripe;
   }
 
-  private assertClientOrAdminAccess(clientId: string, userId: string, roles: Role[]) {
+  private assertClientOrAdminAccess(
+    clientId: string,
+    userId: string,
+    roles: Role[],
+  ) {
     if (!roles.includes(Role.ADMIN) && clientId !== userId) {
-      throw new ForbiddenException('You do not have access to this delivery order');
+      throw new ForbiddenException(
+        'You do not have access to this delivery order',
+      );
     }
   }
 
-  private assertDeliveryReadAccess(deliveryOrder: any, userId: string, roles: Role[]) {
+  private assertDeliveryReadAccess(
+    deliveryOrder: any,
+    userId: string,
+    roles: Role[],
+  ) {
     if (roles.includes(Role.ADMIN)) {
       return;
     }
@@ -380,7 +592,9 @@ export class DeliveryService {
       return;
     }
 
-    throw new ForbiddenException('You do not have access to this delivery order');
+    throw new ForbiddenException(
+      'You do not have access to this delivery order',
+    );
   }
 
   private async resolveActiveRunnerStripePaymentAccount(runnerId: string) {
@@ -495,7 +709,9 @@ export class DeliveryService {
       this.assertClientOrAdminAccess(order.clientId, userId, roles);
 
       if (order.deliveryOrder) {
-        throw new ConflictException('DeliveryOrder already exists for this order');
+        throw new ConflictException(
+          'DeliveryOrder already exists for this order',
+        );
       }
 
       const deliveryOrder = await tx.deliveryOrder.create({
@@ -577,12 +793,17 @@ export class DeliveryService {
         throw new NotFoundException('DeliveryOrder not found');
       }
 
-      this.assertClientOrAdminAccess(deliveryOrder.order.clientId, userId, roles);
+      this.assertClientOrAdminAccess(
+        deliveryOrder.order.clientId,
+        userId,
+        roles,
+      );
 
       if (
-        ![DeliveryOrderStatus.PENDING, DeliveryOrderStatus.RUNNER_ASSIGNED].includes(
-          deliveryOrder.status,
-        )
+        ![
+          DeliveryOrderStatus.PENDING,
+          DeliveryOrderStatus.RUNNER_ASSIGNED,
+        ].includes(deliveryOrder.status)
       ) {
         throw new ConflictException('DeliveryOrder is not assignable');
       }
@@ -680,16 +901,23 @@ export class DeliveryService {
         throw new NotFoundException('DeliveryOrder not found');
       }
 
-      this.assertClientOrAdminAccess(deliveryOrder.order.clientId, userId, roles);
+      this.assertClientOrAdminAccess(
+        deliveryOrder.order.clientId,
+        userId,
+        roles,
+      );
 
       if (!deliveryOrder.runnerId) {
-        throw new ConflictException('DeliveryOrder does not have an assigned runner');
+        throw new ConflictException(
+          'DeliveryOrder does not have an assigned runner',
+        );
       }
 
       if (
-        ![DeliveryOrderStatus.RUNNER_ASSIGNED, DeliveryOrderStatus.PICKUP_PENDING].includes(
-          deliveryOrder.status,
-        )
+        ![
+          DeliveryOrderStatus.RUNNER_ASSIGNED,
+          DeliveryOrderStatus.PICKUP_PENDING,
+        ].includes(deliveryOrder.status)
       ) {
         throw new ConflictException(
           'DeliveryOrder is not eligible for payment preparation',
@@ -720,7 +948,9 @@ export class DeliveryService {
         await tx.runnerPaymentSession.updateMany({
           where: {
             id: { in: expiredSessionIds },
-            status: { in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY] },
+            status: {
+              in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+            },
           },
           data: {
             status: PaymentSessionStatus.EXPIRED,
@@ -971,7 +1201,11 @@ export class DeliveryService {
     }
   }
 
-  async getDeliveryOrder(deliveryOrderId: string, userId: string, roles: Role[]) {
+  async getDeliveryOrder(
+    deliveryOrderId: string,
+    userId: string,
+    roles: Role[],
+  ) {
     const deliveryOrder = await (this.prisma as any).deliveryOrder.findUnique({
       where: { id: deliveryOrderId },
       include: {
@@ -1077,7 +1311,9 @@ export class DeliveryService {
       });
 
       if (existingClaim) {
-        throw new ConflictException('Runner has already attempted to accept this job');
+        throw new ConflictException(
+          'Runner has already attempted to accept this job',
+        );
       }
 
       if (job.status !== DeliveryJobStatus.OPEN) {
@@ -1108,12 +1344,13 @@ export class DeliveryService {
       });
 
       if (!runner || !runner.isActive || !runner.user.active) {
-        throw new BadRequestException('Runner is not eligible to accept delivery jobs');
+        throw new BadRequestException(
+          'Runner is not eligible to accept delivery jobs',
+        );
       }
 
-      const paymentAccount = await this.resolveActiveRunnerStripePaymentAccount(
-        runnerId,
-      );
+      const paymentAccount =
+        await this.resolveActiveRunnerStripePaymentAccount(runnerId);
       if (!paymentAccount?.isActive) {
         throw new BadRequestException(
           'Runner must complete payment onboarding before accepting delivery jobs.',
@@ -1197,7 +1434,12 @@ export class DeliveryService {
         throw new NotFoundException('DeliveryOrder not found');
       }
 
-      await this.validateAssignedRunnerForLifecycle(tx, deliveryOrder, userId, roles);
+      await this.validateAssignedRunnerForLifecycle(
+        tx,
+        deliveryOrder,
+        userId,
+        roles,
+      );
 
       if (!this.isTrackingActiveStatus(deliveryOrder.status)) {
         throw new ConflictException(
@@ -1237,7 +1479,9 @@ export class DeliveryService {
         );
 
         if (jumpMeters > this.getMaximumLocationJumpMeters()) {
-          throw new ConflictException('Runner location jump exceeds allowed threshold');
+          throw new ConflictException(
+            'Runner location jump exceeds allowed threshold',
+          );
         }
       }
 
@@ -1281,7 +1525,11 @@ export class DeliveryService {
     });
   }
 
-  async getDeliveryTracking(deliveryOrderId: string, userId: string, roles: Role[]) {
+  async getDeliveryTracking(
+    deliveryOrderId: string,
+    userId: string,
+    roles: Role[],
+  ) {
     const deliveryOrder = await (this.prisma as any).deliveryOrder.findUnique({
       where: { id: deliveryOrderId },
       include: {
@@ -1354,6 +1602,184 @@ export class DeliveryService {
     };
   }
 
+  async createIncident(
+    dto: CreateDeliveryIncidentDto,
+    userId: string,
+    roles: Role[],
+  ) {
+    this.validateEvidenceUrl(dto.evidenceUrl);
+    const now = new Date();
+    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const deliveryOrder = await tx.deliveryOrder.findUnique({
+        where: { id: dto.deliveryOrderId },
+        include: {
+          order: {
+            select: {
+              clientId: true,
+              providerOrders: {
+                select: {
+                  providerId: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!deliveryOrder) {
+        throw new NotFoundException('DeliveryOrder not found');
+      }
+
+      const reporterRole = await this.resolveIncidentReporterRole(
+        deliveryOrder,
+        userId,
+        roles,
+      );
+
+      const dailyCount = await tx.deliveryIncident.count({
+        where: {
+          reporterId: userId,
+          createdAt: {
+            gte: since,
+          },
+        },
+      });
+
+      if (dailyCount >= this.getIncidentDailyLimit()) {
+        throw new HttpException(
+          'Daily incident limit exceeded',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const perDeliveryCount = await tx.deliveryIncident.count({
+        where: {
+          deliveryOrderId: dto.deliveryOrderId,
+          reporterId: userId,
+        },
+      });
+
+      if (perDeliveryCount >= this.getIncidentPerDeliveryLimit()) {
+        throw new HttpException(
+          'Incident limit exceeded for this delivery order',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+
+      const incident = await tx.deliveryIncident.create({
+        data: {
+          deliveryOrderId: dto.deliveryOrderId,
+          reporterId: userId,
+          reporterRole,
+          type: dto.type,
+          status: DeliveryIncidentStatusValues.OPEN,
+          description: dto.description,
+          evidenceUrl: dto.evidenceUrl ?? null,
+        },
+      });
+
+      this.logger.log(
+        `incident.created incident=${incident.id} deliveryOrder=${incident.deliveryOrderId} actor=${userId} timestamp=${now.toISOString()}`,
+      );
+
+      return this.sanitizeIncident(incident);
+    });
+  }
+
+  async getIncident(incidentId: string, userId: string, roles: Role[]) {
+    const incident = await (this.prisma as any).deliveryIncident.findUnique({
+      where: { id: incidentId },
+      include: {
+        deliveryOrder: {
+          include: {
+            order: {
+              select: {
+                clientId: true,
+                providerOrders: {
+                  select: {
+                    providerId: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!incident) {
+      throw new NotFoundException('Delivery incident not found');
+    }
+
+    await this.assertIncidentReadAccess(incident, userId, roles);
+    return this.sanitizeIncident(incident);
+  }
+
+  async listDeliveryIncidents(
+    deliveryOrderId: string,
+    userId: string,
+    roles: Role[],
+  ) {
+    const deliveryOrder = await (this.prisma as any).deliveryOrder.findUnique({
+      where: { id: deliveryOrderId },
+      include: {
+        order: {
+          select: {
+            clientId: true,
+            providerOrders: {
+              select: {
+                providerId: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!deliveryOrder) {
+      throw new NotFoundException('DeliveryOrder not found');
+    }
+
+    await this.resolveIncidentReporterRole(deliveryOrder, userId, roles);
+
+    const incidents = await (this.prisma as any).deliveryIncident.findMany({
+      where: {
+        deliveryOrderId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return incidents.map((incident: any) => this.sanitizeIncident(incident));
+  }
+
+  async reviewIncident(incidentId: string, actorId: string) {
+    return this.transitionIncidentStatus(
+      incidentId,
+      actorId,
+      DeliveryIncidentStatusValues.UNDER_REVIEW,
+    );
+  }
+
+  async resolveIncident(incidentId: string, actorId: string) {
+    return this.transitionIncidentStatus(
+      incidentId,
+      actorId,
+      DeliveryIncidentStatusValues.RESOLVED,
+    );
+  }
+
+  async rejectIncident(incidentId: string, actorId: string) {
+    return this.transitionIncidentStatus(
+      incidentId,
+      actorId,
+      DeliveryIncidentStatusValues.REJECTED,
+    );
+  }
+
   async markPickupPending(
     deliveryOrderId: string,
     userId: string,
@@ -1367,11 +1793,7 @@ export class DeliveryService {
     );
   }
 
-  async confirmPickup(
-    deliveryOrderId: string,
-    userId: string,
-    roles: Role[],
-  ) {
+  async confirmPickup(deliveryOrderId: string, userId: string, roles: Role[]) {
     return this.transitionDeliveryLifecycle(
       deliveryOrderId,
       userId,
@@ -1380,11 +1802,7 @@ export class DeliveryService {
     );
   }
 
-  async startTransit(
-    deliveryOrderId: string,
-    userId: string,
-    roles: Role[],
-  ) {
+  async startTransit(deliveryOrderId: string, userId: string, roles: Role[]) {
     return this.transitionDeliveryLifecycle(
       deliveryOrderId,
       userId,

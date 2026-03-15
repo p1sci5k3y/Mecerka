@@ -51,7 +51,9 @@ describe('SupportWebhooksController', () => {
       ],
     }).compile();
 
-    controller = module.get<SupportWebhooksController>(SupportWebhooksController);
+    controller = module.get<SupportWebhooksController>(
+      SupportWebhooksController,
+    );
   });
 
   afterEach(() => {
@@ -100,7 +102,9 @@ describe('SupportWebhooksController', () => {
     );
     expect(logSpy.mock.calls[0]?.[0]).not.toContain('client_secret');
     expect(logSpy.mock.calls[0]?.[0]).not.toContain('authorization');
-    expect(logSpy.mock.calls[0]?.[0]).not.toContain('pi_donation_secret_should_not_log');
+    expect(logSpy.mock.calls[0]?.[0]).not.toContain(
+      'pi_donation_secret_should_not_log',
+    );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
@@ -142,6 +146,8 @@ describe('SupportWebhooksController', () => {
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
     expect(res.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
-    expect(res.send).toHaveBeenCalledWith('Donation webhook support is disabled');
+    expect(res.send).toHaveBeenCalledWith(
+      'Donation webhook support is disabled',
+    );
   });
 });
