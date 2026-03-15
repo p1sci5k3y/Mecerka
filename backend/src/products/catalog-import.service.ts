@@ -36,6 +36,8 @@ interface NormalizedCatalogRow {
 
 @Injectable()
 export class CatalogImportService {
+  private static readonly FORMULA_PREFIXES = new Set(['=', '+', '-', '@']);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalogFileParser: CatalogFileParser,
@@ -261,9 +263,10 @@ export class CatalogImportService {
     rows.forEach((row, rowIndex) => {
       const rowNumber = rowIndex + 2;
       const reference = normalizeProductReference(row.reference ?? '');
-      const name = (row.name ?? '').trim();
+      const rawName = (row.name ?? '').trim();
       const description = this.normalizeOptionalText(row.description);
-      const categoryToken = (row.category ?? '').trim().toLowerCase();
+      const rawCategory = (row.category ?? '').trim();
+      const categoryToken = rawCategory.toLowerCase();
       const price = this.parsePrice(row.price);
       const discountPrice = this.parseOptionalPrice(row.discount_price);
       const stock = this.parseStock(row.stock);
@@ -285,7 +288,7 @@ export class CatalogImportService {
         referencesInFile.add(reference);
       }
 
-      if (!name) {
+      if (!rawName) {
         errors.push({
           rowNumber,
           field: 'name',
@@ -318,6 +321,32 @@ export class CatalogImportService {
         });
       }
 
+      this.pushFormulaInjectionError(
+        errors,
+        rowNumber,
+        'reference',
+        row.reference,
+      );
+      this.pushFormulaInjectionError(errors, rowNumber, 'name', row.name);
+      this.pushFormulaInjectionError(
+        errors,
+        rowNumber,
+        'description',
+        row.description,
+      );
+      this.pushFormulaInjectionError(
+        errors,
+        rowNumber,
+        'category',
+        row.category,
+      );
+      this.pushFormulaInjectionError(
+        errors,
+        rowNumber,
+        'image_url',
+        row.image_url,
+      );
+
       if (imageUrl && !this.isValidHttpUrl(imageUrl)) {
         errors.push({
           rowNumber,
@@ -345,7 +374,7 @@ export class CatalogImportService {
         normalizedRows.push({
           rowNumber,
           reference,
-          name,
+          name: rawName,
           description,
           categoryId,
           categoryLabel: row.category,
@@ -363,6 +392,33 @@ export class CatalogImportService {
   private normalizeOptionalText(value?: string): string | null {
     const normalized = value?.trim();
     return normalized ? normalized : null;
+  }
+
+  private pushFormulaInjectionError(
+    errors: CatalogValidationError[],
+    rowNumber: number,
+    field: string,
+    value?: string,
+  ) {
+    if (!this.hasFormulaLikePrefix(value)) {
+      return;
+    }
+
+    errors.push({
+      rowNumber,
+      field,
+      message: `${field} must not start with spreadsheet formula characters`,
+    });
+  }
+
+  private hasFormulaLikePrefix(value?: string): boolean {
+    const normalized = value?.trim();
+
+    if (!normalized) {
+      return false;
+    }
+
+    return CatalogImportService.FORMULA_PREFIXES.has(normalized[0]);
   }
 
   private parsePrice(value?: string): number | null {
@@ -418,12 +474,30 @@ export class CatalogImportService {
       headers.join(','),
       ...rows.map((row) =>
         headers
-          .map((header) => this.escapeCsvCell(String(row[header] ?? '')))
+          .map((header) =>
+            this.escapeCsvCell(
+              this.sanitizeCsvExportCell(String(row[header] ?? '')),
+            ),
+          )
           .join(','),
       ),
     ];
 
     return `${lines.join('\n')}\n`;
+  }
+
+  private sanitizeCsvExportCell(value: string): string {
+    const normalized = value.trimStart();
+
+    if (!normalized) {
+      return value;
+    }
+
+    if (CatalogImportService.FORMULA_PREFIXES.has(normalized[0])) {
+      return `'${value}`;
+    }
+
+    return value;
   }
 
   private escapeCsvCell(value: string): string {

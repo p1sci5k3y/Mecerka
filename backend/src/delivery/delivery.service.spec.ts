@@ -8,7 +8,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import {
   DeliveryOrderStatus,
   DeliveryJobStatus,
-  PaymentAccountProvider,
   PaymentSessionStatus,
   Role,
   RunnerPaymentStatus,

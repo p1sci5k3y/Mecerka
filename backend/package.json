@@ -32,7 +32,7 @@
     "@nestjs/platform-socket.io": "^11.0.1",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.0.1",
-    "@prisma/client": "^5.18.0",
+    "@prisma/client": "5.18.0",
     "argon2": "^0.44.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
@@ -70,7 +70,7 @@
     "jest": "^29.7.0",
     "jest-esbuild": "^0.4.0",
     "prettier": "^3.4.2",
-    "prisma": "^5.18.0",
+    "prisma": "5.18.0",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
     "ts-jest": "^29.4.6",
@@ -102,6 +102,7 @@
   },
   "overrides": {
     "multer": "^2.1.1",
-    "serialize-javascript": "^6.0.2"
+    "serialize-javascript": "^6.0.2",
+    "file-type": "21.3.2"
   }
 }
