@@ -53,7 +53,6 @@ enum ProductImportJobStatus {
 
 enum ProductImportFormat {
   CSV
-  XLSX
 }
 
 enum CartGroupStatus {
@@ -151,6 +150,23 @@ enum DeliveryIncidentStatus {
   REJECTED
 }
 
+enum RefundType {
+  PROVIDER_FULL
+  PROVIDER_PARTIAL
+  DELIVERY_FULL
+  DELIVERY_PARTIAL
+}
+
+enum RefundStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EXECUTING
+  COMPLETED
+  FAILED
+}
+
 model User {
   id                         String    @id @default(uuid()) @db.Uuid
   email                      String    @unique
@@ -198,6 +214,8 @@ model User {
   deliveryJobClaims DeliveryJobClaim[]
   runnerLocations RunnerLocation[]
   deliveryIncidents DeliveryIncident[]
+  requestedRefunds RefundRequest[] @relation("RequestedRefunds")
+  reviewedRefunds RefundRequest[] @relation("ReviewedRefunds")
 }
 
 model City {
@@ -412,6 +430,7 @@ model ProviderOrder {
   items        OrderItem[]
   reservations StockReservation[]
   paymentSessions ProviderPaymentSession[]
+  refundRequests RefundRequest[]
 
   @@index([orderId])
   @@index([providerId])
@@ -536,6 +555,8 @@ model DeliveryOrder {
   deliveryFee    Decimal            @db.Decimal(10, 2)
   currency       String
   paymentStatus  RunnerPaymentStatus @default(PENDING)
+  paymentRef     String?            @unique
+  paidAt         DateTime?
   pickupAt       DateTime?
   transitAt      DateTime?
   deliveredAt    DateTime?
@@ -552,6 +573,7 @@ model DeliveryOrder {
   job     DeliveryJob?
   paymentSessions RunnerPaymentSession[]
   incidents DeliveryIncident[]
+  refundRequests RefundRequest[]
 
   @@index([orderId])
   @@index([runnerId])
@@ -585,10 +607,44 @@ model DeliveryIncident {
 
   deliveryOrder DeliveryOrder @relation(fields: [deliveryOrderId], references: [id])
   reporter      User          @relation(fields: [reporterId], references: [id])
+  refundRequests RefundRequest[]
 
   @@index([deliveryOrderId])
   @@index([status])
   @@index([createdAt])
+}
+
+model RefundRequest {
+  id               String       @id @default(uuid()) @db.Uuid
+  incidentId       String?      @db.Uuid
+  providerOrderId  String?      @db.Uuid
+  deliveryOrderId  String?      @db.Uuid
+  type             RefundType
+  status           RefundStatus @default(REQUESTED)
+  amount           Decimal      @db.Decimal(10, 2)
+  currency         String
+  requestedById    String       @db.Uuid
+  reviewedById     String?      @db.Uuid
+  externalRefundId String?
+  createdAt        DateTime     @default(now())
+  reviewedAt       DateTime?
+  completedAt      DateTime?
+
+  incident      DeliveryIncident? @relation(fields: [incidentId], references: [id])
+  providerOrder ProviderOrder?    @relation(fields: [providerOrderId], references: [id])
+  deliveryOrder DeliveryOrder?    @relation(fields: [deliveryOrderId], references: [id])
+  requestedBy   User              @relation("RequestedRefunds", fields: [requestedById], references: [id])
+  reviewedBy    User?             @relation("ReviewedRefunds", fields: [reviewedById], references: [id])
+
+  @@index([incidentId])
+  @@index([providerOrderId])
+  @@index([providerOrderId, status])
+  @@index([deliveryOrderId])
+  @@index([deliveryOrderId, status])
+  @@index([status])
+  @@index([requestedById, createdAt])
+  @@unique([providerOrderId, externalRefundId])
+  @@unique([deliveryOrderId, externalRefundId])
 }
 
 model DeliveryJob {

@@ -7,10 +7,28 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs', 'seed-e2e-users.js', 'seed-e2e-admin.js'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'prisma/**/*.ts',
+      'compile*.log',
+      'lint_output.txt',
+      'eslint.config.mjs',
+      '**/*.js',
+      '**/*.d.ts',
+      'mark_picked_up.ts',
+      'seed_order.ts',
+      'simulate_provider.ts',
+      'test-domain.ts',
+      'test-mfa-runtime.ts',
+      'test-reset.ts',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    files: ['src/**/*.ts', 'test/**/*.ts'],
+  },
   {
     plugins: {
       prettier: eslintPluginPrettier,
@@ -43,10 +61,7 @@ export default tseslint.config(
     },
   },
   {
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-    },
+    files: ['src/**/*.ts'],
+    rules: {},
   },
 );

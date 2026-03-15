@@ -20,6 +20,7 @@ import { ProvidersModule } from './providers/providers.module';
 import { CartModule } from './cart/cart.module';
 import { SupportModule } from './support/support.module';
 import { DeliveryModule } from './delivery/delivery.module';
+import { RefundsModule } from './refunds/refunds.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { DeliveryModule } from './delivery/delivery.module';
     CartModule,
     SupportModule,
     DeliveryModule,
+    RefundsModule,
   ],
   controllers: [AppController],
   providers: [

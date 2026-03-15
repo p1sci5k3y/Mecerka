@@ -29,8 +29,16 @@ async function main() {
     { name: 'Pamplona', slug: 'pamplona', active: true },
     { name: 'Salamanca', slug: 'salamanca', active: true },
     { name: 'Cadiz', slug: 'cadiz', active: true },
-    { name: 'Las Palmas de Gran Canaria', slug: 'las-palmas-de-gran-canaria', active: true },
-    { name: 'Santa Cruz de Tenerife', slug: 'santa-cruz-de-tenerife', active: true },
+    {
+      name: 'Las Palmas de Gran Canaria',
+      slug: 'las-palmas-de-gran-canaria',
+      active: true,
+    },
+    {
+      name: 'Santa Cruz de Tenerife',
+      slug: 'santa-cruz-de-tenerife',
+      active: true,
+    },
   ];
 
   for (const city of cities) {

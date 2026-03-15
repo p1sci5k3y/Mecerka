@@ -3,12 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  Prisma,
-  ProductImportFormat,
-  ProductImportJobStatus,
-} from '@prisma/client';
-import XLSX from 'xlsx';
+import { Prisma, ProductImportJobStatus } from '@prisma/client';
 import {
   CatalogFileParser,
   type ParsedCatalogRecord,
@@ -194,7 +189,7 @@ export class CatalogImportService {
     return result;
   }
 
-  async exportCatalog(providerId: string, format: 'csv' | 'xlsx') {
+  async exportCatalog(providerId: string) {
     const products = await this.prisma.product.findMany({
       where: { providerId },
       include: {
@@ -219,10 +214,6 @@ export class CatalogImportService {
       image_url: product.imageUrl ?? '',
     }));
 
-    if (format === 'xlsx') {
-      return this.buildWorkbookResponse(rows, 'catalog-export.xlsx');
-    }
-
     return {
       filename: 'catalog-export.csv',
       contentType: 'text/csv; charset=utf-8',
@@ -230,7 +221,7 @@ export class CatalogImportService {
     };
   }
 
-  exportTemplate(format: 'csv' | 'xlsx') {
+  exportTemplate() {
     const sampleRows = [
       {
         reference: 'CHAIR-001',
@@ -243,10 +234,6 @@ export class CatalogImportService {
         image_url: 'https://cdn.example.com/products/chair-001.jpg',
       },
     ];
-
-    if (format === 'xlsx') {
-      return this.buildWorkbookResponse(sampleRows, 'catalog-template.xlsx');
-    }
 
     return {
       filename: 'catalog-template.csv',
@@ -419,22 +406,6 @@ export class CatalogImportService {
     } catch {
       return false;
     }
-  }
-
-  private buildWorkbookResponse(
-    rows: Record<string, string | number>[],
-    filename: string,
-  ) {
-    const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'catalog');
-
-    return {
-      filename,
-      contentType:
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      buffer: XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' }),
-    };
   }
 
   private toCsv(rows: Record<string, string | number>[]): string {
