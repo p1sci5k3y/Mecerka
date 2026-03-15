@@ -9,7 +9,6 @@ import {
   UseGuards,
   Request,
   ParseUUIDPipe,
-  Query,
   StreamableFile,
   Res,
   UploadedFile,
@@ -28,7 +27,6 @@ import { Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 import { CatalogImportService } from './catalog-import.service';
-import { CatalogFormatQueryDto } from './dto/catalog-format-query.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -95,14 +93,10 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
   async exportCatalog(
-    @Query() query: CatalogFormatQueryDto,
     @Request() req: { user: UserFromJwt },
     @Res({ passthrough: true }) res: Response,
   ) {
-    const file = await this.catalogImportService.exportCatalog(
-      req.user.userId,
-      query.format,
-    );
+    const file = await this.catalogImportService.exportCatalog(req.user.userId);
 
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(
@@ -116,11 +110,8 @@ export class ProductsController {
   @Get('catalog/template')
   @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER)
-  getCatalogTemplate(
-    @Query() query: CatalogFormatQueryDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const file = this.catalogImportService.exportTemplate(query.format);
+  getCatalogTemplate(@Res({ passthrough: true }) res: Response) {
+    const file = this.catalogImportService.exportTemplate();
 
     res.setHeader('Content-Type', file.contentType);
     res.setHeader(

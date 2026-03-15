@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ProductImportFormat } from '@prisma/client';
-import XLSX from 'xlsx';
+import { parse } from 'csv-parse/sync';
 
 export interface UploadedCatalogFile {
   originalname: string;
@@ -15,16 +15,12 @@ export type ParsedCatalogRecord = Record<string, string>;
 export class CatalogFileParser {
   private static readonly MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
   private static readonly MAX_ROW_COUNT = 1000;
-  private static readonly MAX_WORKSHEET_COUNT = 1;
+  private static readonly MAX_COLUMN_COUNT = 50;
   private static readonly ALLOWED_CSV_MIME_TYPES = new Set([
     'text/csv',
     'application/csv',
     'application/vnd.ms-excel',
     'text/plain',
-  ]);
-  private static readonly ALLOWED_XLSX_MIME_TYPES = new Set([
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/octet-stream',
   ]);
 
   detectFormat(file: UploadedCatalogFile): ProductImportFormat {
@@ -34,11 +30,7 @@ export class CatalogFileParser {
       return ProductImportFormat.CSV;
     }
 
-    if (normalizedName.endsWith('.xlsx')) {
-      return ProductImportFormat.XLSX;
-    }
-
-    throw new BadRequestException('Only CSV and XLSX files are supported');
+    throw new BadRequestException('Only CSV files are supported');
   }
 
   parse(file: UploadedCatalogFile): {
@@ -49,10 +41,7 @@ export class CatalogFileParser {
 
     const format = this.detectFormat(file);
     this.validateMimeType(file, format);
-    const rows =
-      format === ProductImportFormat.CSV
-        ? this.parseCsv(file.buffer)
-        : this.parseXlsx(file.buffer);
+    const rows = this.parseCsv(file.buffer);
 
     if (rows.length === 0) {
       throw new BadRequestException('The uploaded catalog is empty');
@@ -86,119 +75,27 @@ export class CatalogFileParser {
     ) {
       throw new BadRequestException('Invalid CSV content type');
     }
-
-    if (
-      format === ProductImportFormat.XLSX &&
-      !CatalogFileParser.ALLOWED_XLSX_MIME_TYPES.has(mimetype)
-    ) {
-      throw new BadRequestException('Invalid XLSX content type');
-    }
   }
 
   private parseCsv(buffer: Buffer): ParsedCatalogRecord[] {
-    const text = buffer.toString('utf8').replace(/^\uFEFF/, '');
-    const matrix = this.parseDelimitedText(text);
-    return this.toRecords(matrix);
-  }
-
-  private parseXlsx(buffer: Buffer): ParsedCatalogRecord[] {
-    if (!this.isZipLike(buffer)) {
-      throw new BadRequestException('Malformed XLSX file');
-    }
-
-    let workbook: XLSX.WorkBook;
-
     try {
-      workbook = XLSX.read(buffer, {
-        type: 'buffer',
-        dense: true,
-        raw: false,
-      });
-    } catch {
-      throw new BadRequestException('Malformed XLSX file');
-    }
+      const text = buffer.toString('utf8').replace(/^\uFEFF/, '');
+      const matrix = parse(text, {
+        bom: true,
+        columns: false,
+        skip_empty_lines: true,
+        relax_column_count: false,
+        trim: false,
+        max_record_size: 64 * 1024,
+      }) as string[][];
 
-    if (
-      workbook.SheetNames.length === 0 ||
-      workbook.SheetNames.length > CatalogFileParser.MAX_WORKSHEET_COUNT
-    ) {
-      throw new BadRequestException(
-        'The uploaded workbook must contain exactly one worksheet',
-      );
-    }
-
-    const firstSheetName = workbook.SheetNames[0];
-
-    if (!firstSheetName) {
-      throw new BadRequestException(
-        'The uploaded workbook does not contain sheets',
-      );
-    }
-
-    const matrix = XLSX.utils.sheet_to_json<string[]>(
-      workbook.Sheets[firstSheetName],
-      {
-        header: 1,
-        raw: false,
-        defval: '',
-      },
-    );
-
-    return this.toRecords(matrix);
-  }
-
-  private parseDelimitedText(text: string): string[][] {
-    const rows: string[][] = [];
-    let currentRow: string[] = [];
-    let currentField = '';
-    let inQuotes = false;
-
-    for (let index = 0; index < text.length; index += 1) {
-      const char = text[index];
-      const next = text[index + 1];
-
-      if (char === '"') {
-        if (inQuotes && next === '"') {
-          currentField += '"';
-          index += 1;
-        } else {
-          inQuotes = !inQuotes;
-        }
-        continue;
+      return this.toRecords(matrix);
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
       }
-
-      if (char === ',' && !inQuotes) {
-        currentRow.push(currentField);
-        currentField = '';
-        continue;
-      }
-
-      if ((char === '\n' || char === '\r') && !inQuotes) {
-        if (char === '\r' && next === '\n') {
-          index += 1;
-        }
-        currentRow.push(currentField);
-        currentField = '';
-
-        if (currentRow.some((value) => value.trim() !== '')) {
-          rows.push(currentRow);
-        }
-
-        currentRow = [];
-        continue;
-      }
-
-      currentField += char;
+      throw new BadRequestException('Malformed CSV file');
     }
-
-    if (currentField.length > 0 || currentRow.length > 0) {
-      currentRow.push(currentField);
-      if (currentRow.some((value) => value.trim() !== '')) {
-        rows.push(currentRow);
-      }
-    }
-
-    return rows;
   }
 
   private toRecords(matrix: string[][]): ParsedCatalogRecord[] {
@@ -212,6 +109,12 @@ export class CatalogFileParser {
 
     const headers = headerRow.map((header) => this.normalizeHeader(header));
     const requiredHeaders = ['reference', 'name', 'category', 'price', 'stock'];
+
+    if (headers.length > CatalogFileParser.MAX_COLUMN_COUNT) {
+      throw new BadRequestException(
+        `Catalog file exceeds the ${CatalogFileParser.MAX_COLUMN_COUNT} column limit`,
+      );
+    }
 
     for (const requiredHeader of requiredHeaders) {
       if (!headers.includes(requiredHeader)) {
@@ -228,6 +131,18 @@ export class CatalogFileParser {
     }
 
     return dataRows.map((row) => {
+      if (row.length > CatalogFileParser.MAX_COLUMN_COUNT) {
+        throw new BadRequestException(
+          `Catalog file exceeds the ${CatalogFileParser.MAX_COLUMN_COUNT} column limit`,
+        );
+      }
+
+      if (row.length !== headers.length) {
+        throw new BadRequestException(
+          'Malformed CSV file: inconsistent column count',
+        );
+      }
+
       const record: ParsedCatalogRecord = {};
 
       headers.forEach((header, index) => {
@@ -240,15 +155,5 @@ export class CatalogFileParser {
 
   private normalizeHeader(header: string): string {
     return header.trim().toLowerCase().replace(/\s+/g, '_');
-  }
-
-  private isZipLike(buffer: Buffer): boolean {
-    return (
-      buffer.length >= 4 &&
-      buffer[0] === 0x50 &&
-      buffer[1] === 0x4b &&
-      buffer[2] === 0x03 &&
-      buffer[3] === 0x04
-    );
   }
 }
