@@ -29,6 +29,10 @@ export class PaymentsService {
   private static readonly WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
   private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
   private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
+  private static readonly FINAL_WEBHOOK_STATUSES = new Set<string>([
+    PaymentsService.WEBHOOK_STATUS_PROCESSED,
+    PaymentsService.WEBHOOK_STATUS_IGNORED,
+  ]);
 
   private readonly stripe: Stripe;
 
@@ -54,8 +58,11 @@ export class PaymentsService {
   async isProcessed(eventId: string): Promise<boolean> {
     const event = await (this.prisma as any).paymentWebhookEvent.findUnique({
       where: { id: eventId },
+      select: { status: true },
     });
-    return !!event;
+    return event
+      ? PaymentsService.FINAL_WEBHOOK_STATUSES.has(event.status ?? '')
+      : false;
   }
 
   private async claimWebhookEvent(
@@ -75,7 +82,22 @@ export class PaymentsService {
       return true;
     } catch (error: any) {
       if (error?.code === 'P2002') {
-        return false;
+        const reclaimed = await (
+          this.prisma as any
+        ).paymentWebhookEvent.updateMany({
+          where: {
+            id: eventId,
+            status: PaymentsService.WEBHOOK_STATUS_FAILED,
+          },
+          data: {
+            provider,
+            eventType,
+            status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
+            processedAt: null,
+          },
+        });
+
+        return reclaimed.count === 1 ? true : false;
       }
       throw error;
     }
@@ -649,6 +671,10 @@ export class PaymentsService {
           throw new NotFoundException('Payment session not found');
         }
 
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
+        );
+
         const providerOrder = await tx.providerOrder.findUnique({
           where: { id: paymentSession.providerOrderId },
           include: {
@@ -710,13 +736,17 @@ export class PaymentsService {
           );
         }
 
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Order" WHERE "id" = ${providerOrder.order.id}::uuid FOR UPDATE`,
+        );
+
         const productIds = [
           ...new Set(
             providerOrder.reservations.map(
               (reservation: any) => reservation.productId,
             ),
           ),
-        ];
+        ].sort();
 
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
@@ -759,17 +789,6 @@ export class PaymentsService {
           },
         });
 
-        const siblingProviderOrders = providerOrder.order.providerOrders.map(
-          (sibling: any) =>
-            sibling.id === providerOrder.id
-              ? { ...sibling, paymentStatus: ProviderPaymentStatus.PAID }
-              : sibling,
-        );
-        const allProviderOrdersPaid = siblingProviderOrders.every(
-          (sibling: any) =>
-            sibling.paymentStatus === ProviderPaymentStatus.PAID,
-        );
-
         await tx.providerOrder.update({
           where: { id: providerOrder.id },
           data: {
@@ -779,14 +798,37 @@ export class PaymentsService {
           },
         });
 
-        let updatedOrderStatus = providerOrder.order.status;
+        const refreshedOrder = await tx.order.findUnique({
+          where: { id: providerOrder.order.id },
+          select: {
+            id: true,
+            status: true,
+            providerOrders: {
+              select: {
+                id: true,
+                paymentStatus: true,
+              },
+            },
+          },
+        });
+
+        if (!refreshedOrder) {
+          throw new NotFoundException('Order not found');
+        }
+
+        const allProviderOrdersPaid = refreshedOrder.providerOrders.every(
+          (sibling: any) =>
+            sibling.paymentStatus === ProviderPaymentStatus.PAID,
+        );
+
+        let updatedOrderStatus = refreshedOrder.status;
         if (
           allProviderOrdersPaid &&
-          providerOrder.order.status === DeliveryStatus.PENDING
+          refreshedOrder.status === DeliveryStatus.PENDING
         ) {
           updatedOrderStatus = DeliveryStatus.CONFIRMED;
           await tx.order.update({
-            where: { id: providerOrder.order.id },
+            where: { id: refreshedOrder.id },
             data: {
               status: DeliveryStatus.CONFIRMED,
               confirmedAt: now,
@@ -796,14 +838,14 @@ export class PaymentsService {
 
         return {
           success: true,
-          orderId: providerOrder.order.id,
+          orderId: refreshedOrder.id,
           providerOrderId: providerOrder.id,
           status: updatedOrderStatus,
           paymentStatus: ProviderPaymentStatus.PAID,
           paymentRef: externalSessionId,
           _events: {
             stateChanged: {
-              orderId: providerOrder.order.id,
+              orderId: refreshedOrder.id,
               status: updatedOrderStatus,
               paymentRef: externalSessionId,
             },
@@ -845,11 +887,34 @@ export class PaymentsService {
     }
   }
 
+  /**
+   * @deprecated Legacy root-order payment wrapper.
+   * Use confirmProviderOrderPayment(externalSessionId, eventId, eventType) instead.
+   * This wrapper is restricted to single-provider orders only.
+   */
   async confirmPayment(orderId: string, paymentRef: string, eventId: string) {
-    void orderId;
-
     if (await this.isProcessed(eventId)) {
       return { message: 'Webhook already processed' };
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        providerOrders: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.providerOrders.length !== 1) {
+      throw new ConflictException(
+        'Legacy payment confirmation wrapper only supports single-provider orders',
+      );
     }
 
     return this.confirmProviderOrderPayment(

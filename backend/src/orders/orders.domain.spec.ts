@@ -1,14 +1,22 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { OrdersService } from './orders.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentsService } from '../payments/payments.service';
 import { ConfigService } from '@nestjs/config';
+import {
+  DeliveryStatus,
+  PaymentSessionStatus,
+  ProviderOrderStatus,
+  ProviderPaymentStatus,
+  Role,
+  StockReservationStatus,
+} from '@prisma/client';
+import { ConflictException } from '@nestjs/common';
+import { OrdersService } from './orders.service';
+import { PaymentsService } from '../payments/payments.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 jest.setTimeout(20000);
 
-describe('OrdersService - Saga Lite Payment Domain', () => {
+describe('OrdersService - Provider Payment Domain', () => {
   let paymentsService: PaymentsService;
   let prisma: PrismaService;
 
@@ -37,7 +45,6 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
     await prisma.$disconnect();
   });
 
-  // Helper to generate isolated database state for each test
   async function setupTestData(stockA: number, stockB: number) {
     const rand = Math.random().toString(36).substring(7);
 
@@ -78,7 +85,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     const prodA = await prisma.product.create({
       data: {
-        reference: 'PROD-A',
+        reference: `PROD-A-${rand}`,
         name: 'Prod A',
         price: 10,
         stock: stockA,
@@ -90,7 +97,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
 
     const prodB = await prisma.product.create({
       data: {
-        reference: 'PROD-B',
+        reference: `PROD-B-${rand}`,
         name: 'Prod B',
         price: 15,
         stock: stockB,
@@ -100,7 +107,7 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
       },
     });
 
-    return { client, city, cat, provA, provB, prodA, prodB };
+    return { client, city, provA, provB, prodA, prodB };
   }
 
   async function createTestOrder(data: any, qtyA: number, qtyB: number) {
@@ -145,144 +152,306 @@ describe('OrdersService - Saga Lite Payment Domain', () => {
           ],
         },
       },
+      include: {
+        providerOrders: {
+          include: {
+            items: true,
+          },
+        },
+      },
     });
   }
 
-  it('A) Confirmación decrementa stock y pasa a CONFIRMED', async () => {
-    // Both products have stock 5
+  async function seedPaymentFixtures(orderId: string) {
+    const providerOrders = await prisma.providerOrder.findMany({
+      where: { orderId },
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    return Promise.all(
+      providerOrders.map(async (providerOrder, index) => {
+        const session = await prisma.providerPaymentSession.create({
+          data: {
+            providerOrderId: providerOrder.id,
+            paymentProvider: 'STRIPE',
+            externalSessionId: `pi_domain_${index}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            status: PaymentSessionStatus.READY,
+            expiresAt,
+          },
+        });
+
+        await prisma.stockReservation.createMany({
+          data: providerOrder.items.map((item) => ({
+            providerOrderId: providerOrder.id,
+            productId: item.productId,
+            quantity: item.quantity,
+            status: StockReservationStatus.ACTIVE,
+            expiresAt,
+          })),
+        });
+
+        await prisma.providerOrder.update({
+          where: { id: providerOrder.id },
+          data: {
+            paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+            paymentRef: session.externalSessionId,
+            paymentReadyAt: new Date(),
+            paymentExpiresAt: expiresAt,
+            status: ProviderOrderStatus.PAYMENT_READY,
+          },
+        });
+
+        return {
+          providerOrderId: providerOrder.id,
+          providerId: providerOrder.providerId,
+          sessionId: session.externalSessionId!,
+        };
+      }),
+    );
+  }
+
+  it('keeps the root order pending until all provider orders are paid, then confirms it', async () => {
     const data = await setupTestData(5, 5);
-    // User buys 2 units of each
     const order = await createTestOrder(data, 2, 2);
+    const [providerA, providerB] = await seedPaymentFixtures(order.id);
 
-    // Expected: Order CONFIRMED
-    const paymentRef = 'PAY_A_' + Date.now();
-    const result: any = await paymentsService.confirmPayment(
-      order.id,
-      paymentRef,
-      'evt_A_' + Date.now(),
+    const firstResult: any = await paymentsService.confirmProviderOrderPayment(
+      providerA.sessionId,
+      `evt_A_${Date.now()}`,
+      'payment_intent.succeeded',
     );
 
-    // Expected: Order CONFIRMED
-    expect(result.status).toBe(DeliveryStatus.CONFIRMED);
+    expect(firstResult.paymentStatus).toBe(ProviderPaymentStatus.PAID);
+    expect(firstResult.status).toBe(DeliveryStatus.PENDING);
 
-    // Verify actual DB State
-    const dbOrder = await prisma.order.findUnique({ where: { id: order.id } });
-    expect(dbOrder!.status).toBe(DeliveryStatus.CONFIRMED);
-    expect(dbOrder!.paymentRef).toBe(paymentRef);
+    const afterFirstOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+    });
+    expect(afterFirstOrder!.status).toBe(DeliveryStatus.PENDING);
 
-    // Verify Stock physically decremented
-    const pA = await prisma.product.findUnique({
+    const firstProviderState = await prisma.providerOrder.findUnique({
+      where: { id: providerA.providerOrderId },
+    });
+    const secondProviderStateBefore = await prisma.providerOrder.findUnique({
+      where: { id: providerB.providerOrderId },
+    });
+    expect(firstProviderState!.paymentStatus).toBe(ProviderPaymentStatus.PAID);
+    expect(firstProviderState!.status).toBe(ProviderOrderStatus.PAID);
+    expect(secondProviderStateBefore!.paymentStatus).toBe(
+      ProviderPaymentStatus.PAYMENT_READY,
+    );
+
+    const stockAfterFirstA = await prisma.product.findUnique({
       where: { id: data.prodA.id },
     });
-    const pB = await prisma.product.findUnique({
+    const stockAfterFirstB = await prisma.product.findUnique({
       where: { id: data.prodB.id },
     });
-    expect(pA!.stock).toBe(3); // 5 - 2
-    expect(pB!.stock).toBe(3); // 5 - 2
+    expect(stockAfterFirstA!.stock).toBe(3);
+    expect(stockAfterFirstB!.stock).toBe(5);
+
+    const secondResult: any = await paymentsService.confirmProviderOrderPayment(
+      providerB.sessionId,
+      `evt_B_${Date.now()}`,
+      'payment_intent.succeeded',
+    );
+
+    expect(secondResult.paymentStatus).toBe(ProviderPaymentStatus.PAID);
+    expect(secondResult.status).toBe(DeliveryStatus.CONFIRMED);
+
+    const finalOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+    });
+    expect(finalOrder!.status).toBe(DeliveryStatus.CONFIRMED);
+
+    const secondProviderState = await prisma.providerOrder.findUnique({
+      where: { id: providerB.providerOrderId },
+    });
+    expect(secondProviderState!.paymentStatus).toBe(ProviderPaymentStatus.PAID);
+    expect(secondProviderState!.status).toBe(ProviderOrderStatus.PAID);
+
+    const finalStockA = await prisma.product.findUnique({
+      where: { id: data.prodA.id },
+    });
+    const finalStockB = await prisma.product.findUnique({
+      where: { id: data.prodB.id },
+    });
+    expect(finalStockA!.stock).toBe(3);
+    expect(finalStockB!.stock).toBe(3);
   });
 
-  it('B) No hay stock → ProviderOrder rechazado + order sigue (Partial failure)', async () => {
-    // Prod A lacks stock (1 available), Prod B has stock (5 available)
-    const data = await setupTestData(1, 5);
-    // User tries to buy 2 units of each
+  it('confirms the root order deterministically when provider confirmations arrive concurrently', async () => {
+    const data = await setupTestData(5, 5);
     const order = await createTestOrder(data, 2, 2);
+    const [providerA, providerB] = await seedPaymentFixtures(order.id);
 
-    const result: any = await paymentsService.confirmPayment(
-      order.id,
-      'PAY_B_' + Date.now(),
-      'evt_B_' + Date.now(),
-    );
+    await Promise.all([
+      paymentsService.confirmProviderOrderPayment(
+        providerA.sessionId,
+        `evt_concurrent_A_${Date.now()}`,
+        'payment_intent.succeeded',
+      ),
+      paymentsService.confirmProviderOrderPayment(
+        providerB.sessionId,
+        `evt_concurrent_B_${Date.now()}`,
+        'payment_intent.succeeded',
+      ),
+    ]);
 
-    // Expected: Order remains CONFIRMED (because at least B survives)
-    expect(result.status).toBe(DeliveryStatus.CONFIRMED);
-
-    // DB Verification
-    const poList = await prisma.providerOrder.findMany({
-      where: { orderId: order.id },
+    const finalOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: {
+        providerOrders: true,
+      },
     });
-    const poA = poList.find((po) => po.providerId === data.provA.id);
-    const poB = poList.find((po) => po.providerId === data.provB.id);
 
-    expect(poA!.status).toBe(ProviderOrderStatus.REJECTED_BY_STORE);
-    expect(poB!.status).toBe(ProviderOrderStatus.PENDING); // PENDING logic wait! Wait, in my code I don't set ProviderOrder to ACCEPTED yet. I just kept them PENDING. Yes, the ProviderOrderStatus remains PENDING until the store manually accepts.
-
-    // Verify Stock: Product A should NOT be decremented. Product B should be decremented.
-    const pA = await prisma.product.findUnique({
-      where: { id: data.prodA.id },
-    });
-    const pB = await prisma.product.findUnique({
-      where: { id: data.prodB.id },
-    });
-    expect(pA!.stock).toBe(1); // Unchanged!
-    expect(pB!.stock).toBe(3); // 5 - 2 = 3
+    expect(finalOrder!.status).toBe(DeliveryStatus.CONFIRMED);
+    expect(
+      finalOrder!.providerOrders.every(
+        (providerOrder) =>
+          providerOrder.paymentStatus === ProviderPaymentStatus.PAID &&
+          providerOrder.status === ProviderOrderStatus.PAID,
+      ),
+    ).toBe(true);
   });
 
-  it('C) Todos rechazados → Order CANCELLED', async () => {
-    // Neither product has enough stock
-    const data = await setupTestData(0, 0);
+  it('consumes reservations exactly once and returns safely on duplicate webhook replay', async () => {
+    const data = await setupTestData(5, 5);
     const order = await createTestOrder(data, 2, 2);
+    const [providerA] = await seedPaymentFixtures(order.id);
 
-    const result: any = await paymentsService.confirmPayment(
-      order.id,
-      'PAY_C_' + Date.now(),
-      'evt_C_' + Date.now(),
+    const eventId = `evt_replay_${Date.now()}`;
+
+    await paymentsService.confirmProviderOrderPayment(
+      providerA.sessionId,
+      eventId,
+      'payment_intent.succeeded',
     );
 
-    expect(result.status).toBe(DeliveryStatus.CANCELLED);
+    const replayResult = await paymentsService.confirmProviderOrderPayment(
+      providerA.sessionId,
+      eventId,
+      'payment_intent.succeeded',
+    );
 
-    // Verify Stock unchanged
-    const pA = await prisma.product.findUnique({
+    expect(replayResult).toEqual({ message: 'Webhook already processed' });
+
+    const stockAfterReplay = await prisma.product.findUnique({
       where: { id: data.prodA.id },
     });
-    const pB = await prisma.product.findUnique({
-      where: { id: data.prodB.id },
+    expect(stockAfterReplay!.stock).toBe(3);
+
+    const reservations = await prisma.stockReservation.findMany({
+      where: { providerOrderId: providerA.providerOrderId },
     });
-    expect(pA!.stock).toBe(0);
-    expect(pB!.stock).toBe(0);
+    expect(
+      reservations.every((reservation) => reservation.status === 'CONSUMED'),
+    ).toBe(true);
   });
 
-  it('D) Concurrencia: dos confirmPayment a la vez no generan overselling', async () => {
-    const data = await setupTestData(1, 10); // Only 1 unit of A available!
+  it('rejects confirmation when the provider order has no active reservations', async () => {
+    const data = await setupTestData(5, 5);
+    const order = await createTestOrder(data, 2, 2);
+    const [providerA] = await seedPaymentFixtures(order.id);
 
-    // Create 2 separate orders wanting 1 unit of A each
-    const order1 = await createTestOrder(data, 1, 1);
-    const order2 = await createTestOrder(data, 1, 1);
+    await prisma.stockReservation.updateMany({
+      where: { providerOrderId: providerA.providerOrderId },
+      data: { status: StockReservationStatus.EXPIRED },
+    });
 
-    // Fire confirmation simultaneously
-    const now = Date.now();
-    const p1 = paymentsService.confirmPayment(
-      order1.id,
-      'PAY_CONCURRENT_1_' + now,
-      'evt_D1_' + now,
+    await expect(
+      paymentsService.confirmProviderOrderPayment(
+        providerA.sessionId,
+        `evt_missing_res_${Date.now()}`,
+        'payment_intent.succeeded',
+      ),
+    ).rejects.toThrow(
+      new ConflictException(
+        'ProviderOrder has no active reservations to consume',
+      ),
     );
-    const p2 = paymentsService.confirmPayment(
-      order2.id,
-      'PAY_CONCURRENT_2_' + now,
-      'evt_D2_' + now,
-    );
 
-    await Promise.allSettled([p1, p2]);
-
-    // Inspect
-    // Promise resolution check if needed
-
-    // Depending on DB isolation and CPU timing, either:
-    // - One fulfills perfectly, the other resolves gracefully with Partial Failure (Product A REJECTED, Product B CONFIRMED).
-    // - Or the second one throws an Error ('Concurrent stock update detected') if phase A passes but phase B blocks.
-    // In our specific schema and Prisma's row lock, the second transaction will either see stock=0 in Phase A (graceful partial reject)
-    // or fail in Phase B (throws error). Both outcomes are safe (No Overselling!).
-
-    // Verify Physical Stock limits are preserved!
-    const pA = await prisma.product.findUnique({
+    const product = await prisma.product.findUnique({
       where: { id: data.prodA.id },
     });
-    // Can be 0 if the checkout completed before the partial rollback, or 1 if it rolled back early. Both mean we did not oversell.
-    expect(pA!.stock).toBeGreaterThanOrEqual(0);
+    expect(product!.stock).toBe(5);
 
-    // And product B (uncontested) should have decremented based on how many promises succeeded Phase B.
-    const pB = await prisma.product.findUnique({
-      where: { id: data.prodB.id },
+    const providerOrder = await prisma.providerOrder.findUnique({
+      where: { id: providerA.providerOrderId },
     });
-    expect(pB!.stock).toBeGreaterThanOrEqual(8);
+    expect(providerOrder!.paymentStatus).toBe(
+      ProviderPaymentStatus.PAYMENT_READY,
+    );
+  });
+
+  it('allows retry of the same webhook event after a failed confirmation', async () => {
+    const data = await setupTestData(5, 5);
+    const order = await createTestOrder(data, 2, 2);
+    const [providerA] = await seedPaymentFixtures(order.id);
+    const eventId = `evt_retry_failed_${Date.now()}`;
+
+    await prisma.stockReservation.updateMany({
+      where: { providerOrderId: providerA.providerOrderId },
+      data: { status: StockReservationStatus.EXPIRED },
+    });
+
+    await expect(
+      paymentsService.confirmProviderOrderPayment(
+        providerA.sessionId,
+        eventId,
+        'payment_intent.succeeded',
+      ),
+    ).rejects.toThrow(
+      new ConflictException(
+        'ProviderOrder has no active reservations to consume',
+      ),
+    );
+
+    const failedWebhookEvent = await prisma.paymentWebhookEvent.findUnique({
+      where: { id: eventId },
+    });
+    expect(failedWebhookEvent!.status).toBe('FAILED');
+
+    const refreshedExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await prisma.stockReservation.updateMany({
+      where: { providerOrderId: providerA.providerOrderId },
+      data: {
+        status: StockReservationStatus.ACTIVE,
+        expiresAt: refreshedExpiresAt,
+      },
+    });
+
+    await prisma.providerOrder.update({
+      where: { id: providerA.providerOrderId },
+      data: {
+        paymentExpiresAt: refreshedExpiresAt,
+      },
+    });
+
+    const retried = await paymentsService.confirmProviderOrderPayment(
+      providerA.sessionId,
+      eventId,
+      'payment_intent.succeeded',
+    );
+
+    expect(retried).toEqual(
+      expect.objectContaining({
+        success: true,
+        providerOrderId: providerA.providerOrderId,
+        paymentStatus: ProviderPaymentStatus.PAID,
+      }),
+    );
+
+    const retriedWebhookEvent = await prisma.paymentWebhookEvent.findUnique({
+      where: { id: eventId },
+    });
+    expect(retriedWebhookEvent!.status).toBe('PROCESSED');
   });
 });

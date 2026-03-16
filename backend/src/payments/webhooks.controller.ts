@@ -86,7 +86,8 @@ export class WebhooksController {
         return res.status(HttpStatus.OK).json({ received: true });
       }
 
-      // Idempotency check: short-circuit duplicate events
+      // Idempotency check: short-circuit only terminally processed events.
+      // FAILED events must remain retryable.
       if (await this.paymentsService.isProcessed(event.id)) {
         this.logger.debug(`Webhook event ${event.id} already processed.`);
         return res.status(HttpStatus.OK).json({ received: true });
@@ -104,10 +105,7 @@ export class WebhooksController {
         );
       } catch (error: any) {
         // Ignore known concurrent errors if already processed successfully by an overlapping webhook
-        if (
-          error.status === 409 ||
-          error.message.includes('Concurrent stock update detected')
-        ) {
+        if (error.message.includes('Concurrent stock update detected')) {
           this.logger.warn(
             `Ignored concurrent retry or conflict for provider payment ${paymentRef}: ${error.message}`,
           );
