@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
 import { PaymentsService } from './payments.service';
-import { HttpStatus } from '@nestjs/common';
+import { ConflictException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 
@@ -197,6 +197,39 @@ describe('WebhooksController', () => {
     expect(
       paymentsServiceMock.confirmProviderOrderPayment,
     ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded');
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+    expect(res.send).toHaveBeenCalledWith(
+      'Error processing payment confirmation',
+    );
+  });
+
+  it('6b. Returns 500 for reservation conflicts so failed events remain retryable', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_124',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_124',
+        },
+      },
+    });
+
+    (
+      paymentsServiceMock.confirmProviderOrderPayment as jest.Mock
+    ).mockRejectedValueOnce(
+      new ConflictException(
+        'ProviderOrder has no active reservations to consume',
+      ),
+    );
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.send).toHaveBeenCalledWith(
       'Error processing payment confirmation',
