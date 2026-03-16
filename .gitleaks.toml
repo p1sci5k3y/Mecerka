@@ -1,0 +1,19 @@
+title = "Mecerka Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allow test files and mock secrets"
+paths = [
+  '''.*\.spec\.ts''',
+  '''.*\.test\.ts''',
+  '''.*__tests__.*'''
+]
+
+regexes = [
+  '''test_secret''',
+  '''mock_secret''',
+  '''dummy_secret''',
+  '''fake_secret'''
+]
