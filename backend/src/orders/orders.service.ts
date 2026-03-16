@@ -347,12 +347,13 @@ export class OrdersService {
         );
         const productIds = [
           ...new Set(requestedItems.map((item) => item.productId)),
-        ];
+        ].sort();
 
         if (productIds.length === 0) {
           throw new BadRequestException('Active cart has no items to checkout');
         }
 
+        // Keep checkout and payment confirmation on the same deterministic lock order.
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
             productIds.map((id) => Prisma.sql`${id}::uuid`),

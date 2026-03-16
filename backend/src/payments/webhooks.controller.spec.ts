@@ -104,15 +104,34 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {
+            orderId: 'order-1',
+            providerOrderId: 'po-1',
+            providerPaymentSessionId: 'session-1',
+          },
         },
       },
+      account: 'acct_provider_1',
     });
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
     expect(
       paymentsServiceMock.confirmProviderOrderPayment,
-    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded');
+    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded', {
+      amount: 2500,
+      amountReceived: 2500,
+      currency: 'eur',
+      accountId: 'acct_provider_1',
+      metadata: {
+        orderId: 'order-1',
+        providerOrderId: 'po-1',
+        providerPaymentSessionId: 'session-1',
+      },
+    });
     expect(logSpy).toHaveBeenCalledWith(
       'Provider payment confirmed via Webhook. Session: pi_123. Status: CONFIRMED',
     );
@@ -135,8 +154,17 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {
+            orderId: 'order-1',
+            providerOrderId: 'po-1',
+            providerPaymentSessionId: 'session-1',
+          },
         },
       },
+      account: 'acct_provider_1',
     });
     (paymentsServiceMock.isProcessed as jest.Mock).mockResolvedValueOnce(true);
 
@@ -183,8 +211,17 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_123',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {
+            orderId: 'order-1',
+            providerOrderId: 'po-1',
+            providerPaymentSessionId: 'session-1',
+          },
         },
       },
+      account: 'acct_provider_1',
     });
 
     // Simulate DB failure or concurrency panic
@@ -196,7 +233,17 @@ describe('WebhooksController', () => {
 
     expect(
       paymentsServiceMock.confirmProviderOrderPayment,
-    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded');
+    ).toHaveBeenCalledWith('pi_123', 'evt_123', 'payment_intent.succeeded', {
+      amount: 2500,
+      amountReceived: 2500,
+      currency: 'eur',
+      accountId: 'acct_provider_1',
+      metadata: {
+        orderId: 'order-1',
+        providerOrderId: 'po-1',
+        providerPaymentSessionId: 'session-1',
+      },
+    });
     expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     expect(res.send).toHaveBeenCalledWith(
       'Error processing payment confirmation',
@@ -216,8 +263,17 @@ describe('WebhooksController', () => {
       data: {
         object: {
           id: 'pi_124',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {
+            orderId: 'order-1',
+            providerOrderId: 'po-1',
+            providerPaymentSessionId: 'session-1',
+          },
         },
       },
+      account: 'acct_provider_1',
     });
 
     (

@@ -22,6 +22,14 @@ import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import * as argon2 from 'argon2';
 
+type PaymentConfirmationPayload = {
+  amount?: number | null;
+  amountReceived?: number | null;
+  currency?: string | null;
+  accountId?: string | null;
+  metadata?: Record<string, string | undefined> | null;
+};
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -29,6 +37,8 @@ export class PaymentsService {
   private static readonly WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
   private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
   private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
+  private static readonly DEFAULT_PROVIDER_ORDER_CURRENCY = 'eur';
+  private static readonly STALE_WEBHOOK_RECEIVED_MS = 5 * 60 * 1000;
   private static readonly FINAL_WEBHOOK_STATUSES = new Set<string>([
     PaymentsService.WEBHOOK_STATUS_PROCESSED,
     PaymentsService.WEBHOOK_STATUS_IGNORED,
@@ -82,17 +92,27 @@ export class PaymentsService {
       return true;
     } catch (error: any) {
       if (error?.code === 'P2002') {
+        const staleBefore = new Date(
+          Date.now() - PaymentsService.STALE_WEBHOOK_RECEIVED_MS,
+        );
         const reclaimed = await (
           this.prisma as any
         ).paymentWebhookEvent.updateMany({
           where: {
             id: eventId,
-            status: PaymentsService.WEBHOOK_STATUS_FAILED,
+            OR: [
+              { status: PaymentsService.WEBHOOK_STATUS_FAILED },
+              {
+                status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
+                receivedAt: { lt: staleBefore },
+              },
+            ],
           },
           data: {
             provider,
             eventType,
             status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
+            receivedAt: new Date(),
             processedAt: null,
           },
         });
@@ -205,6 +225,128 @@ export class PaymentsService {
     return null;
   }
 
+  private normalizeCurrency(value?: string | null) {
+    return value?.trim().toLowerCase() ?? null;
+  }
+
+  private buildProviderPaymentMetadata(
+    orderId: string,
+    providerOrderId: string,
+    providerPaymentSessionId: string,
+  ) {
+    return {
+      orderId,
+      providerOrderId,
+      providerPaymentSessionId,
+    };
+  }
+
+  private async resolveActiveStripePaymentAccountWithinClient(
+    client: any,
+    ownerType: PaymentAccountOwnerType,
+    ownerId: string,
+  ) {
+    const existing = await client.paymentAccount.findFirst({
+      where: {
+        ownerType,
+        ownerId,
+        provider: PaymentAccountProvider.STRIPE,
+        isActive: true,
+      },
+    });
+
+    if (existing) {
+      return existing;
+    }
+
+    const user = await client.user.findUnique({
+      where: { id: ownerId },
+      select: {
+        stripeAccountId: true,
+      },
+    });
+
+    if (!user?.stripeAccountId) {
+      return null;
+    }
+
+    return this.upsertPaymentAccount(
+      ownerType,
+      ownerId,
+      PaymentAccountProvider.STRIPE,
+      user.stripeAccountId,
+    );
+  }
+
+  private validateConfirmedProviderPayment(
+    providerOrder: any,
+    paymentSession: any,
+    expectedStripeAccountId: string,
+    confirmation?: PaymentConfirmationPayload,
+  ) {
+    if (!confirmation) {
+      throw new ConflictException(
+        'Payment confirmation payload is required for provider payment verification',
+      );
+    }
+
+    const expectedAmount = Math.round(
+      Number(providerOrder.subtotalAmount) * 100,
+    );
+    const paidAmount =
+      confirmation.amountReceived ?? confirmation.amount ?? Number.NaN;
+
+    if (!Number.isFinite(paidAmount) || paidAmount !== expectedAmount) {
+      throw new ConflictException(
+        'Payment amount does not match the expected provider order subtotal',
+      );
+    }
+
+    const paidCurrency = this.normalizeCurrency(confirmation.currency);
+    if (paidCurrency !== PaymentsService.DEFAULT_PROVIDER_ORDER_CURRENCY) {
+      throw new ConflictException(
+        'Payment currency does not match the expected provider order currency',
+      );
+    }
+
+    if (!confirmation.accountId) {
+      throw new ConflictException(
+        'Payment account is missing from the confirmed provider payment',
+      );
+    }
+
+    if (confirmation.accountId !== expectedStripeAccountId) {
+      throw new ConflictException(
+        'Payment account does not match the provider connected account',
+      );
+    }
+
+    const metadata = confirmation.metadata ?? {};
+    if (
+      !metadata.orderId ||
+      !metadata.providerOrderId ||
+      !metadata.providerPaymentSessionId
+    ) {
+      throw new ConflictException(
+        'Payment metadata is incomplete for provider payment verification',
+      );
+    }
+
+    if (metadata.orderId !== providerOrder.order.id) {
+      throw new ConflictException('Payment metadata orderId mismatch');
+    }
+
+    if (metadata.providerOrderId !== providerOrder.id) {
+      throw new ConflictException('Payment metadata providerOrderId mismatch');
+    }
+
+    if (metadata.providerPaymentSessionId !== paymentSession.id) {
+      throw new ConflictException(
+        'Payment metadata providerPaymentSessionId mismatch',
+      );
+    }
+  }
+
   async prepareProviderOrderPayment(providerOrderId: string, clientId: string) {
     const now = new Date();
     const eligibleStatuses: ProviderOrderStatus[] = [
@@ -212,8 +354,7 @@ export class PaymentsService {
       ProviderOrderStatus.PAYMENT_PENDING,
       ProviderOrderStatus.PAYMENT_READY,
     ];
-
-    return this.prisma.$transaction(async (tx: any) => {
+    const prepared = await this.prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${providerOrderId}::uuid FOR UPDATE`,
       );
@@ -307,10 +448,12 @@ export class PaymentsService {
           (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
       );
 
-      const paymentAccount = await this.resolveActiveStripePaymentAccount(
-        PaymentAccountOwnerType.PROVIDER,
-        providerOrder.providerId,
-      );
+      const paymentAccount =
+        await this.resolveActiveStripePaymentAccountWithinClient(
+          tx,
+          PaymentAccountOwnerType.PROVIDER,
+          providerOrder.providerId,
+        );
 
       if (!paymentAccount?.isActive) {
         throw new ConflictException(
@@ -319,6 +462,24 @@ export class PaymentsService {
       }
 
       if (activeSession) {
+        const supersededSessionIds = paymentSessions
+          .filter((session) => session.id !== activeSession.id)
+          .map((session) => session.id);
+
+        if (supersededSessionIds.length > 0) {
+          await tx.providerPaymentSession.updateMany({
+            where: {
+              id: { in: supersededSessionIds },
+              status: {
+                in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+              },
+            },
+            data: {
+              status: PaymentSessionStatus.EXPIRED,
+            },
+          });
+        }
+
         const existingIntent = await this.stripe.paymentIntents.retrieve(
           activeSession.externalSessionId,
           {
@@ -343,6 +504,8 @@ export class PaymentsService {
         return {
           providerOrderId: providerOrder.id,
           paymentSessionId: activeSession.id,
+          orderId: providerOrder.order.id,
+          subtotalAmount: providerOrder.subtotalAmount,
           externalSessionId: activeSession.externalSessionId,
           clientSecret: existingIntent.client_secret,
           stripeAccountId: paymentAccount.externalAccountId,
@@ -350,48 +513,39 @@ export class PaymentsService {
           paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
         };
       }
-
-      const intent = await this.stripe.paymentIntents.create(
-        {
-          amount: Math.round(Number(providerOrder.subtotalAmount) * 100),
-          currency: 'eur',
-          automatic_payment_methods: { enabled: true },
-          metadata: {
-            orderId: providerOrder.order.id,
-            providerOrderId: providerOrder.id,
+      await tx.providerPaymentSession.updateMany({
+        where: {
+          providerOrderId: providerOrder.id,
+          status: {
+            in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
           },
         },
-        {
-          stripeAccount: paymentAccount.externalAccountId,
+        data: {
+          status: PaymentSessionStatus.EXPIRED,
         },
-      );
+      });
 
       const session = await tx.providerPaymentSession.create({
         data: {
           providerOrderId: providerOrder.id,
           paymentProvider: PaymentAccountProvider.STRIPE,
-          externalSessionId: intent.id,
+          externalSessionId: null,
           paymentUrl: null,
-          status: PaymentSessionStatus.READY,
+          status: PaymentSessionStatus.CREATED,
           expiresAt: reservationExpiresAt,
-          providerResponsePayload: {
-            stripeAccountId: paymentAccount.externalAccountId,
-            paymentIntentId: intent.id,
-            livemode: Boolean((intent as any).livemode ?? false),
-          },
         } as any,
       });
 
       await tx.providerOrder.update({
         where: { id: providerOrderId },
         data: {
-          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
-          paymentReadyAt: now,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+          paymentReadyAt: null,
           paymentExpiresAt: reservationExpiresAt,
-          paymentRef: intent.id,
+          paymentRef: null,
           status:
             providerOrder.status === ProviderOrderStatus.PENDING
-              ? ProviderOrderStatus.PAYMENT_READY
+              ? ProviderOrderStatus.PAYMENT_PENDING
               : providerOrder.status,
         },
       });
@@ -399,13 +553,174 @@ export class PaymentsService {
       return {
         providerOrderId: providerOrder.id,
         paymentSessionId: session.id,
-        externalSessionId: intent.id,
-        clientSecret: intent.client_secret,
         stripeAccountId: paymentAccount.externalAccountId,
         expiresAt: reservationExpiresAt,
-        paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+        orderId: providerOrder.order.id,
+        subtotalAmount: providerOrder.subtotalAmount,
+        paymentStatus: ProviderPaymentStatus.PENDING,
       };
     });
+
+    const metadata = this.buildProviderPaymentMetadata(
+      prepared.orderId,
+      prepared.providerOrderId,
+      prepared.paymentSessionId,
+    );
+
+    if (prepared.externalSessionId) {
+      return prepared;
+    }
+
+    let intent: Stripe.PaymentIntent;
+    try {
+      intent = await this.stripe.paymentIntents.create(
+        {
+          amount: Math.round(Number(prepared.subtotalAmount) * 100),
+          currency: PaymentsService.DEFAULT_PROVIDER_ORDER_CURRENCY,
+          automatic_payment_methods: { enabled: true },
+          metadata,
+        },
+        {
+          stripeAccount: prepared.stripeAccountId,
+          idempotencyKey: `provider-payment-session:${prepared.paymentSessionId}`,
+        },
+      );
+    } catch (error) {
+      await this.prisma.providerPaymentSession.updateMany({
+        where: {
+          id: prepared.paymentSessionId,
+          status: PaymentSessionStatus.CREATED,
+        },
+        data: {
+          status: PaymentSessionStatus.FAILED,
+        },
+      });
+      await this.prisma.providerOrder.updateMany({
+        where: {
+          id: prepared.providerOrderId,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+        },
+        data: {
+          paymentStatus: ProviderPaymentStatus.PENDING,
+          status: ProviderOrderStatus.PENDING,
+        },
+      });
+      throw error;
+    }
+
+    try {
+      return await this.prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${prepared.providerOrderId}::uuid FOR UPDATE`,
+        );
+
+        const providerOrder = await tx.providerOrder.findUnique({
+          where: { id: prepared.providerOrderId },
+          include: {
+            reservations: {
+              where: {
+                status: 'ACTIVE',
+                expiresAt: { gt: new Date() },
+              },
+              select: {
+                expiresAt: true,
+              },
+            },
+          },
+        });
+
+        if (!providerOrder) {
+          throw new NotFoundException('ProviderOrder not found');
+        }
+
+        if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
+          throw new ConflictException('ProviderOrder is already paid');
+        }
+
+        if (providerOrder.reservations.length === 0) {
+          throw new ConflictException(
+            'ProviderOrder has no active stock reservation for payment',
+          );
+        }
+
+        const session = await tx.providerPaymentSession.findUnique({
+          where: { id: prepared.paymentSessionId },
+        });
+
+        if (!session || session.status !== PaymentSessionStatus.CREATED) {
+          throw new ConflictException(
+            'ProviderPaymentSession is no longer eligible for activation',
+          );
+        }
+
+        const paymentExpiresAt = providerOrder.reservations.reduce(
+          (earliest: Date, reservation: { expiresAt: Date }) =>
+            reservation.expiresAt < earliest ? reservation.expiresAt : earliest,
+          providerOrder.reservations[0].expiresAt,
+        );
+
+        await tx.providerPaymentSession.update({
+          where: { id: prepared.paymentSessionId },
+          data: {
+            externalSessionId: intent.id,
+            paymentUrl: null,
+            status: PaymentSessionStatus.READY,
+            expiresAt: paymentExpiresAt,
+            providerResponsePayload: {
+              stripeAccountId: prepared.stripeAccountId,
+              paymentIntentId: intent.id,
+              livemode: Boolean((intent as any).livemode ?? false),
+              metadata,
+            },
+          } as any,
+        });
+
+        await tx.providerOrder.update({
+          where: { id: prepared.providerOrderId },
+          data: {
+            paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+            paymentReadyAt: new Date(),
+            paymentExpiresAt: paymentExpiresAt,
+            paymentRef: intent.id,
+            status: ProviderOrderStatus.PAYMENT_READY,
+          },
+        });
+
+        return {
+          providerOrderId: prepared.providerOrderId,
+          paymentSessionId: prepared.paymentSessionId,
+          externalSessionId: intent.id,
+          clientSecret: intent.client_secret,
+          stripeAccountId: prepared.stripeAccountId,
+          expiresAt: paymentExpiresAt,
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+        };
+      });
+    } catch (error) {
+      try {
+        await this.stripe.paymentIntents.cancel(intent.id, {
+          stripeAccount: prepared.stripeAccountId,
+        });
+      } catch {
+        this.logger.warn(
+          `Failed to cancel orphaned provider payment intent ${intent.id}`,
+        );
+      }
+
+      await this.prisma.providerPaymentSession.updateMany({
+        where: {
+          id: prepared.paymentSessionId,
+          status: {
+            in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+          },
+        },
+        data: {
+          status: PaymentSessionStatus.FAILED,
+        },
+      });
+
+      throw error;
+    }
   }
   /**
    * Generates a Stripe Onboarding Link for Providers/Runners.
@@ -496,9 +811,9 @@ export class PaymentsService {
   }
 
   /**
-   * Creates a Stripe Payment Intent using Direct Charges (Zero-Liability).
+   * Prepares a provider-owned Stripe Payment Intent using a connected account.
    * The charge is created directly on the Provider's Stripe Account.
-   * Mecerka routes the runner's cut through the application_fee_amount, then transfers it out.
+   * The platform does not split, hold, transfer, or settle funds internally.
    */
   async createTripartitePaymentIntent(orderId: string, clientId: string) {
     const order = await this.prisma.order.findUnique({
@@ -523,10 +838,19 @@ export class PaymentsService {
   }
 
   /**
-   * Processes a "Cash on Delivery" or "Al Contado" payment.
-   * Skips Stripe entirely but marks the order securely and returns the 50/50 ledger breakdown.
+   * Legacy offline cash flow.
+   * This path is disabled by default because it does not follow the provider
+   * payment-session boundary used by the marketplace payment model.
    */
   async processCashPayment(orderId: string, clientId: string, pin: string) {
+    if (
+      this.configService.get<string>('ENABLE_LEGACY_CASH_PAYMENTS') !== 'true'
+    ) {
+      throw new ConflictException(
+        'Legacy cash payments are disabled. Use provider payment sessions instead.',
+      );
+    }
+
     if (!pin) {
       throw new BadRequestException(
         'El PIN es requerido para pagos en efectivo',
@@ -559,7 +883,7 @@ export class PaymentsService {
     const po = order.providerOrders[0];
     if (!po) throw new ConflictException('Order has no provider items');
 
-    // Calculate logistics split for ledger
+    // Calculate the offline payment breakdown for the legacy response payload.
     const productsTotalCents = po.items.reduce(
       (acc, item) =>
         acc + Math.round(Number(item.priceAtPurchase) * 100) * item.quantity,
@@ -648,6 +972,7 @@ export class PaymentsService {
     externalSessionId: string,
     eventId: string,
     eventType: string,
+    confirmation?: PaymentConfirmationPayload,
   ) {
     const claimed = await this.claimWebhookEvent(eventId, 'STRIPE', eventType);
     if (!claimed) {
@@ -671,21 +996,30 @@ export class PaymentsService {
           throw new NotFoundException('Payment session not found');
         }
 
+        if (
+          paymentSession.status === PaymentSessionStatus.EXPIRED ||
+          paymentSession.status === PaymentSessionStatus.FAILED
+        ) {
+          throw new ConflictException(
+            'Inactive payment session cannot be confirmed',
+          );
+        }
+
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "StockReservation" WHERE "providerOrderId" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
         );
 
         const providerOrder = await tx.providerOrder.findUnique({
           where: { id: paymentSession.providerOrderId },
           include: {
             order: {
-              include: {
-                providerOrders: {
-                  select: {
-                    id: true,
-                    paymentStatus: true,
-                  },
-                },
+              select: {
+                id: true,
+                status: true,
               },
             },
             reservations: {
@@ -703,6 +1037,15 @@ export class PaymentsService {
 
         if (!providerOrder) {
           throw new NotFoundException('ProviderOrder not found');
+        }
+
+        if (
+          providerOrder.paymentRef &&
+          providerOrder.paymentRef !== externalSessionId
+        ) {
+          throw new ConflictException(
+            'Superseded payment session cannot be confirmed',
+          );
         }
 
         if (paymentSession.status === PaymentSessionStatus.COMPLETED) {
@@ -736,6 +1079,26 @@ export class PaymentsService {
           );
         }
 
+        const paymentAccount =
+          await this.resolveActiveStripePaymentAccountWithinClient(
+            tx,
+            PaymentAccountOwnerType.PROVIDER,
+            providerOrder.providerId,
+          );
+
+        if (!paymentAccount?.externalAccountId) {
+          throw new ConflictException(
+            'Provider payment account is not active for this provider order',
+          );
+        }
+
+        this.validateConfirmedProviderPayment(
+          providerOrder,
+          paymentSession,
+          paymentAccount.externalAccountId,
+          confirmation,
+        );
+
         await tx.$executeRaw(
           Prisma.sql`SELECT 1 FROM "Order" WHERE "id" = ${providerOrder.order.id}::uuid FOR UPDATE`,
         );
@@ -754,6 +1117,29 @@ export class PaymentsService {
           )}) FOR UPDATE`,
         );
 
+        const reservationIds = providerOrder.reservations.map(
+          (reservation: any) => reservation.id,
+        );
+
+        const consumedReservations = await tx.stockReservation.updateMany({
+          where: {
+            id: {
+              in: reservationIds,
+            },
+            providerOrderId: providerOrder.id,
+            status: 'ACTIVE',
+          },
+          data: {
+            status: 'CONSUMED',
+          },
+        });
+
+        if (consumedReservations.count !== reservationIds.length) {
+          throw new ConflictException(
+            'Reservations changed during payment confirmation',
+          );
+        }
+
         for (const reservation of providerOrder.reservations) {
           const updated = await tx.product.updateMany({
             where: {
@@ -771,16 +1157,6 @@ export class PaymentsService {
             );
           }
         }
-
-        await tx.stockReservation.updateMany({
-          where: {
-            providerOrderId: providerOrder.id,
-            status: 'ACTIVE',
-          },
-          data: {
-            status: 'CONSUMED',
-          },
-        });
 
         await tx.providerPaymentSession.update({
           where: { id: paymentSession.id },
@@ -917,10 +1293,108 @@ export class PaymentsService {
       );
     }
 
-    return this.confirmProviderOrderPayment(
-      paymentRef,
-      eventId,
-      'payment_intent.succeeded',
+    this.logger.warn(
+      `Deprecated confirmPayment(orderId=..., paymentRef=...) wrapper invoked for order ${orderId}`,
     );
+
+    void paymentRef;
+    throw new ConflictException(
+      'Legacy payment confirmation wrapper is disabled. Use verified provider webhook confirmation instead.',
+    );
+  }
+
+  async findPaymentReconciliationIssues(now = new Date()) {
+    const staleBefore = new Date(
+      now.getTime() - PaymentsService.STALE_WEBHOOK_RECEIVED_MS,
+    );
+
+    const [
+      paidProviderOrdersPendingRootOrders,
+      activeSessionsWithExpiredReservations,
+      staleReceivedWebhookEvents,
+      openSessions,
+    ] = await Promise.all([
+      this.prisma.providerOrder.findMany({
+        where: {
+          paymentStatus: ProviderPaymentStatus.PAID,
+          order: {
+            status: DeliveryStatus.PENDING,
+          },
+        },
+        select: {
+          id: true,
+          orderId: true,
+        },
+      }),
+      this.prisma.providerOrder.findMany({
+        where: {
+          paymentStatus: {
+            in: [
+              ProviderPaymentStatus.PENDING,
+              ProviderPaymentStatus.PAYMENT_READY,
+            ],
+          },
+          paymentSessions: {
+            some: {
+              status: {
+                in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+              },
+            },
+          },
+          reservations: {
+            some: {
+              status: 'EXPIRED',
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderId: true,
+        },
+      }),
+      (this.prisma as any).paymentWebhookEvent.findMany({
+        where: {
+          status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
+          receivedAt: { lt: staleBefore },
+        },
+        select: {
+          id: true,
+          eventType: true,
+          receivedAt: true,
+        },
+      }),
+      this.prisma.providerPaymentSession.findMany({
+        where: {
+          status: {
+            in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+          },
+        },
+        select: {
+          providerOrderId: true,
+        },
+      }),
+    ]);
+
+    const multipleOpenSessions = Array.from(
+      openSessions.reduce((counts, session) => {
+        counts.set(
+          session.providerOrderId,
+          (counts.get(session.providerOrderId) ?? 0) + 1,
+        );
+        return counts;
+      }, new Map<string, number>()),
+    )
+      .filter(([, openSessionCount]) => openSessionCount > 1)
+      .map(([providerOrderId, openSessionCount]) => ({
+        providerOrderId,
+        openSessionCount,
+      }));
+
+    return {
+      paidProviderOrdersPendingRootOrders,
+      activeSessionsWithExpiredReservations,
+      staleReceivedWebhookEvents,
+      multipleOpenSessions,
+    };
   }
 }
