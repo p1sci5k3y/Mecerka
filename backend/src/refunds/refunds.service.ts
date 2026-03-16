@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -14,11 +15,14 @@ import {
   PaymentAccountProvider,
   Prisma,
   ProviderPaymentStatus,
+  RiskActorType,
+  RiskCategory,
   Role,
   RunnerPaymentStatus,
 } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { RiskService } from '../risk/risk.service';
 import { RequestRefundDto } from './dto/request-refund.dto';
 import {
   RefundStatusValue,
@@ -63,6 +67,7 @@ export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Optional() private readonly riskService?: RiskService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
@@ -93,6 +98,35 @@ export class RefundsService {
       reviewedAt: refund.reviewedAt ?? null,
       completedAt: refund.completedAt ?? null,
     };
+  }
+
+  private async emitRiskEvent(
+    actorType: RiskActorType,
+    actorId: string,
+    category: RiskCategory,
+    score: number,
+    dedupKey: string,
+    metadata?: Record<string, string | number | boolean>,
+  ) {
+    if (!this.riskService) {
+      return;
+    }
+
+    try {
+      await this.riskService.recordRiskEvent({
+        actorType,
+        actorId,
+        category,
+        score,
+        dedupKey,
+        metadata,
+      });
+      await this.riskService.recalculateRiskScore(actorType, actorId);
+    } catch (error: any) {
+      this.logger.warn(
+        `risk.refund.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+      );
+    }
   }
 
   private ensureSingleBoundary(dto: RequestRefundDto) {
@@ -476,7 +510,7 @@ export class RefundsService {
     const currency = this.normalizeCurrency(dto.currency);
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx: any) => {
+    const result = await this.prisma.$transaction(async (tx: any) => {
       const boundary = await this.resolveBoundaryForRequest(tx, dto);
       this.assertRequestAccess(boundary, userId, roles);
       this.assertBoundaryPaid(boundary);
@@ -521,6 +555,29 @@ export class RefundsService {
 
       return this.sanitizeRefund(refund);
     });
+
+    if (roles.includes(Role.CLIENT) && !roles.includes(Role.ADMIN)) {
+      const dedupKey = `refund-abuse:${result.id}`;
+      const boundaryId = result.providerOrderId ?? result.deliveryOrderId;
+
+      await this.emitRiskEvent(
+        RiskActorType.CLIENT,
+        userId,
+        RiskCategory.CLIENT_REFUND_ABUSE,
+        12,
+        dedupKey,
+        boundaryId
+          ? {
+              refundRequestId: result.id,
+              boundaryId,
+            }
+          : {
+              refundRequestId: result.id,
+            },
+      );
+    }
+
+    return result;
   }
 
   async getRefund(refundRequestId: string, userId: string, roles: Role[]) {
