@@ -5,6 +5,8 @@ import {
   UnauthorizedException,
   ForbiddenException,
   ConflictException,
+  Logger,
+  Optional,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -15,6 +17,8 @@ import {
   PaymentSessionStatus,
   ProviderPaymentStatus,
   Prisma,
+  RiskActorType,
+  RiskCategory,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
 import {
@@ -22,15 +26,48 @@ import {
   canTransitionProviderOrder,
 } from './utils/state-machine';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RiskService } from '../risk/risk.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly riskService?: RiskService,
   ) {}
 
   private readonly providerPaymentProvider = 'internal-mvp';
+
+  private async emitRiskEvent(
+    actorType: RiskActorType,
+    actorId: string,
+    category: RiskCategory,
+    score: number,
+    dedupKey: string,
+    metadata?: Record<string, string | number | boolean>,
+  ) {
+    if (!this.riskService) {
+      return;
+    }
+
+    try {
+      await this.riskService.recordRiskEvent({
+        actorType,
+        actorId,
+        category,
+        score,
+        dedupKey,
+        metadata,
+      });
+      await this.riskService.recalculateRiskScore(actorType, actorId);
+    } catch (error: any) {
+      this.logger.warn(
+        `risk.orders.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+      );
+    }
+  }
 
   private buildProviderPaymentUrl(providerOrderId: string, sessionId: string) {
     return `/provider-orders/${providerOrderId}/payment-sessions/${sessionId}`;
@@ -977,9 +1014,30 @@ export class OrdersService {
       }
     }
 
-    return this.prisma.providerOrder.findUnique({
+    const finalProviderOrder = await this.prisma.providerOrder.findUnique({
       where: { id: providerOrderId },
     });
+
+    if (
+      finalProviderOrder &&
+      actingRole === Role.PROVIDER &&
+      (status === ProviderOrderStatus.REJECTED_BY_STORE ||
+        status === ProviderOrderStatus.CANCELLED)
+    ) {
+      await this.emitRiskEvent(
+        RiskActorType.PROVIDER,
+        userId,
+        RiskCategory.PROVIDER_REJECTION_SPIKE,
+        status === ProviderOrderStatus.REJECTED_BY_STORE ? 12 : 10,
+        `provider-cancel:${providerOrderId}:${status}`,
+        {
+          providerOrderId,
+          status,
+        },
+      );
+    }
+
+    return finalProviderOrder;
   }
 
   async getAvailableOrders() {
