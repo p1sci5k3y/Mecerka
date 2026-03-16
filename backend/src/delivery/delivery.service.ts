@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -16,11 +17,14 @@ import {
   PaymentAccountProvider,
   PaymentSessionStatus,
   Prisma,
+  RiskActorType,
+  RiskCategory,
   Role,
   RunnerPaymentStatus,
 } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { RiskService } from '../risk/risk.service';
 import { AssignDeliveryRunnerDto } from './dto/assign-delivery-runner.dto';
 import { ConfirmDeliveryDto } from './dto/confirm-delivery.dto';
 import {
@@ -45,7 +49,49 @@ export class DeliveryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Optional() private readonly riskService?: RiskService,
   ) {}
+
+  private getJobGrabbingWindowMs() {
+    return 5 * 60 * 1000;
+  }
+
+  private getJobGrabbingThreshold() {
+    return 5;
+  }
+
+  private buildWindowKey(now: Date, windowMs: number) {
+    return Math.floor(now.getTime() / windowMs).toString();
+  }
+
+  private async emitRiskEvent(
+    actorType: RiskActorType,
+    actorId: string,
+    category: RiskCategory,
+    score: number,
+    dedupKey: string,
+    metadata?: Record<string, string | number | boolean>,
+  ) {
+    if (!this.riskService) {
+      return;
+    }
+
+    try {
+      await this.riskService.recordRiskEvent({
+        actorType,
+        actorId,
+        category,
+        score,
+        dedupKey,
+        metadata,
+      });
+      await this.riskService.recalculateRiskScore(actorType, actorId);
+    } catch (error: any) {
+      this.logger.warn(
+        `risk.delivery.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+      );
+    }
+  }
 
   private getDispatchWindowMs() {
     const configured = Number(
@@ -1059,7 +1105,15 @@ export class DeliveryService {
         const session = await tx.runnerPaymentSession.findUnique({
           where: { externalSessionId },
           include: {
-            deliveryOrder: true,
+            deliveryOrder: {
+              include: {
+                order: {
+                  select: {
+                    clientId: true,
+                  },
+                },
+              },
+            },
           },
         });
 
@@ -1177,6 +1231,7 @@ export class DeliveryService {
           deliveryOrderId: session.deliveryOrderId,
           status: session.deliveryOrder.status,
           paymentStatus: RunnerPaymentStatus.FAILED,
+          clientId: session.deliveryOrder.order.clientId,
         };
       });
 
@@ -1187,6 +1242,19 @@ export class DeliveryService {
             ? DeliveryService.WEBHOOK_STATUS_IGNORED
             : DeliveryService.WEBHOOK_STATUS_PROCESSED,
           new Date(),
+        );
+      }
+
+      if ('clientId' in result && result.clientId) {
+        await this.emitRiskEvent(
+          RiskActorType.CLIENT,
+          result.clientId,
+          RiskCategory.PAYMENT_FAILURE_PATTERN,
+          10,
+          `runner-payment-failed:${result.deliveryOrderId}`,
+          {
+            deliveryOrderId: result.deliveryOrderId,
+          },
         );
       }
 
@@ -1279,7 +1347,7 @@ export class DeliveryService {
   async acceptDeliveryJob(jobId: string, runnerId: string) {
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx: any) => {
+    const result = await this.prisma.$transaction(async (tx: any) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 1 FROM "DeliveryJob" WHERE "id" = ${jobId}::uuid FOR UPDATE`,
       );
@@ -1395,6 +1463,38 @@ export class DeliveryService {
         status: DeliveryJobStatus.ASSIGNED,
       };
     });
+
+    const windowMs = this.getJobGrabbingWindowMs();
+    const deliveryJobClaimClient = (this.prisma as any).deliveryJobClaim;
+    const recentClaims =
+      typeof deliveryJobClaimClient?.count === 'function'
+        ? await deliveryJobClaimClient.count({
+            where: {
+              runnerId,
+              createdAt: {
+                gte: new Date(now.getTime() - windowMs),
+              },
+            },
+          })
+        : 0;
+
+    if (recentClaims >= this.getJobGrabbingThreshold()) {
+      const windowKey = this.buildWindowKey(now, windowMs);
+      await this.emitRiskEvent(
+        RiskActorType.RUNNER,
+        runnerId,
+        RiskCategory.RUNNER_JOB_GRABBING,
+        Math.min(recentClaims * 3, 20),
+        `job-grabbing:${runnerId}:${windowKey}`,
+        {
+          deliveryOrderId: result.deliveryOrderId,
+          claimCount: recentClaims,
+          windowKey,
+        },
+      );
+    }
+
+    return result;
   }
 
   async expireDeliveryJobs(now = new Date()) {
@@ -1423,108 +1523,132 @@ export class DeliveryService {
   ) {
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx: any) => {
-      await tx.$executeRaw(
-        Prisma.sql`SELECT 1 FROM "DeliveryOrder" WHERE "id" = ${deliveryOrderId}::uuid FOR UPDATE`,
-      );
-
-      const deliveryOrder = await tx.deliveryOrder.findUnique({
-        where: { id: deliveryOrderId },
-      });
-
-      if (!deliveryOrder) {
-        throw new NotFoundException('DeliveryOrder not found');
-      }
-
-      await this.validateAssignedRunnerForLifecycle(
-        tx,
-        deliveryOrder,
-        userId,
-        roles,
-      );
-
-      if (!this.isTrackingActiveStatus(deliveryOrder.status)) {
-        throw new ConflictException(
-          'Runner location updates are not allowed for the current delivery status',
-        );
-      }
-
-      const latestRunnerLocation = await tx.runnerLocation.findFirst({
-        where: {
-          runnerId: userId,
-        },
-        orderBy: {
-          recordedAt: 'desc',
-        },
-      });
-
-      if (
-        latestRunnerLocation?.recordedAt instanceof Date &&
-        now.getTime() - latestRunnerLocation.recordedAt.getTime() <
-          this.getLocationUpdateIntervalMs()
-      ) {
-        throw new ConflictException('Runner location updates are too frequent');
-      }
-
-      if (
-        deliveryOrder.lastLocationUpdateAt instanceof Date &&
-        now.getTime() - deliveryOrder.lastLocationUpdateAt.getTime() <
-          this.getLocationUpdateIntervalMs() &&
-        deliveryOrder.lastRunnerLocationLat != null &&
-        deliveryOrder.lastRunnerLocationLng != null
-      ) {
-        const jumpMeters = this.calculateDistanceMeters(
-          deliveryOrder.lastRunnerLocationLat,
-          deliveryOrder.lastRunnerLocationLng,
-          dto.latitude,
-          dto.longitude,
+    try {
+      return await this.prisma.$transaction(async (tx: any) => {
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "DeliveryOrder" WHERE "id" = ${deliveryOrderId}::uuid FOR UPDATE`,
         );
 
-        if (jumpMeters > this.getMaximumLocationJumpMeters()) {
+        const deliveryOrder = await tx.deliveryOrder.findUnique({
+          where: { id: deliveryOrderId },
+        });
+
+        if (!deliveryOrder) {
+          throw new NotFoundException('DeliveryOrder not found');
+        }
+
+        await this.validateAssignedRunnerForLifecycle(
+          tx,
+          deliveryOrder,
+          userId,
+          roles,
+        );
+
+        if (!this.isTrackingActiveStatus(deliveryOrder.status)) {
           throw new ConflictException(
-            'Runner location jump exceeds allowed threshold',
+            'Runner location updates are not allowed for the current delivery status',
           );
         }
-      }
 
+        const latestRunnerLocation = await tx.runnerLocation.findFirst({
+          where: {
+            runnerId: userId,
+          },
+          orderBy: {
+            recordedAt: 'desc',
+          },
+        });
+
+        if (
+          latestRunnerLocation?.recordedAt instanceof Date &&
+          now.getTime() - latestRunnerLocation.recordedAt.getTime() <
+            this.getLocationUpdateIntervalMs()
+        ) {
+          throw new ConflictException(
+            'Runner location updates are too frequent',
+          );
+        }
+
+        if (
+          deliveryOrder.lastLocationUpdateAt instanceof Date &&
+          now.getTime() - deliveryOrder.lastLocationUpdateAt.getTime() <
+            this.getLocationUpdateIntervalMs() &&
+          deliveryOrder.lastRunnerLocationLat != null &&
+          deliveryOrder.lastRunnerLocationLng != null
+        ) {
+          const jumpMeters = this.calculateDistanceMeters(
+            deliveryOrder.lastRunnerLocationLat,
+            deliveryOrder.lastRunnerLocationLng,
+            dto.latitude,
+            dto.longitude,
+          );
+
+          if (jumpMeters > this.getMaximumLocationJumpMeters()) {
+            throw new ConflictException(
+              'Runner location jump exceeds allowed threshold',
+            );
+          }
+        }
+
+        if (
+          deliveryOrder.lastLocationUpdateAt instanceof Date &&
+          now.getTime() - deliveryOrder.lastLocationUpdateAt.getTime() <
+            this.getLocationUpdateIntervalMs()
+        ) {
+          throw new ConflictException(
+            'Runner location updates are too frequent',
+          );
+        }
+
+        await tx.runnerLocation.create({
+          data: {
+            runnerId: userId,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            recordedAt: now,
+          },
+        });
+
+        const updated = await tx.deliveryOrder.update({
+          where: { id: deliveryOrderId },
+          data: {
+            lastRunnerLocationLat: dto.latitude,
+            lastRunnerLocationLng: dto.longitude,
+            lastLocationUpdateAt: now,
+          },
+        });
+
+        this.logger.log(
+          `Runner location updated: deliveryOrder=${deliveryOrderId} runner=${userId} recordedAt=${now.toISOString()}`,
+        );
+        this.logger.log(
+          `tracking.${deliveryOrder.lastLocationUpdateAt ? 'updated' : 'started'} deliveryOrder=${deliveryOrderId} runner=${userId} timestamp=${now.toISOString()}`,
+        );
+
+        return {
+          deliveryOrderId: updated.id,
+          lastLocationUpdateAt: updated.lastLocationUpdateAt,
+        };
+      });
+    } catch (error: any) {
       if (
-        deliveryOrder.lastLocationUpdateAt instanceof Date &&
-        now.getTime() - deliveryOrder.lastLocationUpdateAt.getTime() <
-          this.getLocationUpdateIntervalMs()
+        error instanceof ConflictException &&
+        error.message === 'Runner location jump exceeds allowed threshold'
       ) {
-        throw new ConflictException('Runner location updates are too frequent');
+        await this.emitRiskEvent(
+          RiskActorType.RUNNER,
+          userId,
+          RiskCategory.RUNNER_GPS_ANOMALY,
+          20,
+          `gps-anomaly:${deliveryOrderId}`,
+          {
+            deliveryOrderId,
+          },
+        );
       }
 
-      await tx.runnerLocation.create({
-        data: {
-          runnerId: userId,
-          latitude: dto.latitude,
-          longitude: dto.longitude,
-          recordedAt: now,
-        },
-      });
-
-      const updated = await tx.deliveryOrder.update({
-        where: { id: deliveryOrderId },
-        data: {
-          lastRunnerLocationLat: dto.latitude,
-          lastRunnerLocationLng: dto.longitude,
-          lastLocationUpdateAt: now,
-        },
-      });
-
-      this.logger.log(
-        `Runner location updated: deliveryOrder=${deliveryOrderId} runner=${userId} recordedAt=${now.toISOString()}`,
-      );
-      this.logger.log(
-        `tracking.${deliveryOrder.lastLocationUpdateAt ? 'updated' : 'started'} deliveryOrder=${deliveryOrderId} runner=${userId} timestamp=${now.toISOString()}`,
-      );
-
-      return {
-        deliveryOrderId: updated.id,
-        lastLocationUpdateAt: updated.lastLocationUpdateAt,
-      };
-    });
+      throw error;
+    }
   }
 
   async getDeliveryTracking(
@@ -1613,7 +1737,7 @@ export class DeliveryService {
     const now = new Date();
     const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    return this.prisma.$transaction(async (tx: any) => {
+    const result = await this.prisma.$transaction(async (tx: any) => {
       const deliveryOrder = await tx.deliveryOrder.findUnique({
         where: { id: dto.deliveryOrderId },
         include: {
@@ -1686,8 +1810,65 @@ export class DeliveryService {
         `incident.created incident=${incident.id} deliveryOrder=${incident.deliveryOrderId} actor=${userId} timestamp=${now.toISOString()}`,
       );
 
-      return this.sanitizeIncident(incident);
+      return {
+        incident: this.sanitizeIncident(incident),
+        reporterRole,
+        runnerId: deliveryOrder.runnerId ?? null,
+      };
     });
+
+    if (
+      result.reporterRole === IncidentReporterRoleValues.CLIENT &&
+      roles.includes(Role.CLIENT)
+    ) {
+      await this.emitRiskEvent(
+        RiskActorType.CLIENT,
+        userId,
+        RiskCategory.CLIENT_INCIDENT_ABUSE,
+        10,
+        `incident:${result.incident.id}`,
+        {
+          incidentId: result.incident.id,
+          deliveryOrderId: result.incident.deliveryOrderId,
+        },
+      );
+    } else if (
+      result.reporterRole === IncidentReporterRoleValues.RUNNER ||
+      result.reporterRole === IncidentReporterRoleValues.PROVIDER
+    ) {
+      const actorType =
+        result.reporterRole === IncidentReporterRoleValues.RUNNER
+          ? RiskActorType.RUNNER
+          : RiskActorType.PROVIDER;
+
+      await this.emitRiskEvent(
+        actorType,
+        userId,
+        RiskCategory.EXCESSIVE_INCIDENTS,
+        8,
+        `incident:${result.incident.id}`,
+        {
+          incidentId: result.incident.id,
+          deliveryOrderId: result.incident.deliveryOrderId,
+        },
+      );
+    }
+
+    if (dto.type === 'FAILED_DELIVERY' && result.runnerId) {
+      await this.emitRiskEvent(
+        RiskActorType.RUNNER,
+        result.runnerId,
+        RiskCategory.DELIVERY_FAILURE_PATTERN,
+        15,
+        `delivery-failure:${result.incident.id}`,
+        {
+          incidentId: result.incident.id,
+          deliveryOrderId: result.incident.deliveryOrderId,
+        },
+      );
+    }
+
+    return result.incident;
   }
 
   async getIncident(incidentId: string, userId: string, roles: Role[]) {
