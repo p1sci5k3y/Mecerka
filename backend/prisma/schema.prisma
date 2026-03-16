@@ -167,6 +167,35 @@ enum RefundStatus {
   FAILED
 }
 
+enum RiskActorType {
+  CLIENT
+  PROVIDER
+  RUNNER
+  ORDER
+  DELIVERY_ORDER
+}
+
+enum RiskCategory {
+  EXCESSIVE_REFUNDS
+  EXCESSIVE_INCIDENTS
+  EXCESSIVE_CANCELLATIONS
+  RUNNER_GPS_ANOMALY
+  RUNNER_JOB_GRABBING
+  PROVIDER_REJECTION_SPIKE
+  CLIENT_REFUND_ABUSE
+  CLIENT_INCIDENT_ABUSE
+  DELIVERY_FAILURE_PATTERN
+  PAYMENT_FAILURE_PATTERN
+  OTHER
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
 model User {
   id                         String    @id @default(uuid()) @db.Uuid
   email                      String    @unique
@@ -497,6 +526,33 @@ model PaymentWebhookEvent {
 
   @@index([provider, eventType, receivedAt])
   @@index([status, receivedAt])
+}
+
+model RiskEvent {
+  id        String        @id @default(uuid()) @db.Uuid
+  actorType RiskActorType
+  actorId   String        @db.Uuid
+  category  RiskCategory
+  score     Int
+  metadata  Json?
+  dedupKey  String?       @unique
+  createdAt DateTime      @default(now())
+
+  @@index([actorType, actorId])
+  @@index([category, createdAt])
+  @@index([createdAt])
+}
+
+model RiskScoreSnapshot {
+  id        String        @id @default(uuid()) @db.Uuid
+  actorType RiskActorType
+  actorId   String        @db.Uuid
+  score     Int
+  level     RiskLevel
+  updatedAt DateTime      @updatedAt
+
+  @@unique([actorType, actorId])
+  @@index([level])
 }
 
 model PlatformDonation {

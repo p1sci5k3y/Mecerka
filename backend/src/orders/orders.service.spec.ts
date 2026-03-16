@@ -515,6 +515,115 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         service.checkoutFromCart('client-1', 'idem-stock'),
       ).rejects.toThrow('STOCK_UNAVAILABLE');
     });
+
+    it('locks checkout products in deterministic sorted order', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 30,
+            items: [
+              {
+                productId: 'product-b',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 10,
+              },
+              {
+                productId: 'product-a',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 20,
+              },
+            ],
+          },
+        ],
+      });
+
+      const executeRaw = jest.fn();
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: executeRaw,
+          product: {
+            findMany: jest.fn().mockResolvedValue([
+              { id: 'product-a', stock: 5 },
+              { id: 'product-b', stock: 5 },
+            ]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({ count: 2 }),
+          },
+          order: {
+            create: jest.fn().mockResolvedValue({
+              id: 'ord-new',
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  items: [
+                    {
+                      productId: 'product-b',
+                      quantity: 1,
+                      priceAtPurchase: 10,
+                    },
+                    {
+                      productId: 'product-a',
+                      quantity: 1,
+                      priceAtPurchase: 20,
+                    },
+                  ],
+                },
+              ],
+            }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue({
+              id: 'ord-new',
+              clientId: 'client-1',
+              summaryDocument: {
+                id: 'summary-1',
+                orderId: 'ord-new',
+                displayNumber: 'SUM-ORD-NEW',
+                totalAmount: 30,
+                currency: 'EUR',
+              },
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  items: [
+                    {
+                      productId: 'product-b',
+                      quantity: 1,
+                      priceAtPurchase: 10,
+                    },
+                    {
+                      productId: 'product-a',
+                      quantity: 1,
+                      priceAtPurchase: 20,
+                    },
+                  ],
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                },
+              ],
+            }),
+          },
+          orderSummaryDocument: {
+            create: jest.fn().mockResolvedValue({ id: 'summary-1' }),
+          },
+          cartGroup: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        }),
+      );
+
+      await service.checkoutFromCart('client-1', 'idem-lock-order');
+
+      const sql = executeRaw.mock.calls[0]?.[0];
+      expect(sql.values).toEqual(['product-a', 'product-b']);
+    });
   });
 
   describe('ProviderOrder payment sessions', () => {

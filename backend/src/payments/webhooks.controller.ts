@@ -94,11 +94,31 @@ export class WebhooksController {
       }
 
       try {
+        const paymentConfirmation = {
+          amount:
+            typeof paymentIntent.amount === 'number'
+              ? paymentIntent.amount
+              : null,
+          amountReceived:
+            typeof paymentIntent.amount_received === 'number'
+              ? paymentIntent.amount_received
+              : null,
+          currency:
+            typeof paymentIntent.currency === 'string'
+              ? paymentIntent.currency
+              : null,
+          accountId: typeof event.account === 'string' ? event.account : null,
+          metadata:
+            paymentIntent.metadata && typeof paymentIntent.metadata === 'object'
+              ? paymentIntent.metadata
+              : null,
+        };
         const result: any =
           await this.paymentsService.confirmProviderOrderPayment(
             paymentRef,
             event.id,
             event.type,
+            paymentConfirmation,
           );
         this.logger.log(
           `Provider payment confirmed via Webhook. Session: ${paymentRef}. Status: ${result.status}`,
