@@ -71,6 +71,7 @@ describe('OrdersService - Provider Payment Domain', () => {
         password: 'pass',
         name: 'Prov A',
         roles: { set: [Role.PROVIDER] },
+        stripeAccountId: `acct_provider_a_${rand}`,
       },
     });
 
@@ -80,6 +81,7 @@ describe('OrdersService - Provider Payment Domain', () => {
         password: 'pass',
         name: 'Prov B',
         roles: { set: [Role.PROVIDER] },
+        stripeAccountId: `acct_provider_b_${rand}`,
       },
     });
 
@@ -211,10 +213,31 @@ describe('OrdersService - Provider Payment Domain', () => {
         return {
           providerOrderId: providerOrder.id,
           providerId: providerOrder.providerId,
+          paymentSessionId: session.id,
           sessionId: session.externalSessionId!,
         };
       }),
     );
+  }
+
+  function buildConfirmationPayload(
+    orderId: string,
+    providerOrderId: string,
+    providerPaymentSessionId: string,
+    accountId: string,
+    amount: number,
+  ) {
+    return {
+      amount,
+      amountReceived: amount,
+      currency: 'eur',
+      accountId,
+      metadata: {
+        orderId,
+        providerOrderId,
+        providerPaymentSessionId,
+      },
+    };
   }
 
   it('keeps the root order pending until all provider orders are paid, then confirms it', async () => {
@@ -226,6 +249,13 @@ describe('OrdersService - Provider Payment Domain', () => {
       providerA.sessionId,
       `evt_A_${Date.now()}`,
       'payment_intent.succeeded',
+      buildConfirmationPayload(
+        order.id,
+        providerA.providerOrderId,
+        providerA.paymentSessionId,
+        data.provA.stripeAccountId!,
+        2000,
+      ),
     );
 
     expect(firstResult.paymentStatus).toBe(ProviderPaymentStatus.PAID);
@@ -261,6 +291,13 @@ describe('OrdersService - Provider Payment Domain', () => {
       providerB.sessionId,
       `evt_B_${Date.now()}`,
       'payment_intent.succeeded',
+      buildConfirmationPayload(
+        order.id,
+        providerB.providerOrderId,
+        providerB.paymentSessionId,
+        data.provB.stripeAccountId!,
+        3000,
+      ),
     );
 
     expect(secondResult.paymentStatus).toBe(ProviderPaymentStatus.PAID);
@@ -297,11 +334,25 @@ describe('OrdersService - Provider Payment Domain', () => {
         providerA.sessionId,
         `evt_concurrent_A_${Date.now()}`,
         'payment_intent.succeeded',
+        buildConfirmationPayload(
+          order.id,
+          providerA.providerOrderId,
+          providerA.paymentSessionId,
+          data.provA.stripeAccountId!,
+          2000,
+        ),
       ),
       paymentsService.confirmProviderOrderPayment(
         providerB.sessionId,
         `evt_concurrent_B_${Date.now()}`,
         'payment_intent.succeeded',
+        buildConfirmationPayload(
+          order.id,
+          providerB.providerOrderId,
+          providerB.paymentSessionId,
+          data.provB.stripeAccountId!,
+          3000,
+        ),
       ),
     ]);
 
@@ -333,12 +384,26 @@ describe('OrdersService - Provider Payment Domain', () => {
       providerA.sessionId,
       eventId,
       'payment_intent.succeeded',
+      buildConfirmationPayload(
+        order.id,
+        providerA.providerOrderId,
+        providerA.paymentSessionId,
+        data.provA.stripeAccountId!,
+        2000,
+      ),
     );
 
     const replayResult = await paymentsService.confirmProviderOrderPayment(
       providerA.sessionId,
       eventId,
       'payment_intent.succeeded',
+      buildConfirmationPayload(
+        order.id,
+        providerA.providerOrderId,
+        providerA.paymentSessionId,
+        data.provA.stripeAccountId!,
+        2000,
+      ),
     );
 
     expect(replayResult).toEqual({ message: 'Webhook already processed' });
@@ -371,6 +436,13 @@ describe('OrdersService - Provider Payment Domain', () => {
         providerA.sessionId,
         `evt_missing_res_${Date.now()}`,
         'payment_intent.succeeded',
+        buildConfirmationPayload(
+          order.id,
+          providerA.providerOrderId,
+          providerA.paymentSessionId,
+          data.provA.stripeAccountId!,
+          2000,
+        ),
       ),
     ).rejects.toThrow(
       new ConflictException(
@@ -407,6 +479,13 @@ describe('OrdersService - Provider Payment Domain', () => {
         providerA.sessionId,
         eventId,
         'payment_intent.succeeded',
+        buildConfirmationPayload(
+          order.id,
+          providerA.providerOrderId,
+          providerA.paymentSessionId,
+          data.provA.stripeAccountId!,
+          2000,
+        ),
       ),
     ).rejects.toThrow(
       new ConflictException(
@@ -439,6 +518,13 @@ describe('OrdersService - Provider Payment Domain', () => {
       providerA.sessionId,
       eventId,
       'payment_intent.succeeded',
+      buildConfirmationPayload(
+        order.id,
+        providerA.providerOrderId,
+        providerA.paymentSessionId,
+        data.provA.stripeAccountId!,
+        2000,
+      ),
     );
 
     expect(retried).toEqual(
