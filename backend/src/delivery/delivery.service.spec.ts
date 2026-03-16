@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { RiskService } from '../risk/risk.service';
 import {
   DeliveryIncidentStatusValues,
   DeliveryIncidentTypeValues,
@@ -26,6 +27,7 @@ jest.mock('stripe');
 describe('DeliveryService', () => {
   let service: DeliveryService;
   let prismaMock: any;
+  let riskServiceMock: any;
   let stripePaymentIntentsCreate: jest.Mock;
   let stripePaymentIntentsRetrieve: jest.Mock;
   const assignedRunner = {
@@ -116,11 +118,18 @@ describe('DeliveryService', () => {
       },
       $transaction: jest.fn(),
     };
+    riskServiceMock = {
+      recordRiskEvent: jest.fn().mockResolvedValue({
+        created: true,
+      }),
+      recalculateRiskScore: jest.fn().mockResolvedValue({}),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DeliveryService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: RiskService, useValue: riskServiceMock },
         {
           provide: ConfigService,
           useValue: {
@@ -1296,6 +1305,21 @@ describe('DeliveryService', () => {
         longitude: 2.1686,
       }),
     ).rejects.toThrow('Runner location jump exceeds allowed threshold');
+
+    expect(riskServiceMock.recordRiskEvent).toHaveBeenCalledWith({
+      actorType: 'RUNNER',
+      actorId: 'runner-1',
+      category: 'RUNNER_GPS_ANOMALY',
+      score: 20,
+      dedupKey: 'gps-anomaly:delivery-1',
+      metadata: {
+        deliveryOrderId: 'delivery-1',
+      },
+    });
+    expect(riskServiceMock.recalculateRiskScore).toHaveBeenCalledWith(
+      'RUNNER',
+      'runner-1',
+    );
   });
 
   it('applies per-runner rate limiting across deliveries', async () => {
@@ -1398,6 +1422,22 @@ describe('DeliveryService', () => {
       createdAt: new Date('2099-01-01T00:00:00.000Z'),
       resolvedAt: null,
     });
+
+    expect(riskServiceMock.recordRiskEvent).toHaveBeenCalledWith({
+      actorType: 'CLIENT',
+      actorId: 'client-1',
+      category: 'CLIENT_INCIDENT_ABUSE',
+      score: 10,
+      dedupKey: 'incident:incident-1',
+      metadata: {
+        incidentId: 'incident-1',
+        deliveryOrderId: 'delivery-1',
+      },
+    });
+    expect(riskServiceMock.recalculateRiskScore).toHaveBeenCalledWith(
+      'CLIENT',
+      'client-1',
+    );
   });
 
   it('rejects runner incident creation on unrelated delivery', async () => {

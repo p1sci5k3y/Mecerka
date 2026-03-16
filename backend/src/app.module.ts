@@ -21,6 +21,8 @@ import { CartModule } from './cart/cart.module';
 import { SupportModule } from './support/support.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { RefundsModule } from './refunds/refunds.module';
+import { RiskModule } from './risk/risk.module';
+import { ObservabilityModule } from './observability/observability.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { RefundsModule } from './refunds/refunds.module';
     SupportModule,
     DeliveryModule,
     RefundsModule,
+    RiskModule,
+    ObservabilityModule,
   ],
   controllers: [AppController],
   providers: [
