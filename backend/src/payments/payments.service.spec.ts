@@ -55,6 +55,7 @@ describe('PaymentsService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       paymentAccount: {
         upsert: jest.fn(),
@@ -215,15 +216,31 @@ describe('PaymentsService', () => {
 
   it('treats concurrent duplicate webhook inserts as idempotent and emits no side effects', async () => {
     prismaMock.paymentWebhookEvent.create.mockRejectedValue({ code: 'P2002' });
+    prismaMock.paymentWebhookEvent.updateMany.mockResolvedValue({ count: 0 });
 
-    const result = await service.confirmPayment(
-      'order-1',
+    const result = await service.confirmProviderOrderPayment(
       'pi_test_123',
       'evt_duplicate',
+      'payment_intent.succeeded',
     );
 
     expect(result).toEqual({ message: 'Webhook already processed' });
     expect(eventEmitterMock.emit).not.toHaveBeenCalled();
+  });
+
+  it('treats only terminal webhook statuses as processed', async () => {
+    prismaMock.paymentWebhookEvent.findUnique
+      .mockResolvedValueOnce({ status: 'PROCESSED' })
+      .mockResolvedValueOnce({ status: 'IGNORED' })
+      .mockResolvedValueOnce({ status: 'FAILED' })
+      .mockResolvedValueOnce({ status: 'RECEIVED' })
+      .mockResolvedValueOnce(null);
+
+    await expect(service.isProcessed('evt_processed')).resolves.toBe(true);
+    await expect(service.isProcessed('evt_ignored')).resolves.toBe(true);
+    await expect(service.isProcessed('evt_failed')).resolves.toBe(false);
+    await expect(service.isProcessed('evt_received')).resolves.toBe(false);
+    await expect(service.isProcessed('evt_missing')).resolves.toBe(false);
   });
 
   it('confirms provider payment atomically, consumes reservations, and decrements stock once', async () => {
@@ -284,6 +301,16 @@ describe('PaymentsService', () => {
           updateMany: transactionProductUpdateMany,
         },
         order: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'order-1',
+            status: DeliveryStatus.PENDING,
+            providerOrders: [
+              {
+                id: 'po-1',
+                paymentStatus: ProviderPaymentStatus.PAID,
+              },
+            ],
+          }),
           update: transactionOrderUpdate,
         },
         $executeRaw: jest.fn(),
@@ -360,6 +387,7 @@ describe('PaymentsService', () => {
     prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
     prismaMock.$transaction.mockImplementation(async (callback: any) =>
       callback({
+        $executeRaw: jest.fn(),
         providerPaymentSession: {
           findUnique: jest.fn().mockResolvedValue({
             id: 'session-1',
@@ -439,6 +467,239 @@ describe('PaymentsService', () => {
         processedAt: expect.any(Date),
       },
     });
+  });
+
+  it('allows retry when a previously failed webhook event is delivered again', async () => {
+    const transactionProductUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
+    const transactionReservationsUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
+    const transactionSessionUpdate = jest.fn().mockResolvedValue({});
+    const transactionProviderOrderUpdate = jest.fn().mockResolvedValue({});
+    const transactionOrderUpdate = jest.fn().mockResolvedValue({});
+
+    prismaMock.paymentWebhookEvent.create.mockRejectedValue({ code: 'P2002' });
+    prismaMock.paymentWebhookEvent.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'session-1',
+            providerOrderId: 'po-1',
+            externalSessionId: 'pi_test_123',
+          }),
+          update: transactionSessionUpdate,
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            paymentStatus: ProviderPaymentStatus.PENDING,
+            status: ProviderOrderStatus.PAYMENT_READY,
+            reservations: [
+              {
+                id: 'res-1',
+                productId: 'prod-1',
+                quantity: 2,
+                expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+              },
+            ],
+            items: [{ productId: 'prod-1', quantity: 2 }],
+            order: {
+              id: 'order-1',
+              status: DeliveryStatus.PENDING,
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  paymentStatus: ProviderPaymentStatus.PENDING,
+                },
+              ],
+            },
+          }),
+          update: transactionProviderOrderUpdate,
+        },
+        stockReservation: {
+          updateMany: transactionReservationsUpdateMany,
+        },
+        product: {
+          updateMany: transactionProductUpdateMany,
+        },
+        order: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'order-1',
+            status: DeliveryStatus.CONFIRMED,
+            providerOrders: [
+              {
+                id: 'po-1',
+                paymentStatus: ProviderPaymentStatus.PAID,
+              },
+            ],
+          }),
+          update: transactionOrderUpdate,
+        },
+        $executeRaw: jest.fn(),
+      }),
+    );
+
+    const result = await service.confirmProviderOrderPayment(
+      'pi_test_123',
+      'evt_failed_retry',
+      'payment_intent.succeeded',
+    );
+
+    expect(prismaMock.paymentWebhookEvent.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'evt_failed_retry',
+        status: 'FAILED',
+      },
+      data: {
+        provider: 'STRIPE',
+        eventType: 'payment_intent.succeeded',
+        status: 'RECEIVED',
+        processedAt: null,
+      },
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        providerOrderId: 'po-1',
+        paymentStatus: ProviderPaymentStatus.PAID,
+      }),
+    );
+  });
+
+  it('recomputes sibling provider payment states after updating the current provider order', async () => {
+    const transactionProductUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
+    const transactionReservationsUpdateMany = jest
+      .fn()
+      .mockResolvedValue({ count: 1 });
+    const transactionSessionUpdate = jest.fn().mockResolvedValue({});
+    const transactionProviderOrderUpdate = jest.fn().mockResolvedValue({});
+    const transactionOrderFindUnique = jest.fn().mockResolvedValue({
+      id: 'order-1',
+      status: DeliveryStatus.PENDING,
+      providerOrders: [
+        {
+          id: 'po-1',
+          paymentStatus: ProviderPaymentStatus.PAID,
+        },
+        {
+          id: 'po-2',
+          paymentStatus: ProviderPaymentStatus.PAID,
+        },
+      ],
+    });
+    const transactionOrderUpdate = jest.fn().mockResolvedValue({});
+
+    prismaMock.paymentWebhookEvent.create.mockResolvedValue({
+      id: 'evt_recompute',
+    });
+    prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'session-1',
+            providerOrderId: 'po-1',
+            externalSessionId: 'pi_test_123',
+          }),
+          update: transactionSessionUpdate,
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+            status: ProviderOrderStatus.PAYMENT_READY,
+            reservations: [
+              {
+                id: 'res-1',
+                productId: 'prod-1',
+                quantity: 1,
+                expiresAt: new Date('2026-03-15T12:15:00.000Z'),
+              },
+            ],
+            items: [{ productId: 'prod-1', quantity: 1 }],
+            order: {
+              id: 'order-1',
+              status: DeliveryStatus.PENDING,
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+                },
+                {
+                  id: 'po-2',
+                  paymentStatus: ProviderPaymentStatus.PENDING,
+                },
+              ],
+            },
+          }),
+          update: transactionProviderOrderUpdate,
+        },
+        stockReservation: {
+          updateMany: transactionReservationsUpdateMany,
+        },
+        product: {
+          updateMany: transactionProductUpdateMany,
+        },
+        order: {
+          findUnique: transactionOrderFindUnique,
+          update: transactionOrderUpdate,
+        },
+        $executeRaw: jest.fn(),
+      }),
+    );
+
+    const result = await service.confirmProviderOrderPayment(
+      'pi_test_123',
+      'evt_recompute',
+      'payment_intent.succeeded',
+    );
+
+    expect(transactionOrderFindUnique).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      select: {
+        id: true,
+        status: true,
+        providerOrders: {
+          select: {
+            id: true,
+            paymentStatus: true,
+          },
+        },
+      },
+    });
+    expect(transactionOrderUpdate).toHaveBeenCalledWith({
+      where: { id: 'order-1' },
+      data: {
+        status: DeliveryStatus.CONFIRMED,
+        confirmedAt: expect.any(Date),
+      },
+    });
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: DeliveryStatus.CONFIRMED,
+        orderId: 'order-1',
+      }),
+    );
+  });
+
+  it('rejects the legacy wrapper for multi-provider orders', async () => {
+    prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      providerOrders: [{ id: 'po-1' }, { id: 'po-2' }],
+    });
+
+    await expect(
+      service.confirmPayment('order-1', 'pi_test_123', 'evt_legacy'),
+    ).rejects.toThrow(
+      'Legacy payment confirmation wrapper only supports single-provider orders',
+    );
   });
 
   it('returns the same active provider payment session on retry', async () => {
