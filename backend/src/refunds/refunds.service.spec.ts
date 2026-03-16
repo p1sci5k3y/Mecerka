@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
+import { RiskService } from '../risk/risk.service';
 import { RefundStatusValues, RefundTypeValues } from './refund.constants';
 import { RefundsService } from './refunds.service';
 
@@ -22,6 +23,7 @@ jest.mock('stripe');
 describe('RefundsService', () => {
   let service: RefundsService;
   let prismaMock: any;
+  let riskServiceMock: any;
   let stripeRefundsCreate: jest.Mock;
 
   beforeEach(async () => {
@@ -62,11 +64,18 @@ describe('RefundsService', () => {
       },
       $transaction: jest.fn(),
     };
+    riskServiceMock = {
+      recordRiskEvent: jest.fn().mockResolvedValue({
+        created: true,
+      }),
+      recalculateRiskScore: jest.fn().mockResolvedValue({}),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RefundsService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: RiskService, useValue: riskServiceMock },
         {
           provide: ConfigService,
           useValue: {
@@ -188,6 +197,84 @@ describe('RefundsService', () => {
 
     expect(refund.amount).toBe(15);
     expect(txRefundCreate).toHaveBeenCalled();
+  });
+
+  it('emits a refund-abuse risk event when a client creates a refund request', async () => {
+    const createdAt = new Date('2099-01-01T00:00:00.000Z');
+
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 50,
+            paymentRef: 'pi_provider_1',
+            paymentStatus: ProviderPaymentStatus.PAID,
+            order: {
+              id: 'order-1',
+              clientId: 'client-1',
+              deliveryOrder: { id: 'delivery-1' },
+            },
+          }),
+        },
+        deliveryOrder: {
+          findUnique: jest.fn(),
+        },
+        deliveryIncident: {
+          findUnique: jest.fn(),
+        },
+        refundRequest: {
+          count: jest.fn().mockResolvedValue(0),
+          aggregate: jest.fn().mockResolvedValue({
+            _sum: { amount: 0 },
+          }),
+          create: jest.fn().mockResolvedValue({
+            id: 'refund-1',
+            incidentId: null,
+            providerOrderId: 'po-1',
+            deliveryOrderId: null,
+            type: RefundTypeValues.PROVIDER_PARTIAL,
+            status: RefundStatusValues.REQUESTED,
+            amount: 15,
+            currency: 'EUR',
+            requestedById: 'client-1',
+            reviewedById: null,
+            externalRefundId: null,
+            createdAt,
+            reviewedAt: null,
+            completedAt: null,
+          }),
+        },
+      }),
+    );
+
+    await service.requestRefund(
+      {
+        providerOrderId: 'po-1',
+        type: RefundTypeValues.PROVIDER_PARTIAL,
+        amount: 15,
+        currency: 'EUR',
+      },
+      'client-1',
+      [Role.CLIENT],
+    );
+
+    expect(riskServiceMock.recordRiskEvent).toHaveBeenCalledWith({
+      actorType: 'CLIENT',
+      actorId: 'client-1',
+      category: 'CLIENT_REFUND_ABUSE',
+      score: 12,
+      dedupKey: 'refund-abuse:refund-1',
+      metadata: {
+        refundRequestId: 'refund-1',
+        boundaryId: 'po-1',
+      },
+    });
+    expect(riskServiceMock.recalculateRiskScore).toHaveBeenCalledWith(
+      'CLIENT',
+      'client-1',
+    );
   });
 
   it('does not execute the same refund twice', async () => {
