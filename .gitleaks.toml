@@ -1,19 +1,22 @@
-title = "Mecerka Gitleaks Config"
+title = "Mecerka security config"
 
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Allow test files and mock secrets"
+description = "Ignore tests and dependencies"
+
 paths = [
+  '''node_modules''',
+  '''dist''',
+  '''coverage''',
   '''.*\.spec\.ts''',
-  '''.*\.test\.ts''',
-  '''.*__tests__.*'''
+  '''.*\.test\.ts'''
 ]
 
 regexes = [
-  '''test_secret''',
   '''mock_secret''',
-  '''dummy_secret''',
-  '''fake_secret'''
+  '''test_secret''',
+  '''dummy_secret'''
 ]
+
