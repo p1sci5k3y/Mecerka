@@ -96,7 +96,7 @@ npm run test:e2e
 For the full local quality gate:
 
 ```bash
-cd /Users/machinehead/Documents/TFM
+cd /path/to/repo
 npm run test:ci
 ```
 
@@ -104,3 +104,9 @@ npm run test:ci
 
 - In normal local Docker execution, Mailpit is available for email inspection.
 - In backend `test` / `E2E` execution, Nodemailer uses `jsonTransport`, so tests do not depend on external SMTP availability.
+
+## 9. Production deployment
+
+Production deployment is handled by [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) against [`docker-compose.prod.yml`](../docker-compose.prod.yml).
+
+The deployment flow validates required environment variables before writing `.env`, keeps secrets externalized, uses restrictive file permissions, and is safe to run repeatedly on the same host.

@@ -1,7 +1,7 @@
 # System Validation Report
 
 Date: 2026-03-18  
-Workspace: `/Users/machinehead/Documents/TFM`
+Workspace: repository root
 
 ## Objective
 
@@ -52,7 +52,7 @@ If demo mode is intentionally enabled, validation may additionally include:
 The backend validation pipeline is executed with:
 
 ```bash
-cd /Users/machinehead/Documents/TFM
+cd /path/to/repo
 npm run test:ci
 ```
 

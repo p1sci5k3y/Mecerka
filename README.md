@@ -77,6 +77,22 @@ curl http://localhost:3000/health
 - backend: `http://localhost:3000`
 - Mailpit: `http://localhost:8025`
 
+## Despliegue en producción
+
+El despliegue productivo se ejecuta mediante el workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+El flujo actual:
+
+- se conecta por SSH al host objetivo;
+- valida que todas las variables requeridas estén presentes antes de ejecutar Docker Compose;
+- escribe una `.env` completa con permisos restrictivos;
+- usa [`docker-compose.prod.yml`](docker-compose.prod.yml) sin `container_name` explícitos;
+- elimina de forma dirigida los nombres legacy de contenedores si aún existen;
+- ejecuta `docker compose down`, `build --pull` y `up -d --force-recreate --remove-orphans`;
+- valida Nginx antes de recargarlo.
+
+Esto hace que el despliegue sea **repetible e idempotente** sin hardcodear ni imprimir secretos.
+
 ## Modo demo
 
 El modo demo es **opt-in** y está **deshabilitado por defecto**.
@@ -145,11 +161,11 @@ Husky impone quality gates locales:
 
 ## Documentación principal
 
-- [Architecture](/Users/machinehead/Documents/TFM/docs/architecture.md)
-- [Security](/Users/machinehead/Documents/TFM/docs/security.md)
-- [Testing](/Users/machinehead/Documents/TFM/docs/testing.md)
-- [Getting Started](/Users/machinehead/Documents/TFM/docs/getting-started.md)
-- [Demo Environment](/Users/machinehead/Documents/TFM/docs/demo-environment.md)
-- [Observability](/Users/machinehead/Documents/TFM/docs/observability.md)
-- [Final Audit](/Users/machinehead/Documents/TFM/docs/final-audit.md)
-- [SBOM](/Users/machinehead/Documents/TFM/docs/sbom.md)
+- [Architecture](docs/architecture.md)
+- [Security](docs/security.md)
+- [Testing](docs/testing.md)
+- [Getting Started](docs/getting-started.md)
+- [Demo Environment](docs/demo-environment.md)
+- [Observability](docs/observability.md)
+- [Final Audit](docs/final-audit.md)
+- [SBOM](docs/sbom.md)
