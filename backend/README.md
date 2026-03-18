@@ -23,7 +23,7 @@
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+NestJS backend for the Mecerka marketplace. The backend is deployed together with PostgreSQL and the Next.js frontend through Docker Compose.
 
 ## Project setup
 
@@ -59,16 +59,12 @@ $ npm run test:cov
 
 ## Deployment
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Repository deployment is defined at the root level through:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)
+- [`../docker-compose.prod.yml`](../docker-compose.prod.yml)
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+The production workflow validates required environment variables, writes a complete `.env` with restrictive permissions on the target host, and redeploys the Docker Compose stack idempotently.
 
 ## Resources
 

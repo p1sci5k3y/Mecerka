@@ -1,7 +1,7 @@
 # Final Audit Report
 
 Date: 2026-03-18  
-Workspace: `/Users/machinehead/Documents/TFM`
+Workspace: repository root
 
 ## Verdict
 
@@ -56,6 +56,9 @@ This close-out audit evaluates the repository as shipped across:
 
 - bootstrap script generates secrets securely with `openssl rand`
 - `.env` is not versioned
+- production deployment validates required environment variables before compose runs
+- production deployment writes a complete `.env` with restrictive permissions
+- production redeploys are idempotent and clean up legacy explicit container names if present
 - Husky enforces:
   - pre-commit: lint + type-check
   - pre-push: test + e2e

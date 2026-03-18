@@ -118,7 +118,7 @@ Delivery is modeled through `DeliveryOrder`, `DeliveryJob`, and `RunnerLocation`
 
 See:
 
-- [Domain Model Diagram](/Users/machinehead/Documents/TFM/docs/diagrams/domain-model-diagram.md)
+- [Domain Model Diagram](diagrams/domain-model-diagram.md)
 
 ## Important Domain Rules
 
@@ -190,4 +190,4 @@ Provider orders progress independently as merchants accept and prepare their own
 
 See:
 
-- [Order Flow Sequence](/Users/machinehead/Documents/TFM/docs/diagrams/order-flow-sequence.md)
+- [Order Flow Sequence](diagrams/order-flow-sequence.md)

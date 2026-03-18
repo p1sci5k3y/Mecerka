@@ -26,8 +26,11 @@ When demo mode is explicitly enabled, the backend auto-seeds this dataset on sta
 Example reset flow:
 
 ```bash
-curl -X POST http://127.0.0.1:3000/demo/reset \
-  -H "Authorization: Bearer <admin-jwt>"
+curl -c cookies.txt -X POST http://127.0.0.1:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin.demo@local.test","password":"<admin-password>"}'
+
+curl -b cookies.txt -X POST http://127.0.0.1:3000/demo/reset
 ```
 
 `/demo/reset` is admin-only.
@@ -69,7 +72,7 @@ Default demo accounts:
 - `user.demo@local.test`
 - `user2.demo@local.test`
 
-The Playwright suite also supports reading these from [frontend/.env.test](/Users/machinehead/Documents/TFM/frontend/.env.test).
+The Playwright suite also supports reading these from [`frontend/.env.test`](../frontend/.env.test).
 
 Roles:
 
@@ -103,7 +106,7 @@ The demo catalog includes:
 
 Images are served from:
 
-- [frontend/public/demo-products](/Users/machinehead/Documents/TFM/frontend/public/demo-products)
+- [`frontend/public/demo-products`](../frontend/public/demo-products)
 
 Each demo product includes:
 
@@ -138,8 +141,8 @@ Typical states visible during testing:
 
 Current Playwright coverage lives in:
 
-- [frontend/e2e](/Users/machinehead/Documents/TFM/frontend/e2e)
-- [frontend/tests/e2e](/Users/machinehead/Documents/TFM/frontend/tests/e2e)
+- [`frontend/e2e`](../frontend/e2e)
+- [`frontend/tests/e2e`](../frontend/tests/e2e)
 
 Covered journeys:
 

@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: mecerka_postgres_prod
     restart: unless-stopped
     env_file:
       - .env
@@ -27,7 +24,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: mecerka_backend_prod
     restart: unless-stopped
     env_file:
       - .env
@@ -66,7 +62,6 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-    container_name: mecerka_frontend_prod
     restart: unless-stopped
     env_file:
       - .env

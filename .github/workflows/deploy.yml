@@ -41,75 +41,121 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: POSTGRES_PASSWORD,JWT_SECRET,JWT_SECRET_CURRENT,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,BACKEND_URL,MAIL_HOST,MAIL_PORT,MAIL_USER,MAIL_PASS,MAIL_FROM
+          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,JWT_SECRET,JWT_SECRET_CURRENT,FISCAL_PEPPER,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,DELIVERY_STRIPE_WEBHOOK_SECRET,DONATIONS_STRIPE_WEBHOOK_SECRET,BACKEND_URL,MAIL_HOST,MAIL_PORT,MAIL_USER,MAIL_PASS,MAIL_FROM,DEMO_MODE
           command_timeout: 20m
           script: |
-            set -e
+            set -eu
             echo "Starting deployment..."
 
+            APP_DIR="/opt/mecerka"
+            COMPOSE_FILE="docker-compose.prod.yml"
+            REPO_URL="https://github.com/p1sci5k3y/Mecerka.git"
+            REQUIRED_VARS="POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET JWT_SECRET_CURRENT FISCAL_PEPPER NEXT_PUBLIC_API_URL NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY CORS_ORIGIN FRONTEND_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET DELIVERY_STRIPE_WEBHOOK_SECRET DONATIONS_STRIPE_WEBHOOK_SECRET BACKEND_URL MAIL_HOST MAIL_PORT MAIL_USER MAIL_PASS MAIL_FROM DEMO_MODE"
+
             # 1. Setup /opt/mecerka if missing
-            if [ ! -d "/opt/mecerka/.git" ]; then
-              echo "Directory /opt/mecerka not found or not a git repo. Setting up..."
-              sudo mkdir -p /opt/mecerka
+            if [ ! -d "${APP_DIR}/.git" ]; then
+              echo "Directory ${APP_DIR} not found or not a git repo. Setting up..."
+              sudo mkdir -p "${APP_DIR}"
               # Give current user permissions
-              sudo chown -R $USER:$USER /opt/mecerka
-              git clone https://github.com/p1sci5k3y/Mecerka.git /opt/mecerka
+              sudo chown -R "$USER:$USER" "${APP_DIR}"
+              git clone "${REPO_URL}" "${APP_DIR}"
             fi
 
             # 2. Pull latest application code
-            cd /opt/mecerka
-            git fetch --all
+            cd "${APP_DIR}"
+            git fetch origin main --prune
             git reset --hard origin/main
 
-            # 2. Write secrets to .env file
-            cat > .env << EOF
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            JWT_SECRET=${JWT_SECRET}
-            JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
-            NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-            NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-            CORS_ORIGIN=${CORS_ORIGIN}
-            FRONTEND_URL=${FRONTEND_URL}
-            STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-            STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-            BACKEND_URL=${BACKEND_URL}
-            MAIL_HOST=${MAIL_HOST}
-            MAIL_PORT=${MAIL_PORT}
-            MAIL_USER=${MAIL_USER}
-            MAIL_PASS=${MAIL_PASS}
-            MAIL_FROM=${MAIL_FROM}
-            EOF
-            chmod 600 .env
+            # 3. Validate required deployment environment
+            missing_vars=""
+            for var_name in ${REQUIRED_VARS}; do
+              eval "var_value=\${${var_name}:-}"
+              if [ -z "${var_value}" ]; then
+                missing_vars="${missing_vars} ${var_name}"
+              fi
+            done
 
-            # 3. Rebuild images and restart containers
-            sudo docker compose -f docker-compose.prod.yml down --remove-orphans
-            sudo docker compose -f docker-compose.prod.yml build --pull --no-cache
-            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
+            if [ -n "${missing_vars}" ]; then
+              echo "Missing required deployment variables:${missing_vars}" >&2
+              exit 1
+            fi
 
-            # 4. Configure Nginx Reverse Proxy
+            DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+
+            # 4. Write a complete .env with restrictive permissions
+            umask 077
+            ENV_FILE="${APP_DIR}/.env"
+            TEMP_ENV_FILE="${ENV_FILE}.tmp"
+            : > "${TEMP_ENV_FILE}"
+            printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}" >> "${TEMP_ENV_FILE}"
+            printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}" >> "${TEMP_ENV_FILE}"
+            printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}" >> "${TEMP_ENV_FILE}"
+            printf 'DATABASE_URL=%s\n' "${DATABASE_URL}" >> "${TEMP_ENV_FILE}"
+            printf 'JWT_SECRET=%s\n' "${JWT_SECRET}" >> "${TEMP_ENV_FILE}"
+            printf 'JWT_SECRET_CURRENT=%s\n' "${JWT_SECRET_CURRENT}" >> "${TEMP_ENV_FILE}"
+            printf 'FISCAL_PEPPER=%s\n' "${FISCAL_PEPPER}" >> "${TEMP_ENV_FILE}"
+            printf 'NEXT_PUBLIC_API_URL=%s\n' "${NEXT_PUBLIC_API_URL}" >> "${TEMP_ENV_FILE}"
+            printf 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=%s\n' "${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "${TEMP_ENV_FILE}"
+            printf 'CORS_ORIGIN=%s\n' "${CORS_ORIGIN}" >> "${TEMP_ENV_FILE}"
+            printf 'FRONTEND_URL=%s\n' "${FRONTEND_URL}" >> "${TEMP_ENV_FILE}"
+            printf 'STRIPE_SECRET_KEY=%s\n' "${STRIPE_SECRET_KEY}" >> "${TEMP_ENV_FILE}"
+            printf 'STRIPE_WEBHOOK_SECRET=%s\n' "${STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
+            printf 'DELIVERY_STRIPE_WEBHOOK_SECRET=%s\n' "${DELIVERY_STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
+            printf 'DONATIONS_STRIPE_WEBHOOK_SECRET=%s\n' "${DONATIONS_STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
+            printf 'BACKEND_URL=%s\n' "${BACKEND_URL}" >> "${TEMP_ENV_FILE}"
+            printf 'MAIL_HOST=%s\n' "${MAIL_HOST}" >> "${TEMP_ENV_FILE}"
+            printf 'MAIL_PORT=%s\n' "${MAIL_PORT}" >> "${TEMP_ENV_FILE}"
+            printf 'MAIL_USER=%s\n' "${MAIL_USER}" >> "${TEMP_ENV_FILE}"
+            printf 'MAIL_PASS=%s\n' "${MAIL_PASS}" >> "${TEMP_ENV_FILE}"
+            printf 'MAIL_FROM=%s\n' "${MAIL_FROM}" >> "${TEMP_ENV_FILE}"
+            printf 'DEMO_MODE=%s\n' "${DEMO_MODE}" >> "${TEMP_ENV_FILE}"
+            mv "${TEMP_ENV_FILE}" "${ENV_FILE}"
+            chmod 600 "${ENV_FILE}"
+
+            # 5. Validate compose configuration and restart containers idempotently
+            sudo docker compose -f "${COMPOSE_FILE}" config >/dev/null
+            sudo docker compose -f "${COMPOSE_FILE}" down --remove-orphans
+
+            for legacy_container in mecerka_postgres_prod mecerka_backend_prod mecerka_frontend_prod; do
+              if sudo docker container inspect "${legacy_container}" >/dev/null 2>&1; then
+                sudo docker rm -f "${legacy_container}" >/dev/null
+              fi
+            done
+
+            sudo docker compose -f "${COMPOSE_FILE}" build --pull
+            sudo docker compose -f "${COMPOSE_FILE}" up -d --force-recreate --remove-orphans
+
+            # 6. Configure Nginx Reverse Proxy
             sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
             sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
             sudo rm -f /etc/nginx/sites-enabled/default
-            sudo systemctl restart nginx
+            sudo nginx -t
+            sudo systemctl reload nginx
 
-            # 5. Prune old dangling images
-            sudo docker image prune -f
+            # 7. Prune old dangling images
+            sudo docker image prune -f >/dev/null
         env:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: marketplace
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_SECRET_CURRENT: ${{ secrets.JWT_SECRET_CURRENT }}
+          FISCAL_PEPPER: ${{ secrets.FISCAL_PEPPER }}
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}
+          DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}
           BACKEND_URL: "https://mecerka.me"
           MAIL_HOST: ${{ secrets.MAIL_HOST }}
           MAIL_PORT: ${{ secrets.MAIL_PORT }}
           MAIL_USER: ${{ secrets.MAIL_USER }}
           MAIL_PASS: ${{ secrets.MAIL_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          DEMO_MODE: false
 
       - name: Revoke GitHub Runner IP
         if: always()
