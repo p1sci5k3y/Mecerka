@@ -73,6 +73,7 @@ If you want the demo dataset and demo endpoints:
 
 ```env
 DEMO_MODE=true
+DEMO_PASSWORD=choose-a-demo-password
 ```
 
 3. restart the stack:
@@ -81,7 +82,7 @@ DEMO_MODE=true
 docker compose up -d --build
 ```
 
-When enabled, the demo module may auto-seed demo users, products, and orders, and the admin-only endpoints `/demo/seed` and `/demo/reset` become usable.
+When enabled, the demo module may auto-seed demo users, products, and orders, and the admin-only endpoints `/demo/seed` and `/demo/reset` become usable. `DEMO_PASSWORD` must be set explicitly because demo credentials are no longer hardcoded in the backend.
 
 ## 7. Backend quality checks
 

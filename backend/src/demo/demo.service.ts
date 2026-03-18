@@ -38,8 +38,6 @@ type DemoProductSeed = {
 export class DemoService implements OnApplicationBootstrap {
   private readonly logger = new Logger(DemoService.name);
   private static readonly DEMO_EMAIL_DOMAIN = '@local.test';
-
-  private static readonly DEMO_PASSWORD = 'DemoPass123!';
   private static readonly DEMO_CITY = {
     name: 'Toledo',
     slug: 'toledo',
@@ -275,10 +273,24 @@ export class DemoService implements OnApplicationBootstrap {
     return user;
   }
 
+  private getDemoPassword() {
+    const configuredPassword = this.configService
+      .get<string>('DEMO_PASSWORD')
+      ?.trim();
+
+    if (configuredPassword) {
+      return configuredPassword;
+    }
+
+    throw new ConflictException(
+      'DEMO_PASSWORD must be set when DEMO_MODE is enabled',
+    );
+  }
+
   private async registerAndVerifyUser(seed: DemoUserSeed) {
     await this.authService.register({
       email: seed.email,
-      password: DemoService.DEMO_PASSWORD,
+      password: this.getDemoPassword(),
       name: seed.name,
     });
 

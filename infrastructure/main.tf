@@ -72,20 +72,16 @@ resource "aws_security_group_rule" "allow_all_egress" {
   security_group_id = aws_security_group.mecerka_sg.id
 }
 
-# 2. Existing EC2 Instance Management (Import Block)
-# We use an import block so Terraform takes over the existing instance without deleting it
-# Note: import blocks do not support variable references — the id must be a literal value
-import {
-  to = aws_instance.mecerka_server
-  id = "i-07b8b2ff00c18d875"
-}
+# 2. Existing EC2 Instance Management
+# Import the existing instance before the first apply:
+# terraform import -var-file=production.tfvars aws_instance.mecerka_server <instance-id>
 
 resource "aws_instance" "mecerka_server" {
   # These properties must match the actual instance to avoid destructive updates during plan/apply
-  ami           = "ami-0eb260c4d5475b901" # Place holder, Terraform schema requires it but import matches the real one
+  ami           = "ami-0eb260c4d5475b901" # Placeholder required by the resource schema; import preserves the real instance
   instance_type = "t3.micro"
   subnet_id     = var.existing_subnet_id
-  
+
   # Attach the newly created Security Group to the existing instance
   vpc_security_group_ids = [aws_security_group.mecerka_sg.id]
 

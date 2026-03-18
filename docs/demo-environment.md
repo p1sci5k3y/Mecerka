@@ -18,7 +18,10 @@ To enable the demo environment:
 
 ```env
 DEMO_MODE=true
+DEMO_PASSWORD=choose-a-demo-password
 ```
+
+`DEMO_PASSWORD` is mandatory when demo mode is enabled. The backend no longer embeds a default demo password.
 
 ## Data seeding strategy
 
@@ -78,6 +81,8 @@ The demo dataset includes reserved non-production identities such as:
 - `user2.demo@local.test`
 
 These addresses are intentionally restricted to reserved test domains.
+
+All demo users share the password configured through `DEMO_PASSWORD`.
 
 ## Demo scope
 
