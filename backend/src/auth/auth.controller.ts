@@ -4,6 +4,7 @@ import {
   Get,
   Post,
   Request,
+  Res,
   UseGuards,
   BadRequestException,
   Query,
@@ -19,6 +20,10 @@ import { MfaService } from './mfa.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import type { RequestWithUser } from './interfaces/auth.interfaces';
 import { VerifyMfaDto } from './dto/verify-mfa.dto';
+import type { Response } from 'express';
+
+const ACCESS_TOKEN_COOKIE_NAME = 'access_token';
+const ACCESS_TOKEN_COOKIE_MAX_AGE_MS = 15 * 60 * 1000;
 
 @Controller('auth')
 export class AuthController {
@@ -26,6 +31,16 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly mfaService: MfaService,
   ) {}
+
+  private setAccessTokenCookie(response: Response, accessToken: string) {
+    response.cookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
+    });
+  }
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
@@ -35,13 +50,27 @@ export class AuthController {
 
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const loginResponse = await this.authService.login(dto);
+    this.setAccessTokenCookie(response, loginResponse.access_token);
+    return loginResponse;
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  async logout(@Request() req: RequestWithUser) {
+  async logout(
+    @Request() req: RequestWithUser,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
     return this.authService.logout(req.user.userId);
   }
 
@@ -139,6 +168,7 @@ export class AuthController {
   async verifyMfa(
     @Request() req: RequestWithUser,
     @Body() verifyMfaDto: VerifyMfaDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
     const isValid = await this.mfaService.verifyMfaToken(
       req.user.userId,
@@ -147,6 +177,10 @@ export class AuthController {
     if (!isValid) {
       throw new BadRequestException('MFA Code Invalid');
     }
-    return this.authService.generateMfaCompleteToken(req.user.userId);
+    const authResponse = await this.authService.generateMfaCompleteToken(
+      req.user.userId,
+    );
+    this.setAccessTokenCookie(response, authResponse.access_token);
+    return authResponse;
   }
 }

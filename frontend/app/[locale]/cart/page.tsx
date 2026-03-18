@@ -82,13 +82,6 @@ function CartContent() {
       return
     }
 
-    const token = localStorage.getItem('token')
-    if (paymentMethod === "card" && !token) {
-      toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
-      router.push('/login');
-      return;
-    }
-
     setCheckingOut(true)
     try {
       const payload = {
@@ -106,7 +99,7 @@ function CartContent() {
 
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/intent/${createdOrder.id}`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
+          credentials: 'include',
         });
 
         if (!res.ok) {
@@ -136,13 +129,6 @@ function CartContent() {
       return
     }
 
-    const token = localStorage.getItem('token')
-    if (!token) {
-      toast.error('Sesión expirada. Por favor, inicia sesión nuevamente.');
-      router.push('/login');
-      return;
-    }
-
     if (!pendingOrderId) {
       toast.error("No hay pedido pendiente por confirmar.");
       return;
@@ -153,8 +139,8 @@ function CartContent() {
 
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/cash/${pendingOrderId}`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ pin: pinValue })

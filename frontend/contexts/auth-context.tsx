@@ -9,13 +9,11 @@ import {
   useMemo,
   type ReactNode,
 } from "react"
-import { setToken } from "@/lib/api"
 import { authService, type LoginPayload, type RegisterPayload } from "@/lib/services/auth-service"
 import type { User } from "@/lib/types"
 
 interface AuthState {
   user: User | null
-  token: string | null
   isLoading: boolean
   isAuthenticated: boolean
 }
@@ -24,7 +22,7 @@ interface AuthContextType extends AuthState {
   login: (payload: LoginPayload) => Promise<any>
   register: (payload: RegisterPayload) => Promise<any>
   verifyMagicLink: (token: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -32,19 +30,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [state, setState] = useState<AuthState>({
     user: null,
-    token: null,
     isLoading: true,
     isAuthenticated: false,
   })
 
   const hydrateUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token')
-      if (!token) throw new Error('No token')
-
-      // Critical: Set token in memory so API client can use it
-      setToken(token)
-
       const userResponse = await authService.getProfile()
       const user = userResponse as User & { userId?: number }
 
@@ -56,10 +47,9 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
         name: user.name || `User ${user.userId}`,
         email: user.email || `user${user.userId}@mecerka.local`
       }
-      setState({ user: uiUser, token, isLoading: false, isAuthenticated: true })
+      setState({ user: uiUser, isLoading: false, isAuthenticated: true })
     } catch {
-      setToken(null)
-      setState({ user: null, token: null, isLoading: false, isAuthenticated: false })
+      setState({ user: null, isLoading: false, isAuthenticated: false })
     }
   }, [])
 
@@ -69,37 +59,28 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const login = useCallback(async (payload: LoginPayload) => {
     const response: any = await authService.login(payload)
-    if (response.access_token) {
-      localStorage.setItem('token', response.access_token)
-      setToken(response.access_token)
-      await hydrateUser()
-    }
+    await hydrateUser()
     return response
   }, [hydrateUser])
 
   const register = useCallback(async (payload: RegisterPayload) => {
     const response: any = await authService.register(payload)
-    if (response.access_token) {
-      localStorage.setItem('token', response.access_token)
-      setToken(response.access_token)
-      await hydrateUser()
-    }
+    await hydrateUser()
     return response
   }, [hydrateUser])
 
   const verifyMagicLink = useCallback(async (token: string) => {
     const response: any = await authService.verifyMagicLink(token)
-    if (response.access_token) {
-      localStorage.setItem('token', response.access_token)
-      setToken(response.access_token)
-      await hydrateUser()
-    }
+    await hydrateUser()
+    return response
   }, [hydrateUser])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('token')
-    setToken(null)
-    setState({ user: null, token: null, isLoading: false, isAuthenticated: false })
+  const logout = useCallback(async () => {
+    try {
+      await authService.logout()
+    } finally {
+      setState({ user: null, isLoading: false, isAuthenticated: false })
+    }
   }, [])
 
   const contextValue = useMemo(() => ({

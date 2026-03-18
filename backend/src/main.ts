@@ -3,12 +3,14 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppLoggerService } from './common/logging/app-logger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.useLogger(app.get(AppLoggerService));
   app.getHttpAdapter().getInstance().disable('x-powered-by');
+  app.use(cookieParser());
 
   // Validation
   app.useGlobalPipes(
@@ -31,6 +33,7 @@ async function bootstrap() {
 
   const allowlist = new Set<string>();
   if (isDev) allowlist.add('http://localhost:3000');
+  if (isDev) allowlist.add('http://localhost:3001');
   if (frontendUrl) allowlist.add(frontendUrl);
 
   app.enableCors({

@@ -15,7 +15,7 @@ const DynamicDeliveryMap = dynamic(() => import('@/components/tracking/DynamicDe
 
 export default function TrackOrderPage() {
     const params = useParams()
-    const { token, user } = useAuth()
+    const { user } = useAuth()
     const orderId = Number(params.id)
 
     const isRunner = user?.roles?.includes("RUNNER")
@@ -28,19 +28,12 @@ export default function TrackOrderPage() {
                     <h1 className="text-2xl font-bold mb-6">Seguimiento del Pedido #{orderId}</h1>
 
                     <div className="rounded-xl border border-border overflow-hidden h-[500px]">
-                        {token ? (
-                            <DynamicDeliveryMap
-                                orderId={orderId}
-                                initialLat={40.4168}
-                                initialLng={-3.7038}
-                                token={token}
-                                isRunner={isRunner}
-                            />
-                        ) : (
-                            <div className="flex items-center justify-center h-full">
-                                <p>Cargando autorización...</p>
-                            </div>
-                        )}
+                        <DynamicDeliveryMap
+                            orderId={orderId}
+                            initialLat={40.4168}
+                            initialLng={-3.7038}
+                            isRunner={isRunner}
+                        />
                     </div>
                 </main>
             </div>

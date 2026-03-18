@@ -23,6 +23,7 @@ export default function RunnerSimulator({ orderId }: RunnerSimulatorProps) {
         const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/tracking`, {
             path: '/socket.io',
             transports: ['websocket'],
+            withCredentials: true,
         });
 
         newSocket.on('connect', () => {
