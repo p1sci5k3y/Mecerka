@@ -186,7 +186,7 @@ async function main() {
         'runner',
       );
       const hashedPassword = await argon2.hash(runnerPassword);
-      const user = await prisma.user.create({
+      await prisma.user.create({
         data: {
           email: r.email,
           password: hashedPassword,
@@ -311,12 +311,12 @@ async function main() {
   // --- MOCK DATA: Clients ---
   console.log('Seeding Clients...');
   const clientEmail = 'client@meceka.local';
-  let client = await prisma.user.findUnique({ where: { email: clientEmail } });
+  const client = await prisma.user.findUnique({ where: { email: clientEmail } });
 
   if (!client) {
     const clientPassword = resolveSeedPassword('SEED_CLIENT_PASSWORD', 'client');
     const pwd = await argon2.hash(clientPassword);
-    client = await prisma.user.create({
+    await prisma.user.create({
       data: {
         email: clientEmail,
         password: pwd,

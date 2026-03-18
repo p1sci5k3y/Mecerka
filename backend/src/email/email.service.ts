@@ -102,6 +102,7 @@ export class EmailService {
   private async sendMailAsync(to: string, subject: string, html: string) {
     const from = process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
     const maskedTo = this.maskEmail(to);
+    this.logger.debug(`Sending email to ${maskedTo}`);
 
     const info = (await this.transporter.sendMail({
       from,
