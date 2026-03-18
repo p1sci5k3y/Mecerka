@@ -107,8 +107,8 @@ function EditProductContent() {
                 description: formData.description,
                 price: Number.parseFloat(formData.price),
                 stock: Number.parseInt(formData.stock),
-                categoryId: Number.parseInt(formData.categoryId),
-                cityId: Number.parseInt(formData.cityId),
+                categoryId: formData.categoryId,
+                cityId: formData.cityId,
                 imageUrl: formData.imageUrl
             }
 

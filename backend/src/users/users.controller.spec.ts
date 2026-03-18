@@ -1,9 +1,7 @@
 import { TestingModule, Test } from '@nestjs/testing';
 import { UsersController } from './users.controller';
 import { Reflector } from '@nestjs/core';
-
-import { PrismaService } from '../prisma/prisma.service';
-import { JwtService } from '@nestjs/jwt';
+import { UsersService } from './users.service';
 
 describe('UsersController (RBAC Audit)', () => {
   let controller: UsersController;
@@ -12,11 +10,7 @@ describe('UsersController (RBAC Audit)', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersController],
-      providers: [
-        { provide: PrismaService, useValue: {} },
-        { provide: JwtService, useValue: {} },
-        Reflector,
-      ],
+      providers: [{ provide: UsersService, useValue: {} }, Reflector],
     }).compile();
 
     controller = module.get<UsersController>(UsersController);

@@ -1,11 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
   private readonly transporter: nodemailer.Transporter;
+  private readonly logger = new Logger(EmailService.name);
 
   constructor() {
+    const useTestTransport =
+      process.env.NODE_ENV === 'test' || process.env.E2E === 'true';
+
+    if (useTestTransport) {
+      this.transporter = nodemailer.createTransport({
+        jsonTransport: true,
+      });
+      this.logger.log(
+        JSON.stringify({
+          event: 'email.transport.configured',
+          message: 'Email transport configured',
+          mode: 'json-test',
+        }),
+      );
+      return;
+    }
+
     const host = process.env.MAIL_HOST || 'mailpit';
     const port = Number(process.env.MAIL_PORT) || 1025;
     const user = process.env.MAIL_USER;
@@ -20,8 +38,11 @@ export class EmailService {
         rejectUnauthorized: process.env.NODE_ENV === 'production',
       },
     });
-    console.log(
-      `[EmailService] Configured with host: ${host}, port: ${port}, auth: ${!!(user && pass)}`,
+    this.logger.log(
+      JSON.stringify({
+        event: 'email.transport.configured',
+        message: 'Email transport configured',
+      }),
     );
   }
 
@@ -88,7 +109,12 @@ export class EmailService {
       subject,
       html,
     })) as { messageId: string };
-    console.log(`[EmailService] Email sent: ${info.messageId} to ${maskedTo}`);
+    this.logger.log(
+      JSON.stringify({
+        event: 'email.sent',
+        message: 'Email sent successfully',
+      }),
+    );
     return info;
   }
 

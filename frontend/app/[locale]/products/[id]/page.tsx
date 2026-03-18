@@ -86,7 +86,7 @@ export default function ProductDetailPage() {
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
                 ) : (
-                  <img src="https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?q=80&w=600&auto=format&fit=crop" alt="Artesanía por defecto" className="object-cover w-full h-full opacity-80" />
+                  <img src="/placeholder.svg" alt="Producto sin imagen" className="object-cover w-full h-full opacity-80" />
                 )}
               </div>
 

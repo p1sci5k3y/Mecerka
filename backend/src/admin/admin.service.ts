@@ -5,11 +5,15 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role } from '@prisma/client';
+import { Role, RoleGrantSource } from '@prisma/client';
+import { RoleAssignmentService } from '../users/role-assignment.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly roleAssignmentService: RoleAssignmentService,
+  ) {}
 
   // --- User Management ---
   async getAllUsers() {
@@ -33,25 +37,30 @@ export class AdminService {
       // The real danger is removing your own admin role.
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id } });
-      if (!user) throw new BadRequestException('User not found');
-
-      const rolesSet = new Set(user.roles);
-      if (rolesSet.has(role)) {
-        return user; // Already has role
-      }
-
-      rolesSet.add(role);
-
-      // If expanding logic later: Create Provider Profile
-      // For now, we just add the role.
-
-      return tx.user.update({
-        where: { id },
-        data: { roles: Array.from(rolesSet) },
-        select: { id: true, roles: true },
-      });
+    return this.roleAssignmentService.withLockedUser(id, async (tx, user) => {
+      return this.roleAssignmentService.assignRoleInTx(
+        tx,
+        user,
+        role,
+        role === Role.PROVIDER || role === Role.RUNNER
+          ? {
+              snapshot: {
+                requestedAt: new Date(),
+              },
+              audit: {
+                source: RoleGrantSource.ADMIN,
+                grantedById: currentAdminId,
+              },
+              onExisting: 'returnCurrent',
+            }
+          : {
+              audit: {
+                source: RoleGrantSource.ADMIN,
+                grantedById: currentAdminId,
+              },
+              onExisting: 'returnCurrent',
+            },
+      );
     });
   }
 
@@ -60,26 +69,8 @@ export class AdminService {
       throw new ForbiddenException('Cannot revoke your own ADMIN role');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id } });
-      if (!user) throw new BadRequestException('User not found');
-
-      const rolesSet = new Set(user.roles);
-      if (!rolesSet.has(role)) {
-        return user; // Doesn't have role
-      }
-
-      rolesSet.delete(role);
-
-      if (rolesSet.size === 0) {
-        throw new BadRequestException('User must have at least one role');
-      }
-
-      return tx.user.update({
-        where: { id },
-        data: { roles: Array.from(rolesSet) },
-        select: { id: true, roles: true },
-      });
+    return this.roleAssignmentService.withLockedUser(id, async (tx, user) => {
+      return this.roleAssignmentService.revokeRoleInTx(tx, user, role);
     });
   }
 
@@ -105,50 +96,34 @@ export class AdminService {
     });
   }
 
-  async grantProvider(userId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new BadRequestException('User not found');
-      if (user.roles.includes(Role.PROVIDER)) {
-        throw new ConflictException('User is already a provider');
-      }
-
-      return tx.user.update({
-        where: { id: userId },
-        data: { roles: { push: Role.PROVIDER } },
-        select: { id: true, roles: true },
-      });
-    });
+  async grantProvider(userId: string, currentAdminId: string) {
+    return this.roleAssignmentService.withLockedUser(userId, async (tx, user) =>
+      this.roleAssignmentService.assignRoleInTx(tx, user, Role.PROVIDER, {
+        snapshot: {
+          requestedAt: new Date(),
+        },
+        audit: {
+          source: RoleGrantSource.ADMIN,
+          grantedById: currentAdminId,
+        },
+        onExisting: 'returnCurrent',
+      }),
+    );
   }
 
-  async grantRunner(userId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({ where: { id: userId } });
-      if (!user) throw new BadRequestException('User not found');
-      if (user.roles.includes(Role.RUNNER)) {
-        throw new ConflictException('User is already a runner');
-      }
-
-      const runnerProfile = await tx.runnerProfile.findUnique({
-        where: { userId },
-      });
-
-      if (!runnerProfile) {
-        await tx.runnerProfile.create({
-          data: {
-            userId,
-            baseLat: null,
-            baseLng: null,
-          },
-        });
-      }
-
-      return tx.user.update({
-        where: { id: userId },
-        data: { roles: { push: Role.RUNNER } },
-        select: { id: true, roles: true },
-      });
-    });
+  async grantRunner(userId: string, currentAdminId: string) {
+    return this.roleAssignmentService.withLockedUser(userId, async (tx, user) =>
+      this.roleAssignmentService.assignRoleInTx(tx, user, Role.RUNNER, {
+        snapshot: {
+          requestedAt: new Date(),
+        },
+        audit: {
+          source: RoleGrantSource.ADMIN,
+          grantedById: currentAdminId,
+        },
+        onExisting: 'returnCurrent',
+      }),
+    );
   }
 
   // --- Master Data: Cities ---

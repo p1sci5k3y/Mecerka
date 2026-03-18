@@ -22,15 +22,15 @@ export const adminService = {
         return api.get<BackendAdminUser[]>("/admin/users")
     },
 
-    updateUserRole: async (id: number, role: Role) => {
+    updateUserRole: async (id: string, role: Role) => {
         return api.patch<BackendAdminUser>(`/admin/users/${id}/role`, { role })
     },
 
-    activateUser: async (id: number) => {
+    activateUser: async (id: string) => {
         return api.patch<BackendAdminUser>(`/admin/users/${id}/activate`)
     },
 
-    blockUser: async (id: number) => {
+    blockUser: async (id: string) => {
         return api.patch<BackendAdminUser>(`/admin/users/${id}/block`)
     },
 
@@ -43,11 +43,11 @@ export const adminService = {
         return api.post<BackendCity>("/admin/cities", data)
     },
 
-    updateCity: async (id: number, data: UpdateCityDto) => {
+    updateCity: async (id: string, data: UpdateCityDto) => {
         return api.patch<BackendCity>(`/admin/cities/${id}`, data)
     },
 
-    deleteCity: async (id: number) => {
+    deleteCity: async (id: string) => {
         return api.delete(`/admin/cities/${id}`)
     },
 
@@ -60,11 +60,11 @@ export const adminService = {
         return api.post<BackendCategory>("/admin/categories", data)
     },
 
-    updateCategory: async (id: number, data: UpdateCategoryDto) => {
+    updateCategory: async (id: string, data: UpdateCategoryDto) => {
         return api.patch<BackendCategory>(`/admin/categories/${id}`, data)
     },
 
-    deleteCategory: async (id: number) => {
+    deleteCategory: async (id: string) => {
         return api.delete(`/admin/categories/${id}`)
     },
 }

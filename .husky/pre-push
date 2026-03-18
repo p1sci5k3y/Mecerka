@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+set -e
+
+echo "Running pre-push quality gate..."
+npm run test -- --runInBand
+npm run test:e2e -- --runInBand

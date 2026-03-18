@@ -5,8 +5,38 @@ import {
   Role,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
+import * as crypto from 'node:crypto';
 
 const prisma = new PrismaClient();
+const generatedSeedValues = new Map<string, string>();
+
+function generatePassword() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+function generatePin() {
+  return crypto.randomInt(1000, 10_000).toString();
+}
+
+function resolveOrGenerate(
+  envKey: string,
+  label: string,
+  factory: () => string,
+) {
+  const configuredValue = process.env[envKey]?.trim();
+  if (configuredValue) {
+    return configuredValue;
+  }
+
+  let generatedValue = generatedSeedValues.get(envKey);
+  if (!generatedValue) {
+    generatedValue = factory();
+    generatedSeedValues.set(envKey, generatedValue);
+    console.warn(`[seed_order] Generated ${label}: ${generatedValue}`);
+  }
+
+  return generatedValue;
+}
 
 async function main() {
   // 1. Get or create a Client
@@ -14,15 +44,25 @@ async function main() {
     where: { email: 'e2e_client@mecerka.com', roles: { has: Role.CLIENT } },
   });
   if (!client) {
+    const clientPassword = resolveOrGenerate(
+      'E2E_SEED_CLIENT_PASSWORD',
+      'client password',
+      generatePassword,
+    );
+    const clientPin = resolveOrGenerate(
+      'E2E_SEED_CLIENT_PIN',
+      'client pin',
+      generatePin,
+    );
     client = await prisma.user.create({
       data: {
         email: 'e2e_client@mecerka.com',
         name: 'E2E Client',
-        password: await argon2.hash('Password123!'),
+        password: await argon2.hash(clientPassword),
         roles: [Role.CLIENT],
         emailVerified: true,
         mfaEnabled: false,
-        pin: await argon2.hash('1234'),
+        pin: await argon2.hash(clientPin),
       },
     });
   }
@@ -32,11 +72,16 @@ async function main() {
     where: { email: 'e2e_provider@mecerka.com', roles: { has: Role.PROVIDER } },
   });
   if (!provider) {
+    const providerPassword = resolveOrGenerate(
+      'E2E_SEED_PROVIDER_PASSWORD',
+      'provider password',
+      generatePassword,
+    );
     provider = await prisma.user.create({
       data: {
         email: 'e2e_provider@mecerka.com',
         name: 'E2E Provider',
-        password: await argon2.hash('Password123!'),
+        password: await argon2.hash(providerPassword),
         roles: [Role.PROVIDER],
         emailVerified: true,
         mfaEnabled: false,

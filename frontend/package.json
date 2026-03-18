@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint .",
-    "test": "echo 'No frontend tests yet' && exit 0"
+    "test": "echo 'No frontend tests yet' && exit 0",
+    "test:e2e": "playwright test --config=e2e.config.mjs",
+    "test:e2e:full": "node scripts/test-e2e-full.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -67,6 +69,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.2",
     "@tailwindcss/postcss": "^4.1.13",

@@ -9,7 +9,7 @@ import {
   ProviderPaymentStatus,
   Role,
 } from '@prisma/client';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let service: OrdersService;
@@ -156,6 +156,111 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       ).rejects.toThrow(
         'El flujo de pago actual solo admite pedidos de un único proveedor.',
       );
+    });
+  });
+
+  describe('Order tracking', () => {
+    it('returns null location before pickup', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 'ord-1',
+        clientId: 'client-1',
+        runnerId: null,
+        status: DeliveryStatus.CONFIRMED,
+        providerOrders: [{ providerId: 'provider-1' }],
+        deliveryOrder: {
+          id: 'delivery-1',
+          status: 'PICKUP_PENDING',
+          runnerId: 'runner-1',
+          lastRunnerLocationLat: 40.4168,
+          lastRunnerLocationLng: -3.7038,
+          lastLocationUpdateAt: new Date('2026-03-16T10:00:00.000Z'),
+          runner: {
+            id: 'runner-1',
+            name: 'Runner Demo',
+          },
+        },
+      });
+
+      const result = await service.getOrderTracking('ord-1', 'client-1', [
+        Role.CLIENT,
+      ]);
+
+      expect(result).toEqual({
+        orderId: 'ord-1',
+        status: 'ASSIGNED',
+        runner: {
+          id: 'runner-1',
+          name: 'Runner Demo',
+        },
+        location: null,
+        updatedAt: new Date('2026-03-16T10:00:00.000Z'),
+      });
+    });
+
+    it('returns runner location once delivery is in transit', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 'ord-2',
+        clientId: 'client-1',
+        runnerId: 'runner-1',
+        status: DeliveryStatus.IN_TRANSIT,
+        providerOrders: [{ providerId: 'provider-1' }],
+        deliveryOrder: {
+          id: 'delivery-2',
+          status: 'IN_TRANSIT',
+          runnerId: 'runner-1',
+          lastRunnerLocationLat: 40.4168123,
+          lastRunnerLocationLng: -3.7038456,
+          lastLocationUpdateAt: new Date('2026-03-16T10:05:00.000Z'),
+          runner: {
+            id: 'runner-1',
+            name: 'Runner Demo',
+          },
+        },
+      });
+
+      const result = await service.getOrderTracking('ord-2', 'client-1', [
+        Role.CLIENT,
+      ]);
+
+      expect(result).toEqual({
+        orderId: 'ord-2',
+        status: 'DELIVERING',
+        runner: {
+          id: 'runner-1',
+          name: 'Runner Demo',
+        },
+        location: {
+          lat: 40.417,
+          lng: -3.704,
+        },
+        updatedAt: new Date('2026-03-16T10:05:00.000Z'),
+      });
+    });
+
+    it('rejects tracking access for unrelated users', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: 'ord-3',
+        clientId: 'client-1',
+        runnerId: 'runner-1',
+        status: DeliveryStatus.IN_TRANSIT,
+        providerOrders: [{ providerId: 'provider-1' }],
+        deliveryOrder: {
+          id: 'delivery-3',
+          status: 'IN_TRANSIT',
+          runnerId: 'runner-1',
+          lastRunnerLocationLat: 40.4168,
+          lastRunnerLocationLng: -3.7038,
+          lastLocationUpdateAt: new Date('2026-03-16T10:05:00.000Z'),
+          runner: {
+            id: 'runner-1',
+            name: 'Runner Demo',
+          },
+        },
+      });
+
+      await expect(
+        service.getOrderTracking('ord-3', 'user-other', [Role.CLIENT]),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

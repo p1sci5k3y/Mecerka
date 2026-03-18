@@ -4,7 +4,6 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
 import { JwtService } from '@nestjs/jwt';
@@ -14,6 +13,16 @@ import { LoginDto } from './dto/login.dto';
 import * as argon2 from 'argon2';
 import { Role, User } from '@prisma/client';
 import * as crypto from 'node:crypto';
+
+type AuthProfileRecord = {
+  id: string;
+  email: string;
+  name: string;
+  roles: Role[];
+  mfaEnabled: boolean;
+  mfaSetupToken: string | null;
+  mfaSetupExpiresAt: Date | null;
+};
 
 @Injectable()
 export class AuthService {
@@ -28,13 +37,7 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const { email, password, name, role } = dto;
-
-    if (role === Role.ADMIN) {
-      throw new ForbiddenException(
-        'No puedes solicitar privilegios de administrador durante el registro.',
-      );
-    }
+    const { email, password, name } = dto;
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -54,7 +57,7 @@ export class AuthService {
             email,
             password: hashedPassword,
             name: name || email.split('@')[0], // Default name
-            roles: role ? [role] : [Role.CLIENT], // Default role array
+            roles: [Role.CLIENT],
             mfaEnabled: false, // User must set up MFA explicitly
             verificationToken,
             verificationTokenExpiresAt: new Date(
@@ -204,14 +207,25 @@ export class AuthService {
     return { message: 'Cuenta verificada con éxito.' };
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<AuthProfileRecord | null> {
     this.logger.log(`Finding user by ID: ${id}`);
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        roles: true,
+        mfaEnabled: true,
+        mfaSetupToken: true,
+        mfaSetupExpiresAt: true,
+      },
+    });
     if (!user) this.logger.warn(`User ${id} not found`);
     return user;
   }
 
-  async generateMfaSetupOtp(user: User): Promise<void> {
+  async generateMfaSetupOtp(user: Pick<User, 'id' | 'email'>): Promise<void> {
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 

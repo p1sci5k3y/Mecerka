@@ -1,8 +1,22 @@
 // @ts-nocheck
 const { PrismaClient } = require('@prisma/client');
+const { randomBytes } = require('node:crypto');
 
 const prisma = new PrismaClient();
 const argon2 = require('argon2');
+
+function resolveE2ePassword() {
+    const configuredPassword = process.env.E2E_SEED_USERS_PASSWORD?.trim();
+    if (configuredPassword) {
+        return configuredPassword;
+    }
+
+    const generatedPassword = randomBytes(24).toString('base64url');
+    console.warn(
+        `[seed-e2e-users] Generated password for E2E users: ${generatedPassword}`,
+    );
+    return generatedPassword;
+}
 
 async function main() {
     if (process.env.NODE_ENV === 'production' && !process.env.FORCE_E2E_SEED) {
@@ -16,7 +30,7 @@ async function main() {
         { email: 'e2e-admin-final-bypass-v3@test.com', roles: ['CLIENT', 'ADMIN'], name: 'E2E Admin' }
     ];
 
-    const hashedPassword = await argon2.hash('dummy-password-for-prisma-schema');
+    const hashedPassword = await argon2.hash(resolveE2ePassword());
 
     for (const user of users) {
         let existing = await prisma.user.findUnique({ where: { email: user.email } });

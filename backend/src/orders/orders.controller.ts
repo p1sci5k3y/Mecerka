@@ -114,6 +114,19 @@ export class OrdersController {
     return this.ordersService.findAll(req.user.userId, req.user.roles);
   }
 
+  @Get(':id/tracking')
+  @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER, Role.ADMIN)
+  getTracking(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.ordersService.getOrderTracking(
+      id,
+      req.user.userId,
+      req.user.roles,
+    );
+  }
+
   @Get(':id')
   @Roles(Role.CLIENT, Role.PROVIDER, Role.RUNNER, Role.ADMIN)
   findOne(

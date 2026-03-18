@@ -1,119 +1,155 @@
-# 🏙️ Mecerka - Local Marketplace Platform
+# Mecerka
 
-## 📖 ¿Qué es Mecerka?
+Plataforma de comercio local con arquitectura modular, backend en **NestJS**, persistencia en **PostgreSQL** mediante **Prisma ORM**, y frontend en **Next.js**.
 
-**Mecerka** es una plataforma tipo _marketplace_ diseñada específicamente para revitalizar el **Comercio de Cercanía**. Permite a los pequeños negocios locales de una misma ciudad unirse en un escaparate digital común, donde los clientes pueden realizar compras simultáneas a múltiples tiendas y unificar la logística de entrega en un solo viaje ("última milla" unificada).
+El proyecto prioriza:
 
-Este proyecto nace como un **Trabajo de Fin de Máster (TFM)** desarrollado bajo estrictos criterios de ingeniería de software corporativo. No es simplemente un CRUD; hace hincapié en la calidad arquitectónica (Domain-Driven Design), la seguridad (Zero Trust, RBAC, JWT Fallback) y la robustez transaccional (Idempotencia, Máquina de Estados Pura) sobre el mero apilamiento de funcionalidades estéticas.
+- separación clara entre transporte, aplicación y persistencia;
+- control de acceso por rol y por propiedad del recurso;
+- privacidad y minimización de datos;
+- consistencia transaccional en flujos críticos;
+- reproducibilidad mediante Docker y Testcontainers.
 
----
+## Stack real
 
-## 🏗️ Arquitectura y Tecnologías
+- Backend: `Node.js + NestJS`
+- Base de datos: `PostgreSQL`
+- ORM: `Prisma`
+- Frontend: `Next.js`
+- Pasarela de pagos: `Stripe`
+- Entorno local: `Docker Compose`
+- Testing backend: `Jest + Testcontainers`
+- Testing frontend: `Playwright`
 
-El sistema está dividido en dos partes principales (Monorepo):
+## Características técnicas verificables
 
-- **Backend (NestJS):** Monolito modular basado en arquitectura hexagonal y Domain-Driven Design (DDD).
-  - **Base de datos:** Prisma ORM (+ SQLite para MVP).
-  - **Tiempo Real:** WebSockets (Socket.io) autorizados por token para seguimiento logístico.
-  - **Eventos:** `@nestjs/event-emitter` para el desacoplamiento interno (Domain Events).
-  - **Pagos:** Integración con webhook de Stripe (verificación de firmas y Body crudo).
-- **Frontend (Next.js 14):** Aplicación re-utilizable con SSR y React Server Components.
-  - Componentes UI modernos (v0.dev / Shadcn UI).
-  - Contextos de Carrito y Autenticación fuertemente tipados.
-- **Entorno Local:** `Docker Compose` orquestando servicios complementarios (Mailpit) y aislando el entorno de pruebas.
+- roles reales: `CLIENT`, `PROVIDER`, `RUNNER`, `ADMIN`
+- registro público restringido a `CLIENT`
+- flujo autenticado de solicitud de rol para `PROVIDER` y `RUNNER`
+- `ADMIN` no autoasignable desde endpoints públicos
+- MFA exigido en rutas sensibles
+- `fiscalId` nunca almacenado en claro
+- protección fiscal mediante `HMAC-SHA256 + FISCAL_PEPPER`
+- logging estructurado con redacción recursiva de campos sensibles
+- asignación de roles protegida por transacción y `SELECT ... FOR UPDATE`
+- `/metrics` protegido para `ADMIN`
+- `DEMO_MODE` deshabilitado por defecto y activable solo de forma explícita
 
----
+## Puesta en marcha
 
-## 🚀 Guía de Instalación y Arranque
-
-### Requisitos Previos
-
-- Node.js (v20 o superior recomendado).
-- Docker y Docker Compose (para el servidor de correo falso en local `Mailpit`).
-
-### 1. Levantar Servicios Docker
-
-Para interceptar los correos electrónicos simulados (Registro, MFA, etc.):
+### 1. Generar configuración local segura
 
 ```bash
-docker-compose up -d
+make setup
 ```
 
-El buzón estará disponible en http://localhost:8025.
+Esto crea `.env` solo si no existe y genera:
 
-### 2. Configurar el Backend
+- `POSTGRES_PASSWORD`
+- `JWT_SECRET`
+- `JWT_SECRET_CURRENT`
+- `FISCAL_PEPPER`
+
+El bootstrap deja `DEMO_MODE=false` por defecto.
+
+### 2. Levantar la pila
+
+```bash
+docker compose up -d --build
+```
+
+Servicios:
+
+- PostgreSQL
+- backend
+- frontend
+- Mailpit
+
+### 3. Verificar salud del backend
+
+```bash
+curl http://localhost:3000/health
+```
+
+### 4. Abrir la aplicación
+
+- frontend: `http://localhost:3001`
+- backend: `http://localhost:3000`
+- Mailpit: `http://localhost:8025`
+
+## Modo demo
+
+El modo demo es **opt-in** y está **deshabilitado por defecto**.
+
+Si se desea un entorno de demostración:
+
+1. editar `.env`
+2. establecer:
+
+```env
+DEMO_MODE=true
+```
+
+3. reiniciar la pila:
+
+```bash
+docker compose up -d --build
+```
+
+Con `DEMO_MODE=true`, el backend puede auto-sembrar el dataset demo y habilitar los endpoints administrativos de demo.
+
+## Testing
+
+### Backend
 
 ```bash
 cd backend
-npm install
+npm run lint
+npm run type-check
+npm run test
+npm run test:e2e
 ```
 
-El archivo de entorno (`.env`) ya debería venir precargado con secretos genéricos en este repositorio de MVP, pero asegúrate de que existen variables clave como `JWT_SECRET`, `JWT_SECRET_CURRENT` y `DATABASE_URL="file:./dev.db"`.
+La suite backend:
 
-Inicializa y carga datos base en la BD:
+- levanta PostgreSQL efímero con Testcontainers;
+- genera `DATABASE_URL` dinámicamente;
+- genera secretos efímeros;
+- aplica migraciones Prisma antes de ejecutar tests;
+- no depende de una base de datos local compartida;
+- no depende de SMTP externo, porque en `test`/`E2E` el email usa `jsonTransport`.
+
+### Quality gate completa
 
 ```bash
-npx prisma migrate dev
-npx prisma db seed
-npm run start:dev
+npm run test:ci
 ```
 
-El backend estará escuchando en http://localhost:3000.
-
-### 3. Configurar el Frontend
+### Frontend / Playwright
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm run test:e2e:full
 ```
 
-La aplicación web consumidora estará disponible en http://localhost:3001.
+La suite Playwright ejecuta el frontend y el backend reales sobre la pila Docker.
 
----
+## Calidad y DevSecOps
 
-## 🎯 Ejemplos de Flujos para Probar
+Husky impone quality gates locales:
 
-Al arrancar con `db seed`, tendrás un entorno listo para operar. Recomendamos seguir este flujo para entender el núcleo de _Mecerka_:
+- `pre-commit`: `lint` + `type-check`
+- `pre-push`: `test` + `test:e2e`
 
-1. **Catálogo y Carrito:** Accede como un usuario cliente, explora la ciudad y añade productos de distintas tiendas al carrito.
-2. **Checkout Lógico:** Observa cómo el sistema bloquea productos de ciudades cruzadas.
-3. **Flujo Cero-Tolerancia:** Completa el pedido simulando la pasarela; el backend restará stock de forma atómica.
-4. **Vistas de Rol:** Inicia sesión como `provider@mecerka.local` y observa cómo el Dashboard muta para mostrar métricas analíticas y tus productos, ocultando el ruido de otras tiendas.
+`.env` no se versiona y `.env.example` no contiene secretos reales.
 
----
+## Documentación principal
 
-## 🚧 Estado del Proyecto (Fases Socráticas)
-
-Mecerka se desarrolla iterativamente siguiendo una Arquitectura Socrática (Propósitos, Flujos e Invariantes claros por fase). Para mayor detalle ver [PROJECT_STATUS.md](./PROJECT_STATUS.md).
-
-- **Fase 1 (MVP Identity & Basics):** Propósito: Autenticación base y BBDD.
-- **Fase 2 (Public Catalog & Privacy):** Propósito: Catálogo (Público/Privado), filtrado dinámico de inventario activo y omisión de PII.
-- **Fase 3 (Order Integrity):** Propósito: Consolidación de carritos y candados anti-crossing-cities.
-- **Fase 4 (State Machines):** Propósito: Robustez del flujo de ProviderOrder con Concurrencia Optimista.
-- **Fase 5 (Payment & Idempotency):** Propósito: Pagos atómicos, deducción de stock en tiempo real y webhooks 100% seguros (Zero-Trust).
-- **Fase 6 (Governance & Metrics):** Propósito: Consistencia en métricas analíticas exclusivas de flujos económicamente válidos y roles granulares seguros (Grant/Revoke).
-- **Fase 7 (Deploy, Security & Documentation):** Propósito: Asegurar la calidad para producción a través de CI/CD continuo (testeos unitarios y E2E), endurecer directrices de mitigación DoS mediante rate limiters, revocación inmediata asíncrona de JWT (`tokenVersion`) y consolidación arquitectónica de pagos en un proveedor aislado.
-- **Fase 8 (Stripe Connect & Tripartite Payments):** Propósito: Orquestación de mercado Multi-Vendor real. Onboarding OAuth seguro para Proveedores y Runners, y ejecución de cargos unificados al Cliente mediante **Direct Charges** (Zero-Liability), aislando instantáneamente la comisión de logística mediante `application_fee_amount` sin retener los fondos.
-- **Fase 9 (AWS EC2 Production Deployment):** Propósito: Despliegue de la plataforma en la nube pública mediante Infraestructura e Integración Continua. Aprovisionamiento de instancia EC2 genérica, configuración de Swap para builds seguros, orquestación con Docker Compose (Frontend, Backend, PostgreSQL) y Proxy Inverso con Nginx + SSL Automático (Certbot).
-## 📋 Changelog
-
-Todas las versiones, correcciones de errores y decisiones arquitectónicas (ej. _Phase 5: Security Hardening_) se registran estrictamente en [CHANGELOG.md](./CHANGELOG.md).
-
----
-
-## 🛡️ Gobernanza & QA
-
-Para garantizar la calidad académica y técnica, este repositorio utiliza **Husky** y **lint-staged**:
-
-- **Pre-commit:** Se ejecutan `eslint` y `tsc --noEmit` automáticamente en los archivos modificados (Frontend y Backend). El commit fallará si el tipado o sintaxis están rotos.
-- **Unit Testing:** Ejecutable vía `npm run test` (Cubre Dominio, Casos de Integración y API).
-- **CI (GitHub Actions):** Bloquea integraciones si fallan Lint, Build o Tests en un entorno limpio.
-
----
-
-# Licencia Mecerka
-
-Copyright (c) 2026 p1sci5k3y.
-
-Se concede permiso, de forma gratuita, a cualquier persona que obtenga una copia de este software y los archivos de documentación asociados, para utilizar el Software sin restricción, incluyendo sin limitación los derechos para usar, copiar, modificar, fusionar, publicar y distribuir el Software, siempre que sea para fines no comerciales. Queda prohibida la venta, licencia o uso del Software para obtener beneficios económicos directos o indirectos. EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO.
+- [Architecture](/Users/machinehead/Documents/TFM/docs/architecture.md)
+- [Security](/Users/machinehead/Documents/TFM/docs/security.md)
+- [Testing](/Users/machinehead/Documents/TFM/docs/testing.md)
+- [Getting Started](/Users/machinehead/Documents/TFM/docs/getting-started.md)
+- [Demo Environment](/Users/machinehead/Documents/TFM/docs/demo-environment.md)
+- [Observability](/Users/machinehead/Documents/TFM/docs/observability.md)
+- [Final Audit](/Users/machinehead/Documents/TFM/docs/final-audit.md)
+- [SBOM](/Users/machinehead/Documents/TFM/docs/sbom.md)
