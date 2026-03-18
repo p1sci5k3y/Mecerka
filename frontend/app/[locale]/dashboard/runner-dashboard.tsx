@@ -52,7 +52,6 @@ export function RunnerDashboard() {
             try {
                 const urlObj = new URL(data.url);
                 if (urlObj.protocol === 'https:' && urlObj.hostname === 'connect.stripe.com') {
-                    // eslint-disable-next-line
                     globalThis.location.href = urlObj.toString();
                 } else {
                     throw new Error('Invalid or unsafe Stripe connecting URL');

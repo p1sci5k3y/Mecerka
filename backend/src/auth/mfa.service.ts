@@ -46,7 +46,10 @@ export class MfaService {
         `<p>MFA setup has been initiated for your account. Please scan the QR code in the application to complete the process.</p>`,
       )
       .catch((err) =>
-        this.logger.error(`Failed to send MFA email to ${email}`, err.stack),
+        this.logger.error(
+          `Failed to send MFA email for user ${userId}`,
+          err.stack,
+        ),
       );
 
     return {

@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { randomBytes } = require('node:crypto');
+const { maskEmail } = require('./seed-utils.js');
 
 const prisma = new PrismaClient();
 const argon2 = require('argon2');
@@ -12,9 +13,9 @@ async function main() {
     randomBytes(24).toString('base64url');
 
   if (!process.env.E2E_BOOTSTRAP_ADMIN_PASSWORD) {
-    console.warn(
-      `[e2e-bootstrap] Generated E2E admin password for ${adminEmail}: ${adminPassword}`,
-    );
+    console.warn('[e2e-bootstrap] Generated E2E admin password', {
+      email: maskEmail(adminEmail),
+    });
   }
 
   if (
@@ -48,7 +49,9 @@ async function main() {
         lastEmailSentAt: new Date(),
       },
     });
-    console.log('Updated E2E bootstrap admin user');
+    console.log('[e2e-bootstrap] Updated admin user', {
+      email: maskEmail(adminEmail),
+    });
   } else {
     await prisma.user.create({
       data: {
@@ -62,14 +65,17 @@ async function main() {
         lastEmailSentAt: new Date(),
       },
     });
-    console.log('Created E2E bootstrap admin user');
+    console.log('[e2e-bootstrap] Created admin user', {
+      email: maskEmail(adminEmail),
+    });
   }
 }
 
 // eslint-disable-next-line unicorn/prefer-top-level-await
 main()
   .catch((e) => {
-    console.error(e);
+    const message = e instanceof Error ? e.message : 'Unknown bootstrap error';
+    console.error('[e2e-bootstrap] Failed', { message });
     process.exit(1);
   })
   .finally(async () => {

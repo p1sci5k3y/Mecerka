@@ -1,6 +1,8 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { maskEmail }: { maskEmail(email: string): string } = require('../seed-utils.js');
 
 const prisma = new PrismaClient();
 const generatedSeedPasswords = new Map<string, string>();
@@ -31,7 +33,7 @@ function resolveSeedPassword(envKey: string, label: string) {
   if (!generatedPassword) {
     generatedPassword = generateSeedPassword();
     generatedSeedPasswords.set(envKey, generatedPassword);
-    console.warn(`[seed] Generated ${label} password: ${generatedPassword}`);
+    console.warn('[seed] Generated seed password', { account: label });
   }
 
   return generatedPassword;
@@ -105,7 +107,7 @@ async function main() {
         emailVerified: true,
       },
     });
-    console.log('Created admin user: admin@meceka.local');
+    console.log('[seed] Created admin user', { email: maskEmail(adminEmail) });
   }
 
   // Categories
@@ -204,7 +206,7 @@ async function main() {
           },
         },
       });
-      console.log(`Created runner: ${user.name}`);
+      console.log('[seed] Created runner user', { email: maskEmail(r.email) });
     }
   }
 
@@ -245,7 +247,9 @@ async function main() {
           longitude: -3.7074,
         },
       });
-      console.log(`Created provider: ${provider.name}`);
+      console.log('[seed] Created provider user', {
+        email: maskEmail(providerEmail),
+      });
     }
 
     // 2. Create Products for Provider
@@ -326,7 +330,7 @@ async function main() {
         longitude: -3.683,
       },
     });
-    console.log(`Created client: ${client.name}`);
+    console.log('[seed] Created client user', { email: maskEmail(clientEmail) });
   }
 
   console.log('Seeding completed.');
@@ -338,7 +342,8 @@ async function main() {
   try {
     await main();
   } catch (e) {
-    console.error(e);
+    const message = e instanceof Error ? e.message : 'Unknown seed error';
+    console.error('[seed] Failed', { message });
     hasError = true;
   } finally {
     await prisma.$disconnect();
