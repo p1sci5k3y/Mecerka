@@ -47,10 +47,8 @@ export function ProviderDashboard() {
 
     const handleStripeConnect = async () => {
         try {
-            // Note: Ideally authService or paymentsService in frontend would have this wrapper
-            const token = localStorage.getItem('token');
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/connect/link`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include',
             });
             if (!res.ok) throw new Error('Failed to get onboarding link');
             const data = await res.json();

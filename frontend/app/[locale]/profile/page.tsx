@@ -239,8 +239,7 @@ function ProfileContent() {
                   <Button
                     onClick={async () => {
                       try {
-                        const res = await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/provider")
-                        if (res.access_token) localStorage.setItem("token", res.access_token)
+                        await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/provider")
                         toast.success("¡Bienvenido al Gremio de Talleres!", { icon: "🔨" })
                         globalThis.location.reload()
                       } catch (error) {
@@ -258,8 +257,7 @@ function ProfileContent() {
                   <Button
                     onClick={async () => {
                       try {
-                        const res = await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/runner")
-                        if (res.access_token) localStorage.setItem("token", res.access_token)
+                        await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/runner")
                         toast.success("¡Licencia de Reparto aprobada!", { icon: "🚲" })
                         globalThis.location.reload()
                       } catch (error) {

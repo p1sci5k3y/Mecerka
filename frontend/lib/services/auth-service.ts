@@ -22,6 +22,10 @@ export const authService = {
     return api.post('/auth/login', payload);
   },
 
+  async logout() {
+    return api.post('/auth/logout');
+  },
+
   async getProfile() {
     return api.get('/auth/me');
   },

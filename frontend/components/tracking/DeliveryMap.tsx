@@ -64,11 +64,10 @@ interface DeliveryMapProps {
     orderId: number;
     initialLat?: number;
     initialLng?: number;
-    token?: string | null;
     isRunner?: boolean;
 }
 
-export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng = -3.7038, token, isRunner }: DeliveryMapProps) {
+export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng = -3.7038, isRunner }: DeliveryMapProps) {
     const [mounted, setMounted] = useState(false);
     const [position, setPosition] = useState<{ lat: number; lng: number }>({ lat: initialLat, lng: initialLng });
     const [origin, setOrigin] = useState<{ lat: number; lng: number, label: string } | null>(null);
@@ -84,11 +83,6 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
     // Initial Load & Socket Setup
     useEffect(() => {
         setMounted(true);
-        if (!token) {
-            setError('Esperando autenticación...');
-            return;
-        }
-
         let isSubscribed = true;
 
         const initMapData = async () => {
@@ -128,7 +122,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
         const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/tracking`, {
             path: '/socket.io',
             transports: ['websocket'],
-            auth: { token },
+            withCredentials: true,
         });
 
         socketRef.current = newSocket;
@@ -157,7 +151,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orderId, token]);
+    }, [orderId]);
 
     const toggleTracking = () => {
         if (isTracking) {

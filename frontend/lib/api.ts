@@ -1,20 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
-let inMemoryToken: string | null = null
-
-export function setToken(token: string | null) {
-  inMemoryToken = token
-  if (token) {
-    localStorage.setItem("token", token)
-  } else {
-    localStorage.removeItem("token")
-  }
-}
-
-export function getToken(): string | null {
-  return inMemoryToken
-}
-
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -24,12 +9,9 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   }
 
-  if (inMemoryToken) {
-    headers["Authorization"] = `Bearer ${inMemoryToken}`
-  }
-
   const res = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    credentials: "include",
     headers,
   })
 

@@ -158,6 +158,18 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   private extractToken(client: Socket): string | undefined {
+    const cookieHeader = client.handshake.headers?.cookie;
+    if (typeof cookieHeader === 'string') {
+      const accessTokenCookie = cookieHeader
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('access_token='));
+      if (accessTokenCookie) {
+        const [, cookieToken] = accessTokenCookie.split('=');
+        if (cookieToken) return decodeURIComponent(cookieToken);
+      }
+    }
+
     // Support standard Auth headers
     const [type, headerToken] =
       client.handshake.headers?.authorization?.split(' ') ?? [];

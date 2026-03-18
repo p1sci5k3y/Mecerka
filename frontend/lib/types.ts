@@ -13,10 +13,6 @@ export interface User {
   stripeAccountId?: string | null // Stripe Connect Connected Account ID for providers/runners
 }
 
-export interface AuthTokens {
-  access_token: string
-}
-
 export interface Product {
   id: string // UI uses string IDs usually
   name: string

@@ -78,12 +78,6 @@ export async function loginThroughUi(page: Page, account: LoginAccount) {
   await page.waitForURL(/\/(es|en)\/dashboard/, { timeout: 15000 });
 }
 
-export async function getTokenFromPage(page: Page) {
-  const token = await page.evaluate(() => globalThis.localStorage.getItem('token'));
-  expect(token).toBeTruthy();
-  return token as string;
-}
-
 export async function apiGetJson<T>(
   request: APIRequestContext,
   endpoint: string,

@@ -41,9 +41,8 @@ export function RunnerDashboard() {
 
     const handleStripeConnect = async () => {
         try {
-            const token = localStorage.getItem('token');
             const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/connect/link`, {
-                headers: { 'Authorization': `Bearer ${token}` }
+                credentials: 'include',
             });
             if (!res.ok) throw new Error('Failed to get onboarding link');
             const data = await res.json();
