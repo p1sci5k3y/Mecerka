@@ -104,6 +104,7 @@ Si se desea un entorno de demostración:
 
 ```env
 DEMO_MODE=true
+DEMO_PASSWORD=elige-una-contraseña-demo
 ```
 
 3. reiniciar la pila:
@@ -112,7 +113,7 @@ DEMO_MODE=true
 docker compose up -d --build
 ```
 
-Con `DEMO_MODE=true`, el backend puede auto-sembrar el dataset demo y habilitar los endpoints administrativos de demo.
+Con `DEMO_MODE=true`, el backend puede auto-sembrar el dataset demo y habilitar los endpoints administrativos de demo. La contraseña de las cuentas demo debe proporcionarse explícitamente mediante `DEMO_PASSWORD`.
 
 ## Testing
 

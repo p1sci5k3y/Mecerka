@@ -1,0 +1,4 @@
+aws_region         = "eu-west-1"
+existing_vpc_id    = "vpc-xxxxxxxxxxxxxxxxx"
+existing_subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+admin_cidr_blocks  = ["203.0.113.10/32"]

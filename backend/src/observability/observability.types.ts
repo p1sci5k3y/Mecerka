@@ -10,6 +10,12 @@ export type ObservabilityWindow = keyof typeof OBSERVABILITY_WINDOWS;
 
 export const DEFAULT_OBSERVABILITY_WINDOW: ObservabilityWindow = '24h';
 
+export function isObservabilityWindow(
+  value: string,
+): value is ObservabilityWindow {
+  return Object.prototype.hasOwnProperty.call(OBSERVABILITY_WINDOWS, value);
+}
+
 export type ObservabilityMetrics = {
   window: ObservabilityWindow;
   windowStart: Date;

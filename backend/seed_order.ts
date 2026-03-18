@@ -32,7 +32,7 @@ function resolveOrGenerate(
   if (!generatedValue) {
     generatedValue = factory();
     generatedSeedValues.set(envKey, generatedValue);
-    console.warn(`[seed_order] Generated ${label}: ${generatedValue}`);
+    console.warn(`[seed_order] Generated ${label}`);
   }
 
   return generatedValue;

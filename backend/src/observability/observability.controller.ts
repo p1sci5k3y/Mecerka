@@ -13,7 +13,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { ObservabilityService } from './observability.service';
 import {
   DEFAULT_OBSERVABILITY_WINDOW,
-  OBSERVABILITY_WINDOWS,
+  isObservabilityWindow,
   ObservabilityWindow,
 } from './observability.types';
 
@@ -28,8 +28,8 @@ export class ObservabilityController {
       return DEFAULT_OBSERVABILITY_WINDOW;
     }
 
-    if (window in OBSERVABILITY_WINDOWS) {
-      return window as ObservabilityWindow;
+    if (isObservabilityWindow(window)) {
+      return window;
     }
 
     throw new BadRequestException(

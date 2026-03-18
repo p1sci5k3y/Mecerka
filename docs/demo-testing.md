@@ -15,6 +15,8 @@ The demo environment is isolated to test accounts using `@local.test`.
 
 When demo mode is explicitly enabled, the backend auto-seeds this dataset on startup if the demo records do not already exist.
 
+Demo mode requires an explicit `DEMO_PASSWORD` value. The backend does not ship a built-in demo password.
+
 ## Quick Start
 
 1. Start PostgreSQL.
@@ -71,6 +73,8 @@ Default demo accounts:
 - `runner2.demo@local.test`
 - `user.demo@local.test`
 - `user2.demo@local.test`
+
+All of these accounts use the password configured in `DEMO_PASSWORD`.
 
 The Playwright suite also supports reading these from [`frontend/.env.test`](../frontend/.env.test).
 
