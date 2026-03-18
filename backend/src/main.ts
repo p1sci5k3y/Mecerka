@@ -8,6 +8,7 @@ import { AppLoggerService } from './common/logging/app-logger.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.useLogger(app.get(AppLoggerService));
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
 
   // Validation
   app.useGlobalPipes(

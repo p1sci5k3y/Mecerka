@@ -9,13 +9,15 @@ export type RequestWithRequestId = Request & {
   };
 };
 
+const SAFE_REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
+
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
   use(req: RequestWithRequestId, res: Response, next: NextFunction) {
     const incomingRequestId = req.header('x-request-id');
     const requestId =
       typeof incomingRequestId === 'string' &&
-      incomingRequestId.trim().length > 0
+      SAFE_REQUEST_ID_PATTERN.test(incomingRequestId.trim())
         ? incomingRequestId.trim()
         : randomUUID();
 
