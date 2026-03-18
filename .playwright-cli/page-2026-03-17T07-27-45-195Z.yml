@@ -1,0 +1,213 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - navigation [ref=e4]:
+        - link "Mecerka" [ref=e5] [cursor=pointer]:
+          - /url: /es
+          - img [ref=e6]
+          - generic [ref=e11]: Mecerka
+        - generic [ref=e13]:
+          - img [ref=e14]
+          - textbox "Busca artesanía, talleres o barrios..." [ref=e17]
+        - link "Catálogo" [ref=e19] [cursor=pointer]:
+          - /url: /es/products
+        - generic [ref=e20]:
+          - button "Switch Language" [ref=e21] [cursor=pointer]:
+            - img
+            - generic [ref=e22]: Switch Language
+          - link "Iniciar sesión" [ref=e23] [cursor=pointer]:
+            - /url: /es/login
+            - button "Iniciar sesión" [ref=e24]
+          - link "Crear cuenta" [ref=e25] [cursor=pointer]:
+            - /url: /es/register
+            - button "Crear cuenta" [ref=e26]
+    - main [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - heading "Catálogo de productos" [level=1] [ref=e30]
+          - paragraph [ref=e31]: Explora todos los productos disponibles en tu ciudad
+        - generic [ref=e32]:
+          - generic [ref=e33]:
+            - img [ref=e34]
+            - textbox "Busca por pieza, taller o técnica..." [ref=e37]
+          - generic [ref=e38]:
+            - generic [ref=e39]:
+              - img [ref=e40]
+              - text: "Filtrar por:"
+            - generic [ref=e41]:
+              - combobox [ref=e42] [cursor=pointer]:
+                - option "Cualquier ciudad" [selected]
+                - option "Toledo Demo"
+              - generic: ▼
+            - generic [ref=e43]:
+              - combobox [ref=e44] [cursor=pointer]:
+                - option "Cualquier técnica/categoría" [selected]
+                - option "Despensa"
+                - option "Panadería"
+                - option "Verduras"
+              - generic: ▼
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - link "Pan artesano Panadería" [ref=e47] [cursor=pointer]:
+              - /url: /es/products/d3d6a6b8-ec31-4c7e-a6d5-16f04ce66294
+              - img "Pan artesano" [ref=e48]
+              - generic [ref=e50]: Panadería
+            - generic [ref=e52]:
+              - link "Pan artesano" [ref=e53] [cursor=pointer]:
+                - /url: /es/products/d3d6a6b8-ec31-4c7e-a6d5-16f04ce66294
+                - heading "Pan artesano" [level=3] [ref=e54]
+              - paragraph [ref=e55]: Hogaza artesanal para pedidos de demo.
+              - generic [ref=e56]:
+                - generic [ref=e57]:
+                  - img [ref=e58]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e61]:
+                  - generic [ref=e62]: 2,50 €
+                  - button "Añadir" [ref=e63] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e64]:
+            - link "Empanada gallega Panadería" [ref=e65] [cursor=pointer]:
+              - /url: /es/products/0ee9657b-9ab5-449e-85a2-2015078e672b
+              - img "Empanada gallega" [ref=e66]
+              - generic [ref=e68]: Panadería
+            - generic [ref=e70]:
+              - link "Empanada gallega" [ref=e71] [cursor=pointer]:
+                - /url: /es/products/0ee9657b-9ab5-449e-85a2-2015078e672b
+                - heading "Empanada gallega" [level=3] [ref=e72]
+              - paragraph [ref=e73]: Empanada lista para probar el flujo de compra.
+              - generic [ref=e74]:
+                - generic [ref=e75]:
+                  - img [ref=e76]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e79]:
+                  - generic [ref=e80]: 6,90 €
+                  - button "Añadir" [ref=e81] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e82]:
+            - link "Tomates ecológicos Verduras" [ref=e83] [cursor=pointer]:
+              - /url: /es/products/a5fd816c-b657-4570-9fb4-30c345932677
+              - img "Tomates ecológicos" [ref=e84]
+              - generic [ref=e86]: Verduras
+            - generic [ref=e88]:
+              - link "Tomates ecológicos" [ref=e89] [cursor=pointer]:
+                - /url: /es/products/a5fd816c-b657-4570-9fb4-30c345932677
+                - heading "Tomates ecológicos" [level=3] [ref=e90]
+              - paragraph [ref=e91]: Tomates frescos para pedidos de demo.
+              - generic [ref=e92]:
+                - generic [ref=e93]:
+                  - img [ref=e94]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e97]:
+                  - generic [ref=e98]: 3,20 €
+                  - button "Añadir" [ref=e99] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e100]:
+            - link "Huevos camperos Despensa" [ref=e101] [cursor=pointer]:
+              - /url: /es/products/b1b5fdc9-4e4a-49bc-b6a2-9f9b9ea7f773
+              - img "Huevos camperos" [ref=e102]
+              - generic [ref=e104]: Despensa
+            - generic [ref=e106]:
+              - link "Huevos camperos" [ref=e107] [cursor=pointer]:
+                - /url: /es/products/b1b5fdc9-4e4a-49bc-b6a2-9f9b9ea7f773
+                - heading "Huevos camperos" [level=3] [ref=e108]
+              - paragraph [ref=e109]: Docena de huevos camperos de muestra.
+              - generic [ref=e110]:
+                - generic [ref=e111]:
+                  - img [ref=e112]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e115]:
+                  - generic [ref=e116]: 4,40 €
+                  - button "Añadir" [ref=e117] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e118]:
+            - link "Queso manchego Despensa" [ref=e119] [cursor=pointer]:
+              - /url: /es/products/739e8392-cca6-4a75-95c4-447b0b2fe624
+              - img "Queso manchego" [ref=e120]
+              - generic [ref=e122]: Despensa
+            - generic [ref=e124]:
+              - link "Queso manchego" [ref=e125] [cursor=pointer]:
+                - /url: /es/products/739e8392-cca6-4a75-95c4-447b0b2fe624
+                - heading "Queso manchego" [level=3] [ref=e126]
+              - paragraph [ref=e127]: Queso manchego curado para la demo.
+              - generic [ref=e128]:
+                - generic [ref=e129]:
+                  - img [ref=e130]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e133]:
+                  - generic [ref=e134]: 8,75 €
+                  - button "Añadir" [ref=e135] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e136]:
+            - link "Aceite de oliva Despensa" [ref=e137] [cursor=pointer]:
+              - /url: /es/products/e531deb2-5184-4fcf-8842-0ba003cd3ac6
+              - img "Aceite de oliva" [ref=e138]
+              - generic [ref=e140]: Despensa
+            - generic [ref=e142]:
+              - link "Aceite de oliva" [ref=e143] [cursor=pointer]:
+                - /url: /es/products/e531deb2-5184-4fcf-8842-0ba003cd3ac6
+                - heading "Aceite de oliva" [level=3] [ref=e144]
+              - paragraph [ref=e145]: Aceite de oliva virgen extra para pedidos demo.
+              - generic [ref=e146]:
+                - generic [ref=e147]:
+                  - img [ref=e148]
+                  - text: Hecho en Toledo Demo
+                - generic [ref=e151]:
+                  - generic [ref=e152]: 9,50 €
+                  - button "Añadir" [ref=e153] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+    - contentinfo [ref=e154]:
+      - generic [ref=e155]:
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - link "Mecerka" [ref=e158] [cursor=pointer]:
+              - /url: /es
+              - img [ref=e159]
+              - generic [ref=e164]: Mecerka
+            - paragraph [ref=e165]:
+              - text: El mercado vivo de tu ciudad.
+              - text: Donde la artesanía local, los talleres de barrio y la confianza de siempre encuentran su lugar en la red.
+          - generic [ref=e166]:
+            - heading "Plataforma" [level=3] [ref=e167]
+            - list [ref=e168]:
+              - listitem [ref=e169]:
+                - link "Catálogo" [ref=e170] [cursor=pointer]:
+                  - /url: /es/products
+              - listitem [ref=e171]:
+                - link "Iniciar sesión" [ref=e172] [cursor=pointer]:
+                  - /url: /es/login
+              - listitem [ref=e173]:
+                - link "Registrarse" [ref=e174] [cursor=pointer]:
+                  - /url: /es/register
+          - generic [ref=e175]:
+            - heading "Legal" [level=3] [ref=e176]
+            - list [ref=e177]:
+              - listitem [ref=e178]:
+                - link "Privacidad" [ref=e179] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e180]:
+                - link "Términos" [ref=e181] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e182]:
+                - link "Cookies" [ref=e183] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=e184]:
+            - heading "Soporte" [level=3] [ref=e185]
+            - list [ref=e186]:
+              - listitem [ref=e187]:
+                - link "FAQ" [ref=e188] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e189]:
+                - link "Contacto" [ref=e190] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e191]:
+                - link "Estado" [ref=e192] [cursor=pointer]:
+                  - /url: "#"
+        - paragraph [ref=e194]: 2026 Mecerka. Todos los derechos reservados.
+  - region "Notifications alt+T"
+  - alert [ref=e195]

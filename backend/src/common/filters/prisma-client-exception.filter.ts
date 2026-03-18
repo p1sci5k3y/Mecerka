@@ -12,13 +12,10 @@ export class PrismaClientExceptionFilter extends BaseExceptionFilter {
     // P2002: Unique constraint failed
     if (exception.code === 'P2002') {
       const status = HttpStatus.CONFLICT;
-      const message = exception.meta?.target
-        ? `Unique constraint failed on field: ${JSON.stringify(exception.meta.target)}`
-        : 'Unique constraint failed';
 
       response.status(status).json({
         statusCode: status,
-        message: message,
+        message: 'Resource already exists or conflicts with an existing value',
       });
     } else if (exception.code === 'P2025') {
       // P2025: Record not found

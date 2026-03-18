@@ -10,5 +10,6 @@ import { PaymentsService } from './payments.service';
   imports: [ConfigModule, OrdersModule],
   controllers: [WebhooksController, OnboardingController, PaymentsController],
   providers: [PaymentsService],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Empanada gallega">
+  <rect width="320" height="240" fill="#fff1d6"/>
+  <path d="M65 150c0-48 43-87 95-87s95 39 95 87" fill="#d89a45"/>
+  <path d="M70 150c6-42 44-74 90-74s84 32 90 74" fill="#f0bb61"/>
+  <path d="M89 141h142" stroke="#b6732c" stroke-width="7" stroke-linecap="round"/>
+  <path d="M108 115l17 26M160 107l0 34M212 115l-17 26" stroke="#b6732c" stroke-width="6" stroke-linecap="round"/>
+  <text x="160" y="210" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#7a4a1c">Empanada gallega</text>
+</svg>

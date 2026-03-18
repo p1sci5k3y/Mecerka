@@ -52,6 +52,20 @@ export class DeliveryService {
     @Optional() private readonly riskService?: RiskService,
   ) {}
 
+  private logStructuredEvent(
+    event: string,
+    payload: Record<string, string | number | boolean | null | undefined>,
+    message: string,
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        event,
+        message,
+        ...payload,
+      }),
+    );
+  }
+
   private getJobGrabbingWindowMs() {
     return 5 * 60 * 1000;
   }
@@ -572,8 +586,13 @@ export class DeliveryService {
         data,
       });
 
-      this.logger.log(
-        `Delivery lifecycle transition: deliveryOrder=${deliveryOrderId} runner=${deliveryOrder.runnerId ?? 'admin'} from=${deliveryOrder.status} to=${nextStatus}`,
+      this.logStructuredEvent(
+        'delivery.state_transition',
+        {
+          orderId: deliveryOrder.orderId,
+          runnerId: deliveryOrder.runnerId ?? userId,
+        },
+        `Delivery lifecycle transitioned from ${deliveryOrder.status} to ${nextStatus}`,
       );
 
       return updated;
@@ -905,6 +924,15 @@ export class DeliveryService {
           runnerId: dto.runnerId,
         },
       });
+
+      this.logStructuredEvent(
+        'delivery.assignment',
+        {
+          orderId: deliveryOrder.order.id,
+          runnerId: dto.runnerId,
+        },
+        'Delivery runner assigned',
+      );
 
       return updated;
     });
@@ -1465,6 +1493,14 @@ export class DeliveryService {
     });
 
     const windowMs = this.getJobGrabbingWindowMs();
+    this.logStructuredEvent(
+      'delivery.assignment',
+      {
+        orderId: result.deliveryOrderId,
+        runnerId,
+      },
+      'Delivery job accepted by runner',
+    );
     const deliveryJobClaimClient = (this.prisma as any).deliveryJobClaim;
     const recentClaims =
       typeof deliveryJobClaimClient?.count === 'function'
@@ -1618,11 +1654,23 @@ export class DeliveryService {
           },
         });
 
-        this.logger.log(
-          `Runner location updated: deliveryOrder=${deliveryOrderId} runner=${userId} recordedAt=${now.toISOString()}`,
+        this.logStructuredEvent(
+          'runner.location.updated',
+          {
+            orderId: updated.orderId,
+            runnerId: userId,
+          },
+          'Runner location updated',
         );
-        this.logger.log(
-          `tracking.${deliveryOrder.lastLocationUpdateAt ? 'updated' : 'started'} deliveryOrder=${deliveryOrderId} runner=${userId} timestamp=${now.toISOString()}`,
+        this.logStructuredEvent(
+          deliveryOrder.lastLocationUpdateAt
+            ? 'tracking.updated'
+            : 'tracking.started',
+          {
+            orderId: updated.orderId,
+            runnerId: userId,
+          },
+          'Delivery tracking heartbeat recorded',
         );
 
         return {

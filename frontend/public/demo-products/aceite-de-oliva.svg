@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Aceite de oliva">
+  <rect width="320" height="240" fill="#eef3cf"/>
+  <path d="M136 78h48l8 20v72c0 20-13 34-32 34s-32-14-32-34V98z" fill="#7a9f39"/>
+  <path d="M144 78h32v22h-32z" fill="#5f7c2e"/>
+  <path d="M146 102h28v68c0 11-6 18-14 18s-14-7-14-18z" fill="#d9bf45"/>
+  <rect x="148" y="58" width="24" height="20" rx="4" fill="#8a6339"/>
+  <ellipse cx="214" cy="138" rx="18" ry="11" fill="#8ca23d"/>
+  <ellipse cx="234" cy="122" rx="14" ry="9" fill="#92ab43"/>
+  <text x="160" y="210" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#55651d">Aceite de oliva</text>
+</svg>

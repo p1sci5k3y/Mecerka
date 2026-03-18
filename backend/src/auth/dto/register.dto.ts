@@ -1,13 +1,11 @@
 import {
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
   MinLength,
   IsStrongPassword,
 } from 'class-validator';
-import { Role } from '@prisma/client';
 
 export class RegisterDto {
   @IsEmail()
@@ -34,8 +32,4 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   name?: string;
-
-  @IsEnum(Role)
-  @IsOptional()
-  role?: Role; // Default to CLIENT in service if not provided
 }

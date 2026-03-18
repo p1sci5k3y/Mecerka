@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Pan artesano">
+  <rect width="320" height="240" fill="#f7ead4"/>
+  <ellipse cx="160" cy="150" rx="95" ry="55" fill="#b86e2d"/>
+  <ellipse cx="160" cy="145" rx="88" ry="48" fill="#d0873a"/>
+  <path d="M120 120c8 10 8 23 0 33" stroke="#8d5322" stroke-width="6" stroke-linecap="round"/>
+  <path d="M160 112c8 12 8 30 0 42" stroke="#8d5322" stroke-width="6" stroke-linecap="round"/>
+  <path d="M200 120c8 10 8 23 0 33" stroke="#8d5322" stroke-width="6" stroke-linecap="round"/>
+  <text x="160" y="210" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#6f451f">Pan artesano</text>
+</svg>

@@ -2,14 +2,21 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: tfm_postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: marketplace
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     container_name: tfm_backend
@@ -17,14 +24,33 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "3001:3000"
+      - "3000:3000"
+    env_file:
+      - .env
     environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/marketplace
-      JWT_SECRET: dev_secret_key_change_in_prod
-      STRIPE_SECRET_KEY: sk_test_dummy
-      STRIPE_WEBHOOK_SECRET: whsec_dummy
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET_CURRENT: ${JWT_SECRET_CURRENT}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      DELIVERY_STRIPE_WEBHOOK_SECRET: ${DELIVERY_STRIPE_WEBHOOK_SECRET}
+      DONATIONS_STRIPE_WEBHOOK_SECRET: ${DONATIONS_STRIPE_WEBHOOK_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+      BACKEND_URL: ${BACKEND_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      DEMO_MODE: ${DEMO_MODE}
+      NODE_ENV: ${NODE_ENV}
+      E2E: ${E2E:-false}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASS: ${MAIL_PASS}
+      MAIL_FROM: ${MAIL_FROM}
+      PORT: 3000
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && node dist/src/main"
     # volumes:
     #   - ./backend:/app
 
@@ -33,17 +59,28 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
     ports:
-      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - .env
     environment:
       INTERNAL_API_URL: http://backend:3000
-      NEXT_PUBLIC_REQUIRE_MFA: "false"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_REQUIRE_MFA: ${NEXT_PUBLIC_REQUIRE_MFA}
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
     depends_on:
       - backend
 
   mailpit:
     image: axllent/mailpit
     container_name: tfm_mailpit
+    env_file:
+      - .env
     ports:
       - "1025:1025"
       - "8025:8025"

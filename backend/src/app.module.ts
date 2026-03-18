@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -23,10 +23,21 @@ import { DeliveryModule } from './delivery/delivery.module';
 import { RefundsModule } from './refunds/refunds.module';
 import { RiskModule } from './risk/risk.module';
 import { ObservabilityModule } from './observability/observability.module';
+import { DemoModule } from './demo/demo.module';
+import { AppLoggerService } from './common/logging/app-logger.service';
+import { RequestLoggingInterceptor } from './common/logging/request-logging.interceptor';
+import { RequestIdMiddleware } from './common/logging/request-id.middleware';
+import { E2eAwareThrottlerGuard } from './common/guards/e2e-throttler.guard';
+import { SeedModule } from './seed/seed.module';
+import { validateEnvironment } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }), // Makes ConfigService injectable across all modules
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '../.env'],
+      validate: validateEnvironment,
+    }),
     EventEmitterModule.forRoot(),
     PrismaModule,
     CitiesModule,
@@ -52,14 +63,25 @@ import { ObservabilityModule } from './observability/observability.module';
     RefundsModule,
     RiskModule,
     ObservabilityModule,
+    SeedModule,
+    DemoModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    AppLoggerService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: E2eAwareThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggingInterceptor,
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+
+set -e
+
+echo "Running pre-commit quality gate..."
+npm run lint
+npm run type-check

@@ -68,16 +68,9 @@ function mapBackendItem(item: any): OrderItem {
 
 export const ordersService = {
   create: async (payload: CreateOrderPayload) => {
-    // Transform payload for backend: wrapper { items: [...] } is expected by backend?
-    // Backend expects { items: [{ productId, quantity }] }.
-    // Payload IS { items: [...] }.
-    // But backend expects productId as NUMBER?
-    // CartPage sends string IDs (from Product.id which is string in adapter).
-
-    // We need to map strings to numbers if Backend needs numbers.
     const backendPayload = {
       items: payload.items.map(i => ({
-        productId: Number.parseInt(i.productId),
+        productId: i.productId,
         quantity: i.quantity
       })),
       ...(payload.deliveryAddress && { deliveryAddress: payload.deliveryAddress })

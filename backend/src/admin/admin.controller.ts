@@ -18,6 +18,10 @@ import { Role } from '@prisma/client';
 import { UserFromJwt } from '../auth/interfaces/auth.interfaces';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
+import { CreateCityDto } from '../cities/dto/create-city.dto';
+import { UpdateCityDto } from '../cities/dto/update-city.dto';
+import { CreateCategoryDto } from '../categories/dto/create-category.dto';
+import { UpdateCategoryDto } from '../categories/dto/update-category.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
@@ -70,13 +74,19 @@ export class AdminController {
   }
 
   @Post('users/:id/grant/provider')
-  grantProvider(@Param('id', ParseUUIDPipe) id: string) {
-    return this.adminService.grantProvider(id);
+  grantProvider(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.adminService.grantProvider(id, req.user.userId);
   }
 
   @Post('users/:id/grant/runner')
-  grantRunner(@Param('id', ParseUUIDPipe) id: string) {
-    return this.adminService.grantRunner(id);
+  grantRunner(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.adminService.grantRunner(id, req.user.userId);
   }
 
   // --- Cities ---
@@ -86,14 +96,14 @@ export class AdminController {
   }
 
   @Post('cities')
-  createCity(@Body() body: { name: string; slug: string; active?: boolean }) {
+  createCity(@Body() body: CreateCityDto) {
     return this.adminService.createCity(body);
   }
 
   @Patch('cities/:id')
   updateCity(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { name?: string; slug?: string; active?: boolean },
+    @Body() body: UpdateCityDto,
   ) {
     return this.adminService.updateCity(id, body);
   }
@@ -110,16 +120,14 @@ export class AdminController {
   }
 
   @Post('categories')
-  createCategory(
-    @Body() body: { name: string; slug: string; image_url?: string },
-  ) {
+  createCategory(@Body() body: CreateCategoryDto) {
     return this.adminService.createCategory(body);
   }
 
   @Patch('categories/:id')
   updateCategory(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { name?: string; slug?: string; image_url?: string },
+    @Body() body: UpdateCategoryDto,
   ) {
     return this.adminService.updateCategory(id, body);
   }

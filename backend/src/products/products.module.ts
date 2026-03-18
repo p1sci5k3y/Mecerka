@@ -9,5 +9,6 @@ import { CatalogFileParser } from './catalog-file.parser';
   imports: [PrismaModule],
   controllers: [ProductsController],
   providers: [ProductsService, CatalogImportService, CatalogFileParser],
+  exports: [ProductsService],
 })
 export class ProductsModule {}

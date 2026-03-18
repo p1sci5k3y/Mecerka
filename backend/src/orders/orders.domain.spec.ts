@@ -13,6 +13,7 @@ import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertTestEnvironment } from '../../test/test-env';
 
 jest.setTimeout(20000);
 
@@ -21,6 +22,8 @@ describe('OrdersService - Provider Payment Domain', () => {
   let prisma: PrismaService;
 
   beforeAll(async () => {
+    assertTestEnvironment();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
