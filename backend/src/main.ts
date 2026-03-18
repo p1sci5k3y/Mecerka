@@ -3,9 +3,11 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
 import helmet from 'helmet';
+import { AppLoggerService } from './common/logging/app-logger.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
+  app.useLogger(app.get(AppLoggerService));
 
   // Validation
   app.useGlobalPipes(
@@ -43,7 +45,12 @@ async function bootstrap() {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-dev-payment-secret'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-dev-payment-secret',
+      'X-Request-ID',
+    ],
   });
   await app.listen(process.env.PORT ?? 3000);
 }

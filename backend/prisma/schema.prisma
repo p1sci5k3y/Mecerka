@@ -18,6 +18,17 @@ enum Role {
   RUNNER
 }
 
+enum RoleRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RoleGrantSource {
+  SELF_SERVICE
+  ADMIN
+}
+
 enum DeliveryStatus {
   PENDING
   CONFIRMED
@@ -203,6 +214,14 @@ model User {
   pin                        String? // Hashed transaction PIN for purchases
   name                       String
   roles                      Role[]    @default([CLIENT])
+  requestedRole              Role?
+  roleStatus                 RoleRequestStatus?
+  fiscalIdHash               String?
+  fiscalIdLast4              String?   @db.VarChar(4)
+  fiscalCountry              String?
+  requestedAt                DateTime?
+  lastRoleGrantedById        String?   @db.Uuid
+  lastRoleSource             RoleGrantSource?
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
   emailVerified              Boolean   @default(false)
@@ -245,6 +264,9 @@ model User {
   deliveryIncidents DeliveryIncident[]
   requestedRefunds RefundRequest[] @relation("RequestedRefunds")
   reviewedRefunds RefundRequest[] @relation("ReviewedRefunds")
+
+  @@index([requestedRole])
+  @@index([roleStatus])
 }
 
 model City {
@@ -429,9 +451,11 @@ model Order {
   runnerPerKmFee     Decimal? @db.Decimal(10, 2)
 
   @@index([clientId])
+  @@index([clientId, createdAt])
   @@index([cityId])
   @@index([runnerId])
   @@index([status])
+  @@index([createdAt])
 }
 
 model ProviderOrder {

@@ -52,7 +52,7 @@ export default function UsersPage() {
         fetchUsers()
     }, [toast])
 
-    const handleStatusChange = async (userId: number, currentStatus: boolean) => {
+    const handleStatusChange = async (userId: string, currentStatus: boolean) => {
         try {
             if (currentStatus) {
                 await adminService.blockUser(userId)

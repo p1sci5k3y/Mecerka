@@ -125,7 +125,7 @@ function CitiesManager() {
         }
     }
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!confirm("¿Estás seguro?")) return
         try {
             await adminService.deleteCity(id)
@@ -262,7 +262,7 @@ function CategoriesManager() {
         }
     }
 
-    const handleDelete = async (id: number) => {
+    const handleDelete = async (id: string) => {
         if (!confirm("¿Estás seguro?")) return
         try {
             await adminService.deleteCategory(id)

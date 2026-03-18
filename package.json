@@ -3,6 +3,11 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
+    "lint": "npm run lint --prefix backend",
+    "type-check": "npm run type-check --prefix backend",
+    "test": "npm run test --prefix backend -- --runInBand",
+    "test:e2e": "npm run test:e2e --prefix backend -- --runInBand",
+    "test:ci": "npm run lint && npm run type-check && npm run test && npm run test:e2e",
     "lint:all": "npm run lint --prefix backend && npm run lint --prefix frontend",
     "type-check:all": "npm run type-check --prefix backend && npm run type-check --prefix frontend"
   },

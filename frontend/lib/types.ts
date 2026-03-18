@@ -104,47 +104,47 @@ export interface BackendUser {
 }
 
 export interface BackendCity {
-  id: number
+  id: string
   name: string
   slug: string
   active?: boolean
 }
 
 export interface BackendCategory {
-  id: number
+  id: string
   name: string
   slug: string
   image_url?: string
 }
 
 export interface BackendProvider {
-  id: number
+  id: string
   name: string
   email: string
 }
 
 export interface BackendProduct {
-  id: number
+  id: string
   name: string
   description?: string
   price: string // Decimal string
   stock: number
   imageUrl?: string
-  cityId: number
+  cityId: string
   city?: BackendCity
-  categoryId: number
+  categoryId: string
   category?: BackendCategory
-  providerId: number
+  providerId: string
   provider?: BackendProvider
   createdAt: string
   updatedAt: string
 }
 
 export interface BackendOrderItem {
-  id: number
+  id: string
   quantity: number
   priceAtPurchase: string // Decimal string
-  productId: number
+  productId: string
   product?: BackendProduct
 }
 
@@ -159,7 +159,7 @@ export interface BackendProviderOrder {
 }
 
 export interface BackendOrder {
-  id: number
+  id: string
   totalPrice: string // Decimal string
   deliveryFee: string // Decimal string
   status: "PENDING" | "CONFIRMED" | "READY_FOR_ASSIGNMENT" | "ASSIGNED" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED"
@@ -181,7 +181,7 @@ export interface AdminMetrics {
 }
 
 export interface BackendAdminUser {
-  id: number
+  id: string
   email: string
   name: string
   roles: Role[]
@@ -214,8 +214,8 @@ export interface CreateProductDto {
   description?: string
   price: number
   stock: number
-  cityId: number
-  categoryId: number
+  cityId: string
+  categoryId: string
   imageUrl?: string
 }
 

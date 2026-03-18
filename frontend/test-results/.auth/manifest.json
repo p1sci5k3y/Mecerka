@@ -1,0 +1,37 @@
+{
+  "admin": {
+    "email": "admin.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5NjMyMTNhYy0yZGUyLTRjMTktYThmYi0yYmYyZmVlMDI2NzEiLCJlbWFpbCI6ImFkbWluLmRlbW9AbG9jYWwudGVzdCIsInJvbGVzIjpbIkFETUlOIl0sIm1mYUF1dGhlbnRpY2F0ZWQiOnRydWUsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczNzM4Mzk1LCJleHAiOjE3NzM3MzkyOTV9.E12nrWjSOzbnsWXtx871GUJYOyq3l7uWiQEzIqc5lkU",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/admin.json"
+  },
+  "provider": {
+    "email": "provider.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3NDRkYzY3ZC04NzkzLTRkNjUtOGU1YS04Y2Y3NzAyZTBmNWEiLCJlbWFpbCI6InByb3ZpZGVyLmRlbW9AbG9jYWwudGVzdCIsInJvbGVzIjpbIlBST1ZJREVSIl0sIm1mYUF1dGhlbnRpY2F0ZWQiOnRydWUsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczNzM4Mzk1LCJleHAiOjE3NzM3MzkyOTV9.H76UeJNIIB98-kFw0rusGzqhdjuDoHF_ACdyzYN-ecU",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/provider.json"
+  },
+  "provider2": {
+    "email": "provider2.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwNmI1ZjFhOS0zMzAwLTQzMzAtYWI4Yi1kNGVjYTU2OTEyZjUiLCJlbWFpbCI6InByb3ZpZGVyMi5kZW1vQGxvY2FsLnRlc3QiLCJyb2xlcyI6WyJQUk9WSURFUiJdLCJtZmFBdXRoZW50aWNhdGVkIjp0cnVlLCJ0b2tlblZlcnNpb24iOjEsImlhdCI6MTc3MzczODM5NSwiZXhwIjoxNzczNzM5Mjk1fQ.9HGsWCp2m7tO6QhP1j4xOTTfT1cgCKrnAj9Jb_l_KN4",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/provider2.json"
+  },
+  "runner": {
+    "email": "runner.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2MTEzYTQxNy03MzdhLTQ5OWUtOTBkMi1lYTYxYjI4MjllNDIiLCJlbWFpbCI6InJ1bm5lci5kZW1vQGxvY2FsLnRlc3QiLCJyb2xlcyI6WyJSVU5ORVIiXSwibWZhQXV0aGVudGljYXRlZCI6dHJ1ZSwidG9rZW5WZXJzaW9uIjoxLCJpYXQiOjE3NzM3MzgzOTUsImV4cCI6MTc3MzczOTI5NX0.4fdkkWaR-mRCV5kTu8c1mb_f2UsqQJ4LG97u0jGt9Bk",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/runner.json"
+  },
+  "runner2": {
+    "email": "runner2.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1YWJkNzViYS0yZTMzLTQ1NWItYjQ2MS00MmQ5NWIxNDgxNDAiLCJlbWFpbCI6InJ1bm5lcjIuZGVtb0Bsb2NhbC50ZXN0Iiwicm9sZXMiOlsiUlVOTkVSIl0sIm1mYUF1dGhlbnRpY2F0ZWQiOnRydWUsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczNzM4Mzk1LCJleHAiOjE3NzM3MzkyOTV9.vO00s9V5UZVylOehCOazh1BXSe_LzGIj4fMFF-N67Os",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/runner2.json"
+  },
+  "user": {
+    "email": "user.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNDE2MjljMy0yNDViLTRhZTItYTYwMy1iMzliMjU3Yzg1NzYiLCJlbWFpbCI6InVzZXIuZGVtb0Bsb2NhbC50ZXN0Iiwicm9sZXMiOlsiQ0xJRU5UIl0sIm1mYUF1dGhlbnRpY2F0ZWQiOnRydWUsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczNzM4Mzk1LCJleHAiOjE3NzM3MzkyOTV9.lnisIMAyILXzUX6D6IMPpnXRL2lDeXc-4AkYtvBlQuI",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/user.json"
+  },
+  "user2": {
+    "email": "user2.demo@local.test",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiZWJkODVmMi0yMzBkLTRlODEtYmJmYS03MjExZjAzMjExMjciLCJlbWFpbCI6InVzZXIyLmRlbW9AbG9jYWwudGVzdCIsInJvbGVzIjpbIkNMSUVOVCJdLCJtZmFBdXRoZW50aWNhdGVkIjp0cnVlLCJ0b2tlblZlcnNpb24iOjEsImlhdCI6MTc3MzczODM5NSwiZXhwIjoxNzczNzM5Mjk1fQ.eYU39cLLm6P515eiebNGx0QG03emFQpPPqJJ3sr-BFA",
+    "storageStatePath": "/Users/machinehead/Documents/TFM/frontend/test-results/.auth/user2.json"
+  }
+}

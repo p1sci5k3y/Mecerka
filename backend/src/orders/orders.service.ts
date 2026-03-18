@@ -40,6 +40,20 @@ export class OrdersService {
 
   private readonly providerPaymentProvider = 'internal-mvp';
 
+  private logStructuredEvent(
+    event: string,
+    payload: Record<string, string | number | boolean | null | undefined>,
+    message: string,
+  ) {
+    this.logger.log(
+      JSON.stringify({
+        event,
+        message,
+        ...payload,
+      }),
+    );
+  }
+
   private async emitRiskEvent(
     actorType: RiskActorType,
     actorId: string,
@@ -97,6 +111,108 @@ export class OrdersService {
           reservationExpiresAt,
         };
       }),
+    };
+  }
+
+  private roundCoordinate(value: number) {
+    return Number(value.toFixed(3));
+  }
+
+  private buildOrderTrackingStatus(order: any) {
+    const deliveryOrder = order.deliveryOrder;
+
+    if (!deliveryOrder) {
+      return order.status;
+    }
+
+    switch (deliveryOrder.status) {
+      case 'PICKED_UP':
+      case 'IN_TRANSIT':
+        return 'DELIVERING';
+      case 'DELIVERED':
+        return 'DELIVERED';
+      case 'RUNNER_ASSIGNED':
+      case 'PICKUP_PENDING':
+        return 'ASSIGNED';
+      case 'CANCELLED':
+        return 'CANCELLED';
+      default:
+        return order.status;
+    }
+  }
+
+  async getOrderTracking(id: string, userId: string, roles: Role[]) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        providerOrders: {
+          select: {
+            providerId: true,
+          },
+        },
+        deliveryOrder: {
+          select: {
+            id: true,
+            status: true,
+            runnerId: true,
+            lastRunnerLocationLat: true,
+            lastRunnerLocationLng: true,
+            lastLocationUpdateAt: true,
+            runner: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ${id} not found`);
+    }
+
+    if (!roles.includes(Role.ADMIN)) {
+      const isClient = order.clientId === userId;
+      const isRunner =
+        order.deliveryOrder?.runnerId === userId || order.runnerId === userId;
+      const isProvider = order.providerOrders.some(
+        (providerOrder) => providerOrder.providerId === userId,
+      );
+
+      if (!isClient && !isRunner && !isProvider) {
+        throw new ForbiddenException(
+          'You do not have permission to view this order tracking',
+        );
+      }
+    }
+
+    const deliveryOrder = order.deliveryOrder;
+    const hasVisibleLocation =
+      deliveryOrder != null &&
+      ['PICKED_UP', 'IN_TRANSIT', 'DELIVERED'].includes(deliveryOrder.status) &&
+      deliveryOrder.lastRunnerLocationLat != null &&
+      deliveryOrder.lastRunnerLocationLng != null;
+    const latitude = deliveryOrder?.lastRunnerLocationLat;
+    const longitude = deliveryOrder?.lastRunnerLocationLng;
+
+    return {
+      orderId: order.id,
+      status: this.buildOrderTrackingStatus(order),
+      runner: deliveryOrder?.runner
+        ? {
+            id: deliveryOrder.runner.id,
+            name: deliveryOrder.runner.name,
+          }
+        : null,
+      location: hasVisibleLocation
+        ? {
+            lat: this.roundCoordinate(latitude as number),
+            lng: this.roundCoordinate(longitude as number),
+          }
+        : null,
+      updatedAt: deliveryOrder?.lastLocationUpdateAt ?? null,
     };
   }
 
@@ -530,7 +646,19 @@ export class OrdersService {
           },
         });
 
-        return this.toReservationAwareOrder(orderWithReservations);
+        const reservationAwareOrder = this.toReservationAwareOrder(
+          orderWithReservations,
+        );
+
+        this.logStructuredEvent(
+          'order.created',
+          {
+            orderId: reservationAwareOrder.id,
+          },
+          'Aggregated order created from cart checkout',
+        );
+
+        return reservationAwareOrder;
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
@@ -722,6 +850,14 @@ export class OrdersService {
         providerOrders: { include: { items: true } },
       },
     });
+
+    this.logStructuredEvent(
+      'order.created',
+      {
+        orderId: order.id,
+      },
+      'Order created through legacy manual flow',
+    );
 
     return order;
   }
@@ -936,6 +1072,14 @@ export class OrdersService {
         data: { status: DeliveryStatus.READY_FOR_ASSIGNMENT },
       });
 
+      this.logStructuredEvent(
+        'order.state_transition',
+        {
+          orderId,
+        },
+        'Order transitioned to READY_FOR_ASSIGNMENT',
+      );
+
       // Event returned instead of emitted inside the transaction to prevent inconsistency
       return {
         event: 'order.stateChanged',
@@ -1010,6 +1154,13 @@ export class OrdersService {
             where: { id: order.id },
             data: { status: DeliveryStatus.IN_TRANSIT },
           });
+          this.logStructuredEvent(
+            'order.state_transition',
+            {
+              orderId: order.id,
+            },
+            'Order transitioned to IN_TRANSIT after all provider orders were picked up',
+          );
         }
       }
     }
@@ -1109,6 +1260,14 @@ export class OrdersService {
       orderId: id,
       status: DeliveryStatus.ASSIGNED,
     });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+        runnerId,
+      },
+      'Order assigned to runner',
+    );
 
     return this.prisma.order.findUnique({ where: { id } });
   }
@@ -1144,6 +1303,14 @@ export class OrdersService {
       orderId: id,
       status: DeliveryStatus.DELIVERED,
     });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+        runnerId,
+      },
+      'Order marked as delivered',
+    );
 
     return this.prisma.order.findUnique({ where: { id } });
   }
@@ -1199,6 +1366,14 @@ export class OrdersService {
       actorRole: Role.RUNNER,
       timestamp: new Date().toISOString(),
     });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+        runnerId,
+      },
+      'Order marked as in transit',
+    );
 
     return updated;
   }
@@ -1291,6 +1466,13 @@ export class OrdersService {
       actorRole: isAdmin ? Role.ADMIN : Role.CLIENT,
       timestamp: new Date().toISOString(),
     });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+      },
+      'Order cancelled',
+    );
 
     return updated;
   }

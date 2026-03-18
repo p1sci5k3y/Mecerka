@@ -52,4 +52,10 @@ describe('State Machine Pure Guard', () => {
       ),
     ).toBe(false);
   });
+
+  it('Should reject illegal skips (ASSIGNED -> DELIVERED)', () => {
+    expect(
+      canTransitionOrder(DeliveryStatus.ASSIGNED, DeliveryStatus.DELIVERED),
+    ).toBe(false);
+  });
 });

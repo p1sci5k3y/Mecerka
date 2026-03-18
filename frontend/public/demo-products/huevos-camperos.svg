@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" role="img" aria-label="Huevos camperos">
+  <rect width="320" height="240" fill="#f7f0da"/>
+  <ellipse cx="115" cy="132" rx="31" ry="43" fill="#f3ead1"/>
+  <ellipse cx="160" cy="120" rx="31" ry="43" fill="#f5ecd6"/>
+  <ellipse cx="205" cy="132" rx="31" ry="43" fill="#efe3c4"/>
+  <path d="M78 171h164" stroke="#b58f5f" stroke-width="8" stroke-linecap="round"/>
+  <text x="160" y="210" text-anchor="middle" font-family="Georgia, serif" font-size="22" fill="#6e5a35">Huevos camperos</text>
+</svg>

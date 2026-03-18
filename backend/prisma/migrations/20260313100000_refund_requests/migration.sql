@@ -24,16 +24,16 @@ ADD COLUMN "paidAt" TIMESTAMP(3);
 
 -- CreateTable
 CREATE TABLE "RefundRequest" (
-  "id" TEXT NOT NULL,
-  "incidentId" TEXT,
-  "providerOrderId" TEXT,
-  "deliveryOrderId" TEXT,
+  "id" UUID NOT NULL,
+  "incidentId" UUID,
+  "providerOrderId" UUID,
+  "deliveryOrderId" UUID,
   "type" "RefundType" NOT NULL,
   "status" "RefundStatus" NOT NULL DEFAULT 'REQUESTED',
   "amount" DECIMAL(10,2) NOT NULL,
   "currency" TEXT NOT NULL,
-  "requestedById" TEXT NOT NULL,
-  "reviewedById" TEXT,
+  "requestedById" UUID NOT NULL,
+  "reviewedById" UUID,
   "externalRefundId" TEXT,
   "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "reviewedAt" TIMESTAMP(3),

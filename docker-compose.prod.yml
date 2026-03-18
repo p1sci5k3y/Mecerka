@@ -5,17 +5,19 @@ services:
     image: postgres:15-alpine
     container_name: mecerka_postgres_prod
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mecerka}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-mecerka}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - mecerka_network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mecerka} -d ${POSTGRES_DB:-mecerka}" ]
-      interval: 10s
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 5s
       timeout: 5s
       retries: 5
     # We do NOT publish ports to the EC2 host to keep DB closed from public internet
@@ -27,26 +29,31 @@ services:
       dockerfile: Dockerfile
     container_name: mecerka_backend_prod
     restart: unless-stopped
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && node dist/src/main"
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && node dist/src/main"
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-mecerka}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mecerka}?schema=public
+      - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
-      - CORS_ORIGIN=${CORS_ORIGIN:-https://mecerka.com}
-      - FRONTEND_URL=${FRONTEND_URL:-https://mecerka.com}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - FRONTEND_URL=${FRONTEND_URL}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - DELIVERY_STRIPE_WEBHOOK_SECRET=${DELIVERY_STRIPE_WEBHOOK_SECRET}
+      - DONATIONS_STRIPE_WEBHOOK_SECRET=${DONATIONS_STRIPE_WEBHOOK_SECRET}
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
       - MAIL_USER=${MAIL_USER}
       - MAIL_PASS=${MAIL_PASS}
       - MAIL_FROM=${MAIL_FROM}
-      - BACKEND_URL=${BACKEND_URL:-https://mecerka.me/api}
+      - BACKEND_URL=${BACKEND_URL}
       - PORT=3000
       - NODE_ENV=production
+      - DEMO_MODE=${DEMO_MODE}
     ports:
       - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
     networks:
@@ -57,12 +64,14 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.mecerka.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
     container_name: mecerka_frontend_prod
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://api.mecerka.com}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
       - PORT=3001
       - HOSTNAME=0.0.0.0

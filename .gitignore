@@ -1,5 +1,6 @@
 node_modules
 .env
+.env.test
 backend/dist
 *.tsbuildinfo
 .DS_Store

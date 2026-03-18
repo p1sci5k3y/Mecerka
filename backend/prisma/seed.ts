@@ -1,7 +1,41 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
+import * as crypto from 'node:crypto';
 
 const prisma = new PrismaClient();
+const generatedSeedPasswords = new Map<string, string>();
+
+function isLocalOrDemoSeedMode() {
+  return (
+    process.env.DEMO_MODE === 'true' || process.env.NODE_ENV !== 'production'
+  );
+}
+
+function generateSeedPassword() {
+  return crypto.randomBytes(24).toString('base64url');
+}
+
+function resolveSeedPassword(envKey: string, label: string) {
+  const configuredPassword = process.env[envKey]?.trim();
+  if (configuredPassword) {
+    return configuredPassword;
+  }
+
+  if (!isLocalOrDemoSeedMode()) {
+    throw new Error(
+      `${envKey} is required when seeding outside demo/local mode`,
+    );
+  }
+
+  let generatedPassword = generatedSeedPasswords.get(envKey);
+  if (!generatedPassword) {
+    generatedPassword = generateSeedPassword();
+    generatedSeedPasswords.set(envKey, generatedPassword);
+    console.warn(`[seed] Generated ${label} password: ${generatedPassword}`);
+  }
+
+  return generatedPassword;
+}
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 async function main() {
@@ -59,12 +93,7 @@ async function main() {
     where: { email: adminEmail },
   });
   if (!adminExists) {
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
-    if (!process.env.SEED_ADMIN_PASSWORD) {
-      console.warn(
-        'WARNING: Using insecure default password for admin user. Set SEED_ADMIN_PASSWORD env var.',
-      );
-    }
+    const adminPassword = resolveSeedPassword('SEED_ADMIN_PASSWORD', 'admin');
     const hashedPassword = await argon2.hash(adminPassword);
     await prisma.user.create({
       data: {
@@ -150,7 +179,11 @@ async function main() {
       where: { email: r.email },
     });
     if (!userExists) {
-      const hashedPassword = await argon2.hash('Runner123!');
+      const runnerPassword = resolveSeedPassword(
+        'SEED_RUNNER_PASSWORD',
+        'runner',
+      );
+      const hashedPassword = await argon2.hash(runnerPassword);
       const user = await prisma.user.create({
         data: {
           email: r.email,
@@ -193,7 +226,11 @@ async function main() {
     });
 
     if (!provider) {
-      const pwd = await argon2.hash('Provider123!');
+      const providerPassword = resolveSeedPassword(
+        'SEED_PROVIDER_PASSWORD',
+        'provider',
+      );
+      const pwd = await argon2.hash(providerPassword);
       provider = await prisma.user.create({
         data: {
           email: providerEmail,
@@ -273,7 +310,8 @@ async function main() {
   let client = await prisma.user.findUnique({ where: { email: clientEmail } });
 
   if (!client) {
-    const pwd = await argon2.hash('Client123!');
+    const clientPassword = resolveSeedPassword('SEED_CLIENT_PASSWORD', 'client');
+    const pwd = await argon2.hash(clientPassword);
     client = await prisma.user.create({
       data: {
         email: clientEmail,
