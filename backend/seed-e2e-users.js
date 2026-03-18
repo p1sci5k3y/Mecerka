@@ -1,6 +1,7 @@
 // @ts-nocheck
 const { PrismaClient } = require('@prisma/client');
 const { randomBytes } = require('node:crypto');
+const { maskEmail } = require('./seed-utils.js');
 
 const prisma = new PrismaClient();
 const argon2 = require('argon2');
@@ -12,9 +13,7 @@ function resolveE2ePassword() {
     }
 
     const generatedPassword = randomBytes(24).toString('base64url');
-    console.warn(
-        `[seed-e2e-users] Generated password for E2E users: ${generatedPassword}`,
-    );
+    console.warn('[seed-e2e-users] Generated password for E2E users');
     return generatedPassword;
 }
 
@@ -44,7 +43,9 @@ async function main() {
                     password: hashedPassword
                 },
             });
-            console.log('Updated existing user:', user.email);
+            console.log('[seed-e2e-users] Updated existing user', {
+                email: maskEmail(user.email),
+            });
         } else {
             await prisma.user.create({
                 data: {
@@ -55,7 +56,9 @@ async function main() {
                     name: user.name
                 },
             });
-            console.log('Created new E2E user:', user.email);
+            console.log('[seed-e2e-users] Created new user', {
+                email: maskEmail(user.email),
+            });
         }
     }
 }
@@ -66,7 +69,8 @@ async function main() {
     try {
         await main();
     } catch (e) {
-        console.error(e);
+        const message = e instanceof Error ? e.message : 'Unknown seed error';
+        console.error('[seed-e2e-users] Failed', { message });
         hasError = true;
     } finally {
         await prisma.$disconnect();

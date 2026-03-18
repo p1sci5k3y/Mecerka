@@ -10,7 +10,7 @@ async function main() {
   // 0. Verify User Existence
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (!existingUser) {
-    console.error(`User not found for email: ${email}`);
+    console.error('Reset test target user not found');
     return;
   }
 
@@ -53,4 +53,9 @@ async function main() {
   console.log("User by token again:", !!user2);
 }
 
-main().catch(console.error).finally(() => prisma.$disconnect());
+main()
+  .catch((error) => {
+    const message = error instanceof Error ? error.message : 'Unknown reset error';
+    console.error('Reset test failed', { message });
+  })
+  .finally(() => prisma.$disconnect());

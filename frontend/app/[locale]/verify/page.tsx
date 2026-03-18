@@ -12,14 +12,15 @@ export default function VerifyEmailPage() {
     const searchParams = useSearchParams()
     const token = searchParams.get("token")
 
-
-    const [status, setStatus] = useState<"loading" | "success" | "error">("loading")
-    const [message, setMessage] = useState("Verificando tu cuenta...")
+    const [status, setStatus] = useState<"loading" | "success" | "error">(
+        token ? "loading" : "error"
+    )
+    const [message, setMessage] = useState(
+        token ? "Verificando tu cuenta..." : "Enlace inválido o sin token de verificación."
+    )
 
     useEffect(() => {
         if (!token) {
-            setStatus("error")
-            setMessage("Enlace inválido o sin token de verificación.")
             return
         }
 
