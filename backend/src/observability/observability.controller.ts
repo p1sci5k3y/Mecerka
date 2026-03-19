@@ -21,7 +21,7 @@ import {
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class ObservabilityController {
-  constructor(private readonly observabilityService: ObservabilityService) {}
+  constructor(private readonly observabilityService: ObservabilityService) { }
 
   private parseWindow(window?: string): ObservabilityWindow {
     if (!window) {
@@ -29,6 +29,8 @@ export class ObservabilityController {
     }
 
     if (isObservabilityWindow(window)) {
+      // False positive: window is constrained to '24h' | '7d' | '30d' by the
+      // type guard above; arbitrary input never reaches the return statement.
       return window;
     }
 
