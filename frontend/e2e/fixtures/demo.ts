@@ -16,7 +16,21 @@ export const BACKEND_URL = 'http://localhost:3000';
 type LoginAccount = {
   email: string;
   password: string;
+  label?: string;
 };
+
+function getExpectedLandingPath(account: LoginAccount) {
+  switch (account.label) {
+    case 'ADMIN':
+      return /\/(es|en)\/admin$/
+    case 'PROVIDER':
+      return /\/(es|en)\/provider\/sales$/
+    case 'RUNNER':
+      return /\/(es|en)\/runner$/
+    default:
+      return /\/(es|en)\/dashboard$/
+  }
+}
 
 async function parseJson(response: any) {
   const text = await response.text();
@@ -75,7 +89,7 @@ export async function loginThroughUi(page: Page, account: LoginAccount) {
   await page.getByLabel(/correo electrónico|email/i).fill(account.email);
   await page.getByLabel(/contraseña|password/i).fill(account.password);
   await page.getByRole('button', { name: /entrar|iniciar sesión|login/i }).click();
-  await page.waitForURL(/\/(es|en)\/dashboard/, { timeout: 15000 });
+  await page.waitForURL(getExpectedLandingPath(account), { timeout: 15000 });
 }
 
 export async function apiGetJson<T>(

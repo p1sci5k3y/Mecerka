@@ -150,10 +150,10 @@ export function ClientDashboard() {
                                                 </div>
 
                                                 <div className="mt-4 pt-6 border-t border-[#df795d]/10 flex items-center justify-between z-10">
-                                                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#df795d] transition-colors cursor-pointer">
+                                                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
                                                         <Receipt className="w-4 h-4" />
-                                                        Ver Recibo Completo
-                                                    </span>
+                                                        Recibo completo no disponible en esta vista
+                                                    </div>
                                                     <Button asChild className="bg-[#df795d] hover:bg-[#c05e42] text-white px-6 rounded-lg text-sm transition-colors shadow-sm flex items-center gap-2">
                                                         <Link href={`/orders/${order.id}/track`}>
                                                             Seguir Envío

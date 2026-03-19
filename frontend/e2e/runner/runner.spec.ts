@@ -20,13 +20,13 @@ test.describe('runner', () => {
       runnerToken,
     );
 
-    await page.goto('/es/dashboard');
+    await page.goto('/es/runner');
 
     await expect(
-      page.getByRole('heading', { name: /panel de ruta/i }),
+      page.getByRole('heading', { name: /panel de repartidor/i }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /ruta actual/i }),
+      page.getByText(/modo ruta activa|en el barrio/i),
     ).toBeVisible();
 
     const token = runnerToken;

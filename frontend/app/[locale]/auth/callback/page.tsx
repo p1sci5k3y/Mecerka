@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import { authService } from "@/lib/services/auth-service"
+import { getPrimaryRouteForUser } from "@/lib/role-navigation"
 
 function CallbackContent() {
     const searchParams = useSearchParams()
@@ -22,9 +24,9 @@ function CallbackContent() {
             verifiedRef.current = true
             try {
                 await verifyMagicLink(token)
+                const user = await authService.getProfile()
                 toast.success("Acceso concedido")
-                // Force a hard navigation to ensure state is fresh if router.push fails
-                globalThis.location.href = "/dashboard"
+                globalThis.location.href = getPrimaryRouteForUser(user)
             } catch (error) {
                 console.error(error)
                 toast.error("El enlace ha expirado o no es válido")

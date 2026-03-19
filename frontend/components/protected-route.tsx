@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "@/lib/navigation"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import type { Role } from "@/lib/types"
+import { getPrimaryRouteForUser } from "@/lib/role-navigation"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -29,8 +30,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       user &&
       !allowedRoles.some(role => user?.roles?.includes(role))
     ) {
-      router.replace("/dashboard")
-      return;
+      router.replace(getPrimaryRouteForUser(user))
+      return
     }
 
     const requireMfa = process.env.NEXT_PUBLIC_REQUIRE_MFA !== 'false';

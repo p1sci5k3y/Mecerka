@@ -9,14 +9,14 @@ import { api } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
 import { useTranslations } from 'next-intl'
 import { BrandMark, BrandWordmark } from "@/components/brand-mark"
+import { getPrimaryRouteForRoles } from "@/lib/role-navigation"
+import type { Role } from "@/lib/types"
 
 const OTP_IDS = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"]
 
 function resolveSafeReturnTo(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/dashboard"
-  }
-
+  if (!value) return null
+  if (!value.startsWith("/") || value.startsWith("//")) return null
   return value
 }
 
@@ -31,6 +31,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [pendingRoles, setPendingRoles] = useState<Role[]>([])
 
   // MFA Step
   const [step, setStep] = useState<1 | 2>(1)
@@ -63,10 +64,11 @@ export default function LoginPage() {
     try {
       const response = await login({ email, password })
       if (response?.user?.mfaEnabled) {
+        setPendingRoles(Array.isArray(response?.user?.roles) ? response.user.roles : [])
         setStep(2)
       } else {
         toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-        router.replace(returnTo)
+        router.replace(returnTo ?? getPrimaryRouteForRoles(response?.user?.roles))
       }
     } catch (error: any) {
       toast.error(error.message || "Credenciales inválidas.")
@@ -86,7 +88,7 @@ export default function LoginPage() {
     try {
       await api.post('/auth/mfa/verify', { token })
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-      router.replace(returnTo)
+      router.replace(returnTo ?? getPrimaryRouteForRoles(pendingRoles))
     } catch (error: any) {
       console.error(error)
       toast.error("Código incorrecto.")
@@ -233,7 +235,7 @@ export default function LoginPage() {
 
               <p className="mt-12 text-center text-sm text-slate-500">
                 {t('newToMarketplace')}{" "}
-                <Link href={`/register?returnTo=${encodeURIComponent(returnTo)}`} className="text-[#e07b61] font-semibold hover:underline underline-offset-4">{t('createAccount')}</Link>
+                <Link href={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : "/register"} className="text-[#e07b61] font-semibold hover:underline underline-offset-4">{t('createAccount')}</Link>
               </p>
             </>
           )}
