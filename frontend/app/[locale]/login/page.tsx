@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react"
 import { useRouter, Link } from "@/lib/navigation"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
@@ -11,10 +12,20 @@ import { BrandMark, BrandWordmark } from "@/components/brand-mark"
 
 const OTP_IDS = ["otp-0", "otp-1", "otp-2", "otp-3", "otp-4", "otp-5"]
 
+function resolveSafeReturnTo(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return "/dashboard"
+  }
+
+  return value
+}
+
 export default function LoginPage() {
   const t = useTranslations('Auth')
   const { login } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const returnTo = resolveSafeReturnTo(searchParams.get("returnTo"))
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -55,7 +66,7 @@ export default function LoginPage() {
         setStep(2)
       } else {
         toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-        globalThis.location.href = "/dashboard"
+        router.replace(returnTo)
       }
     } catch (error: any) {
       toast.error(error.message || "Credenciales inválidas.")
@@ -75,7 +86,7 @@ export default function LoginPage() {
     try {
       await api.post('/auth/mfa/verify', { token })
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
-      globalThis.location.href = "/dashboard"
+      router.replace(returnTo)
     } catch (error: any) {
       console.error(error)
       toast.error("Código incorrecto.")
@@ -222,7 +233,7 @@ export default function LoginPage() {
 
               <p className="mt-12 text-center text-sm text-slate-500">
                 {t('newToMarketplace')}{" "}
-                <Link href="/register" className="text-[#e07b61] font-semibold hover:underline underline-offset-4">{t('createAccount')}</Link>
+                <Link href={`/register?returnTo=${encodeURIComponent(returnTo)}`} className="text-[#e07b61] font-semibold hover:underline underline-offset-4">{t('createAccount')}</Link>
               </p>
             </>
           )}

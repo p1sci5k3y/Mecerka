@@ -116,19 +116,19 @@ export function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <Link href="/cart">
+            <Button variant="ghost" size="sm" className="relative">
+              <Inbox className="h-5 w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                  {totalItems}
+                </span>
+              )}
+            </Button>
+          </Link>
+
           {isAuthenticated ? (
             <>
-              <Link href="/cart">
-                <Button variant="ghost" size="sm" className="relative">
-                  <Inbox className="h-5 w-5" />
-                  {totalItems > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      {totalItems}
-                    </span>
-                  )}
-                </Button>
-              </Link>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2">
@@ -228,16 +228,16 @@ export function Navbar() {
               <span className="text-muted-foreground">/</span>
               <button onClick={() => handleLanguageChange('en')} className={cn("text-sm", locale === 'en' ? "font-bold" : "text-muted-foreground")}>EN</button>
             </div>
+            <Link
+              href="/cart"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+              onClick={() => setMobileOpen(false)}
+            >
+              <Inbox className="h-4 w-4" />
+              {t('cart')} {totalItems > 0 && `(${totalItems})`}
+            </Link>
             {isAuthenticated ? (
               <>
-                <Link
-                  href="/cart"
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  <Inbox className="h-4 w-4" />
-                  {t('cart')} {totalItems > 0 && `(${totalItems})`}
-                </Link>
                 <Link
                   href={getDashboardLink()}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"

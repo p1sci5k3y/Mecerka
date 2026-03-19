@@ -29,7 +29,7 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 function isAuthHydrationRequired(pathname: string) {
-  const protectedPrefixes = ["/dashboard", "/admin", "/profile", "/cart", "/mfa", "/provider", "/runner", "/orders"]
+  const protectedPrefixes = ["/dashboard", "/admin", "/profile", "/mfa", "/provider", "/runner", "/orders"]
   return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 

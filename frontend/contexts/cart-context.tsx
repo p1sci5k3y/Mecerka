@@ -13,7 +13,7 @@ interface CartContextType {
   items: CartItem[]
   totalItems: number
   totalPrice: number
-  addItem: (product: Product, quantity?: number) => void
+  addItem: (product: Product, quantity?: number) => string | null
   removeItem: (productId: string) => void
   updateQuantity: (productId: string, quantity: number) => void
   clearCart: () => void
@@ -29,15 +29,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addItem = useCallback(
     (product: Product, quantity = 1) => {
       setCityConflict(null)
-      setItems((prev) => {
-        // Validate same city
-        if (prev.length > 0 && prev[0].product.city !== product.city) {
-          setCityConflict(
-            `Solo puedes comprar productos de la misma ciudad. Tu carrito tiene productos de ${prev[0].product.city}.`
-          )
-          return prev
-        }
+      if (items.length > 0 && items[0].product.providerId !== product.providerId) {
+        const conflictMessage =
+          "El checkout actual solo admite productos de un mismo taller. Vacía la cesta o termina este pedido antes de añadir piezas de otro proveedor."
+        setCityConflict(conflictMessage)
+        return conflictMessage
+      }
 
+      if (items.length > 0 && items[0].product.city !== product.city) {
+        const conflictMessage = `Solo puedes comprar productos de la misma ciudad. Tu carrito tiene productos de ${items[0].product.city}.`
+        setCityConflict(conflictMessage)
+        return conflictMessage
+      }
+
+      setItems((prev) => {
         const existing = prev.find((i) => i.product.id === product.id)
         if (existing) {
           return prev.map((i) =>
@@ -48,8 +53,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
         return [...prev, { product, quantity }]
       })
+
+      return null
     },
-    []
+    [items]
   )
 
   const removeItem = useCallback((productId: string) => {
