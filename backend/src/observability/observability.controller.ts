@@ -21,7 +21,7 @@ import {
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class ObservabilityController {
-  constructor(private readonly observabilityService: ObservabilityService) { }
+  constructor(private readonly observabilityService: ObservabilityService) {}
 
   private parseWindow(window?: string): ObservabilityWindow {
     if (!window) {

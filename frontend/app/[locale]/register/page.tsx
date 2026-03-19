@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "@/lib/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
@@ -17,18 +17,28 @@ export default function RegisterPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState("CLIENT")
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
 
-  const [num1] = useState(Math.floor(Math.random() * 10) + 1)
-  const [num2] = useState(Math.floor(Math.random() * 10) + 1)
+  const [num1, setNum1] = useState<number | null>(null)
+  const [num2, setNum2] = useState<number | null>(null)
   const [captchaAnswer, setCaptchaAnswer] = useState("")
+
+  useEffect(() => {
+    setNum1(Math.floor(Math.random() * 10) + 1)
+    setNum2(Math.floor(Math.random() * 10) + 1)
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (num1 === null || num2 === null) {
+      toast.error("La validación de seguridad todavía no está lista. Inténtalo de nuevo.")
+      setLoading(false)
+      return
+    }
 
     if (parseInt(captchaAnswer) !== num1 + num2) {
       toast.error("Validación de seguridad (CAPTCHA) incorrecta. Inténtalo de nuevo.")
@@ -43,7 +53,7 @@ export default function RegisterPage() {
     }
 
     try {
-      await register({ name, email, password, role })
+      await register({ name, email, password })
       toast.success("Cuenta creada. Revisa tu correo electrónico para validarla.", { icon: "🌿" })
       setIsSuccess(true)
     } catch (error: any) {
@@ -78,23 +88,11 @@ export default function RegisterPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="space-y-2 mb-4">
-                  <label className="text-slate-800 dark:text-slate-200 text-sm font-medium ml-1">{t('joinAs')}</label>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    {['CLIENT', 'PROVIDER', 'RUNNER'].map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setRole(r)}
-                        className={`h-12 border rounded-lg text-sm font-medium transition-all ${role === r
-                          ? "border-[#e07d61] bg-[#e07d61]/10 text-[#e07d61] shadow-sm"
-                          : "border-[#e07d61]/20 bg-white dark:bg-[#201512]/50 text-slate-600 dark:text-slate-400 hover:border-[#e07d61]/50"
-                          }`}
-                      >
-                        {r === 'CLIENT' ? t('roleClient') : r === 'PROVIDER' ? t('roleProvider') : t('roleRunner')}
-                      </button>
-                    ))}
-                  </div>
+                <div className="rounded-lg border border-[#e07d61]/20 bg-white dark:bg-[#201512]/50 px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{t('registerAccountTypeTitle')}</p>
+                  <p className="mt-1 leading-relaxed">
+                    {t('registerAccountTypeDescription')}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -155,7 +153,7 @@ export default function RegisterPage() {
                   </label>
                   <div className="flex items-center gap-3">
                     <div className="h-14 px-4 bg-muted/50 border border-border rounded-lg flex items-center justify-center font-bold text-lg text-slate-700 dark:text-slate-300 pointer-events-none select-none">
-                      {num1} + {num2} = ?
+                      {num1 ?? "—"} + {num2 ?? "—"} = ?
                     </div>
                     <input
                       type="number"

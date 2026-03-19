@@ -38,6 +38,7 @@ const config = {
             ...process.env,
             PORT: '3000',
             FRONTEND_URL: 'http://localhost:3001',
+            DEMO_PASSWORD: process.env.DEMO_PASSWORD ?? 'DemoPass123!',
             STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? 'sk_test_dummy',
             STRIPE_WEBHOOK_SECRET:
               process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_test',

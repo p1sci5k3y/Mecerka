@@ -59,6 +59,7 @@ describe('Privacy and Response Shape (e2e)', () => {
     const { user, password } = await createTestUser(prisma, {
       email: 'privacy-me@example.test',
       roles: [Role.CLIENT, Role.PROVIDER],
+      stripeAccountId: 'acct_provider_123',
       requestedRole: Role.PROVIDER,
       roleStatus: RoleRequestStatus.APPROVED,
       requestedAt: new Date(),
@@ -67,6 +68,10 @@ describe('Privacy and Response Shape (e2e)', () => {
       fiscalIdLast4: '5678',
       fiscalCountry: 'ES',
     });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { pin: 'hashed-pin' },
+    });
 
     const login = await loginAndGetToken(app, user.email, password);
     const response = await request(app.getHttpServer())
@@ -74,12 +79,26 @@ describe('Privacy and Response Shape (e2e)', () => {
       .set(authHeader(login.body.access_token));
 
     expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      userId: user.id,
+      email: user.email,
+      roles: [Role.CLIENT, Role.PROVIDER],
+      mfaEnabled: false,
+      hasPin: true,
+      stripeAccountId: 'acct_provider_123',
+    });
     expect(response.body).not.toHaveProperty('fiscalId');
     expect(response.body).not.toHaveProperty('fiscalIdHash');
     expect(response.body).not.toHaveProperty('fiscalCountry');
     expect(response.body).not.toHaveProperty('requestedRole');
     expect(response.body).not.toHaveProperty('roleStatus');
     expect(response.body).not.toHaveProperty('password');
+  });
+
+  it('returns 401 for /auth/me without a session', async () => {
+    const response = await request(app.getHttpServer()).get('/auth/me');
+
+    expect(response.status).toBe(401);
   });
 
   it('does not expose fiscal fields in /users/request-role responses', async () => {

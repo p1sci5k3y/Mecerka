@@ -9,6 +9,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react"
+import { usePathname } from "@/lib/navigation"
 import { authService, type LoginPayload, type RegisterPayload } from "@/lib/services/auth-service"
 import type { User } from "@/lib/types"
 
@@ -27,7 +28,13 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function isAuthHydrationRequired(pathname: string) {
+  const protectedPrefixes = ["/dashboard", "/admin", "/profile", "/cart", "/mfa", "/provider", "/runner", "/orders"]
+  return protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
 export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const pathname = usePathname()
   const [state, setState] = useState<AuthState>({
     user: null,
     isLoading: true,
@@ -36,38 +43,37 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const hydrateUser = useCallback(async () => {
     try {
-      const userResponse = await authService.getProfile()
-      const user = userResponse as User & { userId?: number }
-
-      // Fallback for missing name/email from backend
-      // Backend returns 'userId', not 'id'
-      const uiUser: User = {
-        ...user,
-        userId: user.userId || (user as any).id || 0,
-        name: user.name || `User ${user.userId}`,
-        email: user.email || `user${user.userId}@mecerka.local`
-      }
-      setState({ user: uiUser, isLoading: false, isAuthenticated: true })
+      const user = await authService.getProfile() as User
+      setState({ user, isLoading: false, isAuthenticated: true })
     } catch {
       setState({ user: null, isLoading: false, isAuthenticated: false })
     }
   }, [])
 
   useEffect(() => {
+    if (!isAuthHydrationRequired(pathname)) {
+      setState((current) =>
+        current.isLoading
+          ? { user: null, isLoading: false, isAuthenticated: false }
+          : current,
+      )
+      return
+    }
+
     hydrateUser()
-  }, [hydrateUser])
+  }, [hydrateUser, pathname])
 
   const login = useCallback(async (payload: LoginPayload) => {
     const response: any = await authService.login(payload)
-    await hydrateUser()
+    if (!response?.mfaRequired) {
+      await hydrateUser()
+    }
     return response
   }, [hydrateUser])
 
   const register = useCallback(async (payload: RegisterPayload) => {
-    const response: any = await authService.register(payload)
-    await hydrateUser()
-    return response
-  }, [hydrateUser])
+    return authService.register(payload)
+  }, [])
 
   const verifyMagicLink = useCallback(async (token: string) => {
     await authService.verifyMagicLink(token)

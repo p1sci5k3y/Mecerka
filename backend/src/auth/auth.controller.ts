@@ -123,6 +123,8 @@ export class AuthController {
       name: user.name,
       roles: user.roles,
       mfaEnabled: user.mfaEnabled,
+      hasPin: !!user.pin,
+      stripeAccountId: user.stripeAccountId,
     };
   }
 

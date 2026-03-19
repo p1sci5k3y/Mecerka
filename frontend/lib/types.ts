@@ -3,13 +3,13 @@ export type Role = "CLIENT" | "PROVIDER" | "RUNNER" | "ADMIN"
 // --- UI Interfaces (Clean) ---
 
 export interface User {
-  userId: number
+  userId: string
   roles: Role[]
   email?: string
   name?: string
   createdAt?: string
-  mfaEnabled?: boolean
-  hasPin?: boolean
+  mfaEnabled: boolean
+  hasPin: boolean
   stripeAccountId?: string | null // Stripe Connect Connected Account ID for providers/runners
 }
 
@@ -91,10 +91,25 @@ export interface ApiError {
   statusCode: number
 }
 
+export interface RequestRolePayload {
+  role: "PROVIDER" | "RUNNER"
+  country: string
+  fiscalId: string
+}
+
+export interface RequestRoleResponse {
+  message: string
+  userId: string
+  requestedRole: Role
+  roleStatus: string
+  requestedAt: string
+  roles: Role[]
+}
+
 // --- Backend Interfaces (Raw API) ---
 
 export interface BackendUser {
-  userId: number
+  userId: string
   roles: Role[]
   // ...
 }
