@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useEffect, useState } from "react"
 import {
 
   Mail,
@@ -29,6 +29,7 @@ import { TagChip } from "@/components/ui/tag-chip"
 import { SealBadge } from "@/components/ui/seal-badge"
 import { SectionHeader } from "@/components/ui/section-header"
 import { Link } from "@/lib/navigation"
+import { usersService } from "@/lib/services/users-service"
 
 const mockSessions = [
   { device: "Chrome en macOS", icon: Monitor, lastActive: "Ahora", current: true },
@@ -60,6 +61,25 @@ function ProfileContent() {
   const { user } = useAuth()
   const [settingPin, setSettingPin] = useState(false)
   const [pinValue, setPinValue] = useState("")
+  const [requestingRole, setRequestingRole] = useState(false)
+  const [requestedRole, setRequestedRole] = useState<"PROVIDER" | "RUNNER">("PROVIDER")
+  const [country, setCountry] = useState("ES")
+  const [fiscalId, setFiscalId] = useState("")
+
+  const availableRoles = (["PROVIDER", "RUNNER"] as const).filter(
+    (role) => !user?.roles?.includes(role),
+  )
+
+  const roleRequestLabel: Record<"PROVIDER" | "RUNNER", string> = {
+    PROVIDER: "Solicitar alta como proveedor",
+    RUNNER: "Solicitar licencia de repartidor",
+  }
+
+  useEffect(() => {
+    if (availableRoles.length > 0 && !availableRoles.includes(requestedRole)) {
+      setRequestedRole(availableRoles[0])
+    }
+  }, [availableRoles, requestedRole])
 
   const handlePinSetup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,6 +102,47 @@ function ProfileContent() {
       setSettingPin(false)
     }
   }
+
+  const handleRoleRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (availableRoles.length === 0) {
+      return
+    }
+
+    setRequestingRole(true)
+    try {
+      const response = await usersService.requestRole({
+        role: requestedRole,
+        country,
+        fiscalId,
+      })
+
+      toast.success(response.message || "Solicitud tramitada correctamente.")
+      setFiscalId("")
+      setTimeout(() => globalThis.location.reload(), 1200)
+    } catch (error: any) {
+      const statusCode = error?.statusCode
+      const message =
+        error?.message || "No se pudo tramitar la solicitud de rol."
+
+      if (statusCode === 401) {
+        toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.")
+      } else if (statusCode === 403) {
+        toast.error(
+          "Debes completar la verificación MFA de esta sesión antes de solicitar un rol.",
+        )
+      } else if (statusCode === 400 || statusCode === 409) {
+        toast.error(message)
+      } else {
+        toast.error("No se pudo tramitar la solicitud de rol.")
+      }
+    } finally {
+      setRequestingRole(false)
+    }
+  }
+
+  const canRequestRole = availableRoles.includes(requestedRole)
 
   return (
     <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20">
@@ -232,52 +293,92 @@ function ProfileContent() {
 
           {/* Role Management */}
           <section>
-            <SectionHeader title="Solicitud de Puestos" subtitle="Únete a la red de producción y reparto local." />
+            <SectionHeader title="Solicitud de roles" subtitle="Solicita tu alta como proveedor o repartidor desde tu cuenta actual." />
             <div className="mt-6 rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row">
-                {!user?.roles?.includes("PROVIDER") && (
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/provider")
-                        toast.success("¡Bienvenido al Gremio de Talleres!", { icon: "🔨" })
-                        globalThis.location.reload()
-                      } catch (error) {
-                        console.error(error)
-                        toast.error("Error al inscribir tu taller")
-                      }
-                    }}
-                    variant="outline"
-                    className="h-12 px-6 rounded-xl font-bold border-2 max-w-xs"
-                  >
-                    Abrir un Taller
-                  </Button>
-                )}
-                {!user?.roles?.includes("RUNNER") && (
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await api.post<{ message: string, roles: string[], access_token: string }>("/users/roles/runner")
-                        toast.success("¡Licencia de Reparto aprobada!", { icon: "🚲" })
-                        globalThis.location.reload()
-                      } catch (error) {
-                        console.error(error)
-                        toast.error("Error al emitir licencia")
-                      }
-                    }}
-                    variant="outline"
-                    className="h-12 px-6 rounded-xl font-bold border-2 max-w-xs transition-colors hover:bg-primary/5 hover:text-primary hover:border-primary/20"
-                  >
-                    Licencia de Repartidor
-                  </Button>
-                )}
-                {user?.roles?.includes("PROVIDER") && user?.roles?.includes("RUNNER") && (
-                  <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 text-primary">
-                    <CheckCircle2 className="h-5 w-5" />
-                    <p className="text-sm font-bold">Ostentas todos los rangos posibles en esta ciudad.</p>
+              {availableRoles.length === 0 ? (
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-primary/5 border border-primary/20 text-primary">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <p className="text-sm font-bold">Ya dispones de todos los roles solicitables en la plataforma.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground">Flujo real de solicitud</p>
+                    <p className="mt-1">
+                      El alta pública crea solo cuentas cliente. Desde aquí puedes solicitar un rol adicional usando tu cuenta autenticada.
+                    </p>
+                    <p className="mt-2">
+                      El backend solo admite identificadores fiscales españoles y, si tienes MFA activado, debes haber completado la verificación de esta sesión.
+                    </p>
                   </div>
-                )}
-              </div>
+
+                  <form onSubmit={handleRoleRequest} className="grid gap-5 sm:max-w-xl">
+                    <div className="space-y-2">
+                      <Label htmlFor="requested-role" className="text-sm font-semibold text-muted-foreground">
+                        Rol solicitado
+                      </Label>
+                      <select
+                        id="requested-role"
+                        value={requestedRole}
+                        onChange={(e) => setRequestedRole(e.target.value as "PROVIDER" | "RUNNER")}
+                        className="h-12 rounded-xl border border-input bg-background px-4 text-sm"
+                      >
+                        {availableRoles.map((role) => (
+                          <option key={role} value={role}>
+                            {roleRequestLabel[role]}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="requested-country" className="text-sm font-semibold text-muted-foreground">
+                        País fiscal
+                      </Label>
+                      <select
+                        id="requested-country"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="h-12 rounded-xl border border-input bg-background px-4 text-sm"
+                      >
+                        <option value="ES">España (ES)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="requested-fiscal-id" className="text-sm font-semibold text-muted-foreground">
+                        Identificador fiscal
+                      </Label>
+                      <Input
+                        id="requested-fiscal-id"
+                        value={fiscalId}
+                        onChange={(e) => setFiscalId(e.target.value)}
+                        placeholder="NIF, NIE o CIF"
+                        className="h-12 rounded-xl"
+                        autoCapitalize="characters"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Introduce un NIF, NIE o CIF válido. El backend validará el formato y almacenará solo su huella y metadatos mínimos.
+                      </p>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      className="h-12 px-6 rounded-xl font-bold border-2 max-w-sm transition-colors hover:bg-primary/5 hover:text-primary hover:border-primary/20"
+                      disabled={requestingRole || !canRequestRole}
+                    >
+                      {requestingRole ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Enviando solicitud...
+                        </>
+                      ) : roleRequestLabel[requestedRole]}
+                    </Button>
+                  </form>
+                </div>
+              )}
             </div>
           </section>
 

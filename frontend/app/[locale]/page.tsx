@@ -61,7 +61,7 @@ export default function Home() {
                 </Link>
                 <Link href="/register">
                   <Button size="lg" variant="outline" className="h-14 px-8 text-base border-primary/30 bg-background/50 hover:bg-background/80 backdrop-blur-sm font-semibold">
-                    Soy Artesano
+                    Crear cuenta
                   </Button>
                 </Link>
               </div>

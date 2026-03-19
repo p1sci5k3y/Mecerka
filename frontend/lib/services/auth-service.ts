@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import type { User } from '@/lib/types';
 
 export interface LoginPayload {
   email: string;
@@ -10,7 +11,6 @@ export interface RegisterPayload {
   email: string;
   password?: string;
   name?: string;
-  role?: string;
 }
 
 export const authService = {
@@ -27,7 +27,7 @@ export const authService = {
   },
 
   async getProfile() {
-    return api.get('/auth/me');
+    return api.get<User>('/auth/me');
   },
 
   // MFA methods preserved

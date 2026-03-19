@@ -20,6 +20,8 @@ type AuthProfileRecord = {
   name: string;
   roles: Role[];
   mfaEnabled: boolean;
+  pin: string | null;
+  stripeAccountId: string | null;
   mfaSetupToken: string | null;
   mfaSetupExpiresAt: Date | null;
 };
@@ -217,6 +219,8 @@ export class AuthService {
         name: true,
         roles: true,
         mfaEnabled: true,
+        pin: true,
+        stripeAccountId: true,
         mfaSetupToken: true,
         mfaSetupExpiresAt: true,
       },
