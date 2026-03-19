@@ -99,3 +99,22 @@ The demo dataset is designed to exercise:
 The correct claim is not “the platform always starts in demo mode”, but:
 
 > The repository provides an optional demo environment that can be enabled explicitly for evaluation, while the default shipped configuration keeps demo features disabled.
+
+## Security considerations
+
+> [!CAUTION]
+> **DEMO_MODE must never be enabled in production deployments.** Demo mode bypasses standard onboarding flows, creates shared-password accounts, and exposes reset endpoints that are inappropriate for real user data.
+
+- **DEMO_PASSWORD is mandatory.** If `DEMO_MODE=true` but `DEMO_PASSWORD` is unset or empty, the backend refuses to seed demo users and logs an error. There is no fallback default password.
+- **Password quality.** Choose a demo password of at least 12 characters. While demo accounts use test domains (`@local.test`), weak passwords still create risk if the instance is network-accessible.
+- **Secrets management.** In CI/CD or cloud deployments, pass `DEMO_PASSWORD` through GitHub Secrets, environment variable injection, or a secrets manager — never commit it to source.
+
+### Authentication protection model
+
+The platform uses cookie-based JWT authentication with the following defences:
+
+- **HttpOnly** — cookie is not accessible to client-side JavaScript
+- **SameSite=Lax** — browser does not attach the cookie on cross-origin POST/PATCH/DELETE requests, mitigating CSRF for state-changing operations
+- **Secure** — cookie is transmitted only over HTTPS in production (`NODE_ENV=production`)
+
+This posture is considered adequate for the current application architecture. A dedicated CSRF token layer may be added as a defence-in-depth measure in a future hardening pass.

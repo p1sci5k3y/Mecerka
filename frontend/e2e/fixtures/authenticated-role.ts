@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { APIRequestContext } from '@playwright/test';
-import { apiLogin, FRONTEND_URL } from './demo';
+import { FRONTEND_URL } from './demo';
 
 type DemoAccount = {
   email: string;
@@ -29,7 +29,8 @@ function extractAccessTokenCookie(setCookieHeader: string | undefined) {
   }
 
   const [nameValue] = cookiePart.split(';');
-  const [, cookieValue] = nameValue.split('=');
+  const eqIdx = nameValue.indexOf('=');
+  const cookieValue = eqIdx >= 0 ? nameValue.slice(eqIdx + 1) : '';
 
   if (!cookieValue) {
     throw new Error('access_token cookie value is empty');
@@ -50,10 +51,16 @@ export async function createStoredRoleAuth(
     );
   }
 
-  const token = await apiLogin(request, account);
   const loginResponse = await request.post('http://localhost:3000/auth/login', {
     data: account,
   });
+  if (!loginResponse.ok()) {
+    throw new Error(
+      `Login failed for ${account.email}: ${loginResponse.status()}`,
+    );
+  }
+  const body = await loginResponse.json();
+  const token = body.access_token as string;
   const cookieValue = extractAccessTokenCookie(loginResponse.headers()['set-cookie']);
   const authDir = path.resolve(process.cwd(), 'test-results', '.auth');
   const storageStatePath = path.resolve(

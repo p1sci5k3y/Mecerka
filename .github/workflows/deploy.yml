@@ -80,7 +80,8 @@ jobs:
               exit 1
             fi
 
-            DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
+            ENCODED_PG_PASS=$(python3 -c "import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=''))" "${POSTGRES_PASSWORD}")
+            DATABASE_URL="postgresql://${POSTGRES_USER}:${ENCODED_PG_PASS}@postgres:5432/${POSTGRES_DB}"
 
             # 4. Write a complete .env with restrictive permissions
             umask 077

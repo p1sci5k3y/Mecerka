@@ -70,9 +70,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [hydrateUser])
 
   const verifyMagicLink = useCallback(async (token: string) => {
-    const response: any = await authService.verifyMagicLink(token)
+    await authService.verifyMagicLink(token)
     await hydrateUser()
-    return response
   }, [hydrateUser])
 
   const logout = useCallback(async () => {
