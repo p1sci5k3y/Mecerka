@@ -500,7 +500,7 @@ export class OrdersService {
         );
         const productIds = [
           ...new Set(requestedItems.map((item) => item.productId)),
-        ].sort();
+        ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
         if (productIds.length === 0) {
           throw new BadRequestException('Active cart has no items to checkout');

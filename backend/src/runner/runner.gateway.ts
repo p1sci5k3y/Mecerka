@@ -165,7 +165,9 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
         .map((part) => part.trim())
         .find((part) => part.startsWith('access_token='));
       if (accessTokenCookie) {
-        const [, cookieToken] = accessTokenCookie.split('=');
+        const eqIdx = accessTokenCookie.indexOf('=');
+        const cookieToken =
+          eqIdx >= 0 ? accessTokenCookie.slice(eqIdx + 1) : '';
         if (cookieToken) return decodeURIComponent(cookieToken);
       }
     }
@@ -292,7 +294,7 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
       select: { runnerId: true, status: true },
     });
 
-    if (!order || order.runnerId !== userId) {
+    if (order?.runnerId !== userId) {
       throw new WsException(
         'Forbidden: Not the assigned runner for this order',
       );

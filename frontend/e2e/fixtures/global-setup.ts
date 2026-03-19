@@ -41,7 +41,8 @@ function extractAccessTokenCookie(setCookieHeader: string | null) {
   }
 
   const [nameValue] = cookiePart.split(';');
-  const [, cookieValue] = nameValue.split('=');
+  const eqIdx = nameValue.indexOf('=');
+  const cookieValue = eqIdx >= 0 ? nameValue.slice(eqIdx + 1) : '';
 
   if (!cookieValue) {
     throw new Error('access_token cookie value is empty');
