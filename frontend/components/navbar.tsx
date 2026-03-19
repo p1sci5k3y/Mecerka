@@ -27,6 +27,7 @@ import {
 import { cn } from "@/lib/utils"
 import { useTranslations, useLocale } from "next-intl"
 import { BrandMark, BrandWordmark } from "@/components/brand-mark"
+import { getPrimaryRouteForUser } from "@/lib/role-navigation"
 
 const publicLinks = [
   { href: "/products", label: "catalog" }, // labelKey
@@ -42,13 +43,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const getDashboardLink = () => {
-    if (!user) return "/dashboard"
-    if (user?.roles?.includes("ADMIN")) return "/admin"
-    if (user?.roles?.includes("PROVIDER")) return "/provider/sales"
-    if (user?.roles?.includes("RUNNER")) return "/runner"
-    return "/dashboard"
-  }
+  const dashboardLink = getPrimaryRouteForUser(user)
 
   const handleLanguageChange = (newLocale: string) => {
     startTransition(() => {
@@ -140,7 +135,7 @@ export function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem asChild>
-                    <Link href={getDashboardLink()} className="flex items-center gap-2">
+                      <Link href={dashboardLink} className="flex items-center gap-2">
                       <LayoutDashboard className="h-4 w-4" />
                       {t('dashboard')}
                     </Link>
@@ -239,7 +234,7 @@ export function Navbar() {
             {isAuthenticated ? (
               <>
                 <Link
-                  href={getDashboardLink()}
+                  href={dashboardLink}
                   className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
                   onClick={() => setMobileOpen(false)}
                 >

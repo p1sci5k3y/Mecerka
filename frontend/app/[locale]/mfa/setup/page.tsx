@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { authService } from "@/lib/services/auth-service"
 import { Loader2, ShieldCheck } from "lucide-react"
 import Image from "next/image"
+import { getPrimaryRouteForUser } from "@/lib/role-navigation"
 
 export default function MfaSetupPage() {
     const { user, logout, isLoading } = useAuth()
@@ -29,7 +30,7 @@ export default function MfaSetupPage() {
         }
 
         if (user.mfaEnabled) {
-            router.push("/dashboard")
+            router.push(getPrimaryRouteForUser(user))
             return
         }
 
@@ -63,8 +64,7 @@ export default function MfaSetupPage() {
         try {
             await authService.verifyMfa(token)
             toast.success("MFA activado correctamente")
-            // Force reload or re-hydrate to update mfaEnabled status
-            globalThis.location.href = "/dashboard"
+            globalThis.location.href = getPrimaryRouteForUser(user)
         } catch {
             toast.error("Código incorrecto")
         } finally {
