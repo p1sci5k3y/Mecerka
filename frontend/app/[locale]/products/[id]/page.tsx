@@ -25,7 +25,7 @@ import type { Product } from "@/lib/types"
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const { addItem, cityConflict } = useCart()
+  const { addItem } = useCart()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [quantity, setQuantity] = useState(1)
@@ -45,17 +45,14 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = () => {
     if (!product) return
-    addItem(product, quantity)
-    if (!cityConflict) {
-      toast.success(`${product.name} (x${quantity}) añadido al carrito`)
+    const conflictMessage = addItem(product, quantity)
+    if (conflictMessage) {
+      toast.error(conflictMessage)
+      return
     }
-  }
 
-  useEffect(() => {
-    if (cityConflict) {
-      toast.error(cityConflict)
-    }
-  }, [cityConflict])
+    toast.success(`${product.name} (x${quantity}) añadido al carrito`)
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

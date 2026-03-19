@@ -9,13 +9,16 @@ import { toast } from "sonner"
 import { TagChip } from "@/components/ui/tag-chip"
 
 export function ProductCard({ product }: { product: Readonly<Product> }) {
-  const { addItem, cityConflict } = useCart()
+  const { addItem } = useCart()
 
   const handleAdd = () => {
-    addItem(product)
-    if (!cityConflict) {
-      toast.success(`${product.name} añadido al carrito`)
+    const conflictMessage = addItem(product)
+    if (conflictMessage) {
+      toast.error(conflictMessage)
+      return
     }
+
+    toast.success(`${product.name} añadido al carrito`)
   }
 
   return (
