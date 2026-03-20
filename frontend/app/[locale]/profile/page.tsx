@@ -61,10 +61,14 @@ function ProfileContent() {
   }
 
   useEffect(() => {
-    if (availableRoles.length > 0 && !availableRoles.includes(requestedRole)) {
-      setRequestedRole(availableRoles[0])
+    if (availableRoles.length === 0) {
+      return
     }
-  }, [availableRoles, requestedRole])
+
+    setRequestedRole((current) =>
+      availableRoles.includes(current) ? current : availableRoles[0],
+    )
+  }, [availableRoles])
 
   const handlePinSetup = async (e: React.FormEvent) => {
     e.preventDefault()

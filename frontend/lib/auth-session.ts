@@ -1,36 +1,42 @@
-const AUTH_SESSION_HINT_KEY = "mecerka-auth-session-hint"
+// Browser storage slot for a UI hydration hint. It is not a credential or secret.
+const AUTH_SESSION_HINT_STORAGE_SLOT = "mecerka-auth-session-hydration"
 const AUTH_SESSION_HINT_TTL_MS = 12 * 60 * 60 * 1000
 
 type AuthSessionHint = {
-  value: "1"
+  marker: "active"
   expiresAt: number
 }
 
-function hasWindow() {
-  return typeof window !== "undefined"
+function getSessionStorage() {
+  if (typeof globalThis.window === "undefined") {
+    return null
+  }
+
+  return globalThis.window.sessionStorage
 }
 
 function readHint(): AuthSessionHint | null {
-  if (!hasWindow()) return null
+  const storage = getSessionStorage()
+  if (!storage) return null
 
-  const raw = window.sessionStorage.getItem(AUTH_SESSION_HINT_KEY)
+  const raw = storage.getItem(AUTH_SESSION_HINT_STORAGE_SLOT)
   if (!raw) return null
 
   try {
     const parsed = JSON.parse(raw) as Partial<AuthSessionHint>
-    if (parsed.value !== "1" || typeof parsed.expiresAt !== "number") {
-      window.sessionStorage.removeItem(AUTH_SESSION_HINT_KEY)
+    if (parsed.marker !== "active" || typeof parsed.expiresAt !== "number") {
+      storage.removeItem(AUTH_SESSION_HINT_STORAGE_SLOT)
       return null
     }
 
     if (parsed.expiresAt <= Date.now()) {
-      window.sessionStorage.removeItem(AUTH_SESSION_HINT_KEY)
+      storage.removeItem(AUTH_SESSION_HINT_STORAGE_SLOT)
       return null
     }
 
     return parsed as AuthSessionHint
   } catch {
-    window.sessionStorage.removeItem(AUTH_SESSION_HINT_KEY)
+    storage.removeItem(AUTH_SESSION_HINT_STORAGE_SLOT)
     return null
   }
 }
@@ -40,15 +46,17 @@ export function hasAuthSessionHint() {
 }
 
 export function setAuthSessionHint() {
-  if (!hasWindow()) return
+  const storage = getSessionStorage()
+  if (!storage) return
   const payload: AuthSessionHint = {
-    value: "1",
+    marker: "active",
     expiresAt: Date.now() + AUTH_SESSION_HINT_TTL_MS,
   }
-  window.sessionStorage.setItem(AUTH_SESSION_HINT_KEY, JSON.stringify(payload))
+  storage.setItem(AUTH_SESSION_HINT_STORAGE_SLOT, JSON.stringify(payload))
 }
 
 export function clearAuthSessionHint() {
-  if (!hasWindow()) return
-  window.sessionStorage.removeItem(AUTH_SESSION_HINT_KEY)
+  const storage = getSessionStorage()
+  if (!storage) return
+  storage.removeItem(AUTH_SESSION_HINT_STORAGE_SLOT)
 }
