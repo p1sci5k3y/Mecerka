@@ -24,6 +24,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const returnTo = resolveSafeReturnTo(searchParams.get("returnTo"))
+  const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -207,7 +208,7 @@ export default function RegisterPage() {
                 {t('successText2')}
               </div>
               <Link
-                href={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login"}
+                href={loginHref}
                 className="w-full h-14 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-bold rounded-lg hover:shadow-lg transition-all flex items-center justify-center"
               >
                 {t('goToLogin')}
@@ -218,7 +219,7 @@ export default function RegisterPage() {
           {!isSuccess && (
             <div className="mt-8 pt-8 border-t border-[#e07d61]/10 flex flex-col gap-4 text-center">
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                {t('alreadyHaveAccount')} <Link href={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : "/login"} className="text-[#e07d61] font-bold hover:underline">{t('logInLink')}</Link>
+                {t('alreadyHaveAccount')} <Link href={loginHref} className="text-[#e07d61] font-bold hover:underline">{t('logInLink')}</Link>
               </p>
             </div>
           )}

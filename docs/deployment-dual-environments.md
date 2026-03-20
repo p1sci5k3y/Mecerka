@@ -68,6 +68,7 @@ The workflow also needs:
 - `AWS_SECRET_ACCESS_KEY`
 - `GHCR_USERNAME`
 - `GHCR_TOKEN`
+- `LETSENCRYPT_EMAIL`
 
 ## Reverse proxy
 
@@ -77,6 +78,16 @@ The workflow also needs:
 - `demo.mecerka.me`
 
 Each host proxies to its own frontend/backend localhost ports.
+
+TLS is managed during deploy with Certbot and the Nginx plugin:
+
+- the deploy ensures `certbot` and its Nginx plugin are present on the host;
+- it checks that `demo.mecerka.me` resolves publicly before attempting certificate changes;
+- it keeps the existing certificate named `mecerka.me` and expands it to cover:
+  - `mecerka.me`
+  - `www.mecerka.me`
+  - `demo.mecerka.me`
+- after certificate issuance or renewal, the workflow runs `nginx -t` and reloads Nginx safely.
 
 ## Demo reset policy
 
@@ -89,6 +100,5 @@ This keeps `demo.mecerka.me` reproducible and prevents stale or mixed demo data 
 The repository leaves these points prepared but cannot provision them by itself:
 
 - DNS records for `mecerka.me`, `www.mecerka.me` and `demo.mecerka.me`
-- TLS certificates on the target host for both domains
 - GitHub secrets and variables with real environment values
 - GHCR credentials with permission to pull images on the server

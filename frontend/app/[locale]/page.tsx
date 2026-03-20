@@ -5,7 +5,6 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { SectionHeader } from "@/components/ui/section-header"
 import { SealBadge } from "@/components/ui/seal-badge"
-import { TagChip } from "@/components/ui/tag-chip"
 import { Link } from '@/lib/navigation';
 
 export default function Home() {
@@ -99,7 +98,7 @@ export default function Home() {
               </div>
               <h3 className="font-display text-xl font-bold">Comprar de forma local</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Puedes preparar tu cesta sin sesión y autenticarte justo antes del checkout. El flujo online actual admite un solo taller por pedido.
+                Puedes preparar tu cesta sin sesión y autenticarte justo antes del checkout. El flujo online actual ya soporta pedidos multiproveedor dentro de una misma ciudad.
               </p>
             </article>
           </div>

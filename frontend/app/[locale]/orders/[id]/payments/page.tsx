@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   CreditCard,
   Loader2,
-  PackageCheck,
   RefreshCcw,
   ShoppingBag,
   Store,
