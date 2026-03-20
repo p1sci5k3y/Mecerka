@@ -12,6 +12,7 @@ import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
+import { GEOCODING_SERVICE } from '../../src/geocoding/geocoding.constants';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { assertTestEnvironment } from '../test-env';
 
@@ -33,6 +34,9 @@ type CreateTestUserOptions = {
   lastRoleGrantedById?: string | null;
   lastRoleSource?: RoleGrantSource | null;
   withRunnerProfile?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  providerServiceRadiusKm?: number;
 };
 
 type CatalogFixture = {
@@ -49,14 +53,28 @@ type OrderFixtureOptions = {
   status?: DeliveryStatus;
 };
 
+type CreateTestAppOptions = {
+  geocodingService?: {
+    geocodeAddress: (...args: any[]) => Promise<any>;
+  };
+};
+
 export const TEST_PASSWORD = 'Str0ng!Passw0rd';
 
-export async function createTestApp() {
+export async function createTestApp(options: CreateTestAppOptions = {}) {
   assertTestEnvironment();
 
-  const moduleFixture: TestingModule = await Test.createTestingModule({
+  const moduleBuilder = Test.createTestingModule({
     imports: [AppModule],
-  }).compile();
+  });
+
+  if (options.geocodingService) {
+    moduleBuilder
+      .overrideProvider(GEOCODING_SERVICE)
+      .useValue(options.geocodingService);
+  }
+
+  const moduleFixture: TestingModule = await moduleBuilder.compile();
 
   const app = moduleFixture.createNestApplication();
   app.useGlobalPipes(
@@ -128,6 +146,9 @@ export async function createTestUser(
       fiscalCountry: options.fiscalCountry ?? null,
       lastRoleGrantedById: options.lastRoleGrantedById ?? null,
       lastRoleSource: options.lastRoleSource ?? null,
+      latitude: options.latitude ?? null,
+      longitude: options.longitude ?? null,
+      providerServiceRadiusKm: options.providerServiceRadiusKm ?? 10,
     },
   });
 
@@ -161,11 +182,21 @@ export function authHeader(token: string) {
 export async function createCatalogFixture(
   prisma: PrismaService,
   suffix = crypto.randomUUID().slice(0, 8),
+  options: {
+    maxDeliveryRadiusKm?: number | null;
+    baseDeliveryFee?: number;
+    deliveryPerKmFee?: number;
+    extraPickupFee?: number;
+  } = {},
 ): Promise<CatalogFixture> {
   const city = await prisma.city.create({
     data: {
       name: `City ${suffix}`,
       slug: `city-${suffix}`,
+      maxDeliveryRadiusKm: options.maxDeliveryRadiusKm ?? null,
+      baseDeliveryFee: options.baseDeliveryFee ?? 3.5,
+      deliveryPerKmFee: options.deliveryPerKmFee ?? 0.9,
+      extraPickupFee: options.extraPickupFee ?? 1.5,
     },
   });
 
@@ -237,6 +268,8 @@ export async function createOrderFixture(
         providerOrderId: providerOrder.id,
         productId: options.productId,
         quantity: 2,
+        unitBasePriceSnapshot: product.price,
+        discountPriceSnapshot: product.discountPrice ?? null,
         priceAtPurchase: product.discountPrice ?? product.price,
       },
     });

@@ -28,6 +28,7 @@ describe('DeliveryService', () => {
   let service: DeliveryService;
   let prismaMock: any;
   let riskServiceMock: any;
+  let configServiceMock: { get: jest.Mock };
   let stripePaymentIntentsCreate: jest.Mock;
   let stripePaymentIntentsRetrieve: jest.Mock;
   const assignedRunner = {
@@ -125,22 +126,21 @@ describe('DeliveryService', () => {
       recalculateRiskScore: jest.fn().mockResolvedValue({}),
     };
 
+    configServiceMock = {
+      get: jest.fn((key: string) => {
+        if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
+        if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET') return 'whsec_runner';
+        if (key === 'DEMO_MODE') return 'false';
+        return undefined;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DeliveryService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: RiskService, useValue: riskServiceMock },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string) => {
-              if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
-              if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET')
-                return 'whsec_runner';
-              return undefined;
-            }),
-          },
-        },
+        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
@@ -159,6 +159,7 @@ describe('DeliveryService', () => {
           findUnique: jest.fn().mockResolvedValue({
             id: 'order-1',
             clientId: 'client-1',
+            deliveryFee: 6.5,
             deliveryOrder: null,
           }),
           update: jest.fn().mockResolvedValue({}),
@@ -202,6 +203,21 @@ describe('DeliveryService', () => {
     expect(prismaMock.stockReservation.findMany).not.toHaveBeenCalled();
   });
 
+  it('fails cleanly when the demo environment cannot prepare a real runner Stripe payment', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
+      if (key === 'DELIVERY_STRIPE_WEBHOOK_SECRET') return 'whsec_runner';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow(
+      'Este entorno demo no puede preparar el pago Stripe del reparto',
+    );
+  });
+
   it('creates a delivery job when the DeliveryOrder is created', async () => {
     const txDeliveryJobCreate = jest.fn().mockResolvedValue({
       id: 'job-1',
@@ -217,6 +233,7 @@ describe('DeliveryService', () => {
           findUnique: jest.fn().mockResolvedValue({
             id: 'order-1',
             clientId: 'client-1',
+            deliveryFee: 6.5,
             deliveryOrder: null,
           }),
           update: jest.fn().mockResolvedValue({}),
@@ -251,6 +268,32 @@ describe('DeliveryService', () => {
         expiresAt: expect.any(Date),
       },
     });
+  });
+
+  it('rejects delivery order creation when the provided fee does not match the official order snapshot', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        order: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'order-1',
+            clientId: 'client-1',
+            deliveryFee: 6.5,
+            deliveryOrder: null,
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.createDeliveryOrder(
+        { orderId: 'order-1', deliveryFee: 4.5, currency: 'EUR' },
+        'client-1',
+        [Role.CLIENT],
+      ),
+    ).rejects.toThrow(
+      'Delivery fee must match the official order delivery fee',
+    );
   });
 
   it('assigns a runner with an active payment account', async () => {

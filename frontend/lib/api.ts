@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+import { getApiBaseUrl } from "@/lib/runtime-config"
 
 async function request<T>(
   endpoint: string,
@@ -9,7 +9,7 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await fetch(`${getApiBaseUrl()}${endpoint}`, {
     ...options,
     credentials: "include",
     headers,
@@ -31,19 +31,21 @@ export const api = {
   get<T>(endpoint: string) {
     return request<T>(endpoint)
   },
-  post<T>(endpoint: string, data?: unknown) {
+  post<T>(endpoint: string, data?: unknown, options: RequestInit = {}) {
     return request<T>(endpoint, {
+      ...options,
       method: "POST",
       body: data ? JSON.stringify(data) : undefined,
     })
   },
-  patch<T>(endpoint: string, data?: unknown) {
+  patch<T>(endpoint: string, data?: unknown, options: RequestInit = {}) {
     return request<T>(endpoint, {
+      ...options,
       method: "PATCH",
       body: data ? JSON.stringify(data) : undefined,
     })
   },
-  delete<T>(endpoint: string) {
-    return request<T>(endpoint, { method: "DELETE" })
+  delete<T>(endpoint: string, options: RequestInit = {}) {
+    return request<T>(endpoint, { ...options, method: "DELETE" })
   },
 }

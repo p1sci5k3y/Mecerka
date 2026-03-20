@@ -28,7 +28,7 @@ type StructuredLogRecord = {
 @Injectable()
 export class AppLoggerService extends ConsoleLogger implements LoggerService {
   private static readonly SENSITIVE_KEY_PATTERN =
-    /^(fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)$/i;
+    /^(authorization|cookie|password|token|accessToken|refreshToken|secret|apiKey|fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)$/i;
 
   private parseMessage(message: unknown) {
     if (typeof message !== 'string') {
@@ -51,11 +51,11 @@ export class AppLoggerService extends ConsoleLogger implements LoggerService {
     return value
       .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer [redacted]')
       .replace(
-        /(token|jwt|cookie|password|fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)=([^&\s]+)/gi,
+        /(token|jwt|cookie|password|authorization|secret|apiKey|accessToken|refreshToken|fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)=([^&\s]+)/gi,
         '$1=[redacted]',
       )
       .replace(
-        /"(fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)"\s*:\s*"[^"]*"/gi,
+        /"(authorization|cookie|password|token|accessToken|refreshToken|secret|apiKey|fiscalId|fiscalCountry|fiscalIdHash|fiscalIdLast4)"\s*:\s*"[^"]*"/gi,
         '"$1":"[redacted]"',
       );
   }

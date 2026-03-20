@@ -52,7 +52,8 @@ async function bootstrap() {
     allowedHeaders: [
       'Content-Type',
       'Authorization',
-      'x-dev-payment-secret',
+      'Idempotency-Key',
+      'idempotency-key',
       'X-Request-ID',
     ],
   });

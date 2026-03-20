@@ -12,6 +12,11 @@ import {
 import { usePathname } from "@/lib/navigation"
 import { authService, type LoginPayload, type RegisterPayload } from "@/lib/services/auth-service"
 import type { User } from "@/lib/types"
+import {
+  clearAuthSessionHint,
+  hasAuthSessionHint,
+  setAuthSessionHint,
+} from "@/lib/auth-session"
 
 interface AuthState {
   user: User | null
@@ -22,7 +27,6 @@ interface AuthState {
 interface AuthContextType extends AuthState {
   login: (payload: LoginPayload) => Promise<any>
   register: (payload: RegisterPayload) => Promise<any>
-  verifyMagicLink: (token: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -44,14 +48,16 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const hydrateUser = useCallback(async () => {
     try {
       const user = await authService.getProfile() as User
+      setAuthSessionHint()
       setState({ user, isLoading: false, isAuthenticated: true })
     } catch {
+      clearAuthSessionHint()
       setState({ user: null, isLoading: false, isAuthenticated: false })
     }
   }, [])
 
   useEffect(() => {
-    if (!isAuthHydrationRequired(pathname)) {
+    if (!isAuthHydrationRequired(pathname) && !hasAuthSessionHint()) {
       setState((current) =>
         current.isLoading
           ? { user: null, isLoading: false, isAuthenticated: false }
@@ -66,6 +72,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const login = useCallback(async (payload: LoginPayload) => {
     const response: any = await authService.login(payload)
     if (!response?.mfaRequired) {
+      setAuthSessionHint()
       await hydrateUser()
     }
     return response
@@ -75,15 +82,11 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     return authService.register(payload)
   }, [])
 
-  const verifyMagicLink = useCallback(async (token: string) => {
-    await authService.verifyMagicLink(token)
-    await hydrateUser()
-  }, [hydrateUser])
-
   const logout = useCallback(async () => {
     try {
       await authService.logout()
     } finally {
+      clearAuthSessionHint()
       setState({ user: null, isLoading: false, isAuthenticated: false })
     }
   }, [])
@@ -92,9 +95,8 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
     ...state,
     login,
     register,
-    verifyMagicLink,
     logout
-  }), [state, login, register, verifyMagicLink, logout])
+  }), [state, login, register, logout])
 
   return (
     <AuthContext.Provider value={contextValue}>

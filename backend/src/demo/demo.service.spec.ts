@@ -15,6 +15,12 @@ import { BaseSeedService } from '../seed/base-seed.service';
 describe('DemoService', () => {
   let service: DemoService;
   let configService: { get: jest.Mock };
+  let prismaMock: {
+    user: { count: jest.Mock; findUnique: jest.Mock };
+    product: { count: jest.Mock };
+    order: { count: jest.Mock };
+    deliveryOrder: { count: jest.Mock };
+  };
 
   beforeEach(async () => {
     configService = {
@@ -24,12 +30,27 @@ describe('DemoService', () => {
         return undefined;
       }),
     };
+    prismaMock = {
+      user: {
+        count: jest.fn().mockResolvedValue(0),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+      product: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      order: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+      deliveryOrder: {
+        count: jest.fn().mockResolvedValue(0),
+      },
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DemoService,
         { provide: ConfigService, useValue: configService },
-        { provide: PrismaService, useValue: {} },
+        { provide: PrismaService, useValue: prismaMock },
         { provide: AuthService, useValue: {} },
         { provide: AdminService, useValue: {} },
         { provide: ProductsService, useValue: {} },
@@ -79,5 +100,31 @@ describe('DemoService', () => {
 
     await expect(service.seed('admin-1')).rejects.toThrow(ForbiddenException);
     await expect(service.reset('admin-1')).rejects.toThrow(ForbiddenException);
+  });
+
+  it('repairs incomplete demo data on bootstrap instead of leaving a partial seed', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'development';
+      if (key === 'DEMO_MODE') return 'true';
+      if (key === 'DEMO_PASSWORD') return 'DemoPass123!';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(7);
+    prismaMock.product.count.mockResolvedValue(6);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await service.onApplicationBootstrap();
+
+    expect(cleanupSpy).toHaveBeenCalledWith('admin-1');
+    expect(seedSpy).toHaveBeenCalledWith('admin-1');
   });
 });

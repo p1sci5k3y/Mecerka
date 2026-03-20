@@ -19,6 +19,7 @@ jest.mock('stripe');
 describe('PaymentsService', () => {
   let service: PaymentsService;
   let prismaMock: any;
+  let configServiceMock: { get: jest.Mock };
   let stripePaymentIntentsCreate: jest.Mock;
   let stripePaymentIntentsRetrieve: jest.Mock;
   let stripePaymentIntentsCancel: jest.Mock;
@@ -102,19 +103,20 @@ describe('PaymentsService', () => {
     };
     eventEmitterMock = { emit: jest.fn() };
 
+    configServiceMock = {
+      get: jest.fn((key: string) => {
+        if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
+        if (key === 'DEMO_MODE') return 'false';
+        return 'dummy';
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentsService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string) =>
-              key === 'STRIPE_SECRET_KEY' ? 'sk_test_dummy' : 'dummy',
-            ),
-          },
-        },
+        { provide: ConfigService, useValue: configServiceMock },
       ],
     }).compile();
 
@@ -123,6 +125,302 @@ describe('PaymentsService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('prepares one payment session per provider order for the official root-order payment flow', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      clientId: 'client-1',
+      status: DeliveryStatus.PENDING,
+      deliveryFee: 5.15,
+      deliveryDistanceKm: 0.17,
+      runnerBaseFee: 3.5,
+      runnerPerKmFee: 0.9,
+      runnerExtraPickupFee: 1.5,
+      providerOrders: [
+        {
+          id: 'po-1',
+          providerId: 'provider-1',
+          provider: { name: 'Taller Terra' },
+          subtotalAmount: 25,
+          items: [
+            { quantity: 2, priceAtPurchase: 12.5, unitBasePriceSnapshot: 14 },
+          ],
+          status: ProviderOrderStatus.PENDING,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+        },
+        {
+          id: 'po-2',
+          providerId: 'provider-2',
+          provider: { name: 'Luz de Barrio' },
+          subtotalAmount: 40,
+          items: [
+            { quantity: 2, priceAtPurchase: 20, unitBasePriceSnapshot: 20 },
+          ],
+          status: ProviderOrderStatus.PENDING,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+        },
+      ],
+      deliveryOrder: null,
+    });
+
+    const prepareProviderOrderPaymentSpy = jest
+      .spyOn(service, 'prepareProviderOrderPayment')
+      .mockResolvedValueOnce({
+        providerOrderId: 'po-1',
+        paymentSessionId: 'session-1',
+        orderId: 'order-1',
+        subtotalAmount: 25,
+        externalSessionId: 'pi_1',
+        clientSecret: 'pi_1_secret',
+        stripeAccountId: 'acct_provider_1',
+        expiresAt: new Date('2026-03-20T10:00:00.000Z'),
+        paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+      } as any)
+      .mockResolvedValueOnce({
+        providerOrderId: 'po-2',
+        paymentSessionId: 'session-2',
+        orderId: 'order-1',
+        subtotalAmount: 40,
+        externalSessionId: 'pi_2',
+        clientSecret: 'pi_2_secret',
+        stripeAccountId: 'acct_provider_2',
+        expiresAt: new Date('2026-03-20T10:00:00.000Z'),
+        paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+      } as any);
+
+    const result = await service.prepareOrderProviderPayments(
+      'order-1',
+      'client-1',
+    );
+
+    expect(prepareProviderOrderPaymentSpy).toHaveBeenNthCalledWith(
+      1,
+      'po-1',
+      'client-1',
+    );
+    expect(prepareProviderOrderPaymentSpy).toHaveBeenNthCalledWith(
+      2,
+      'po-2',
+      'client-1',
+    );
+    expect(result).toEqual({
+      orderId: 'order-1',
+      orderStatus: DeliveryStatus.PENDING,
+      paymentMode: 'PROVIDER_ORDER_SESSIONS',
+      paymentEnvironment: 'READY',
+      paymentEnvironmentMessage: null,
+      providerPaymentStatus: 'UNPAID',
+      paidProviderOrders: 0,
+      totalProviderOrders: 2,
+      providerOrders: [
+        expect.objectContaining({
+          providerOrderId: 'po-1',
+          providerId: 'provider-1',
+          providerName: 'Taller Terra',
+          originalSubtotalAmount: 28,
+          discountAmount: 3,
+          paymentRequired: true,
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+        }),
+        expect.objectContaining({
+          providerOrderId: 'po-2',
+          providerId: 'provider-2',
+          providerName: 'Luz de Barrio',
+          originalSubtotalAmount: 40,
+          discountAmount: 0,
+          paymentRequired: true,
+          paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+        }),
+      ],
+      runnerPayment: {
+        paymentMode: 'DELIVERY_ORDER_SESSION',
+        deliveryOrderId: null,
+        runnerId: null,
+        deliveryStatus: null,
+        paymentStatus: 'NOT_CREATED',
+        paymentRequired: false,
+        sessionPrepared: false,
+        amount: 5.15,
+        currency: 'EUR',
+        pricingDistanceKm: 0.17,
+        pickupCount: 2,
+        additionalPickupCount: 1,
+        baseFee: 3.5,
+        perKmFee: 0.9,
+        distanceFee: 0.15,
+        extraPickupFee: 1.5,
+        extraPickupCharge: 1.5,
+      },
+    });
+  });
+
+  it('keeps already settled provider orders out of payment preparation on the official root-order flow', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      clientId: 'client-1',
+      status: DeliveryStatus.CONFIRMED,
+      deliveryFee: 5.15,
+      deliveryDistanceKm: 0.17,
+      runnerBaseFee: 3.5,
+      runnerPerKmFee: 0.9,
+      runnerExtraPickupFee: 1.5,
+      providerOrders: [
+        {
+          id: 'po-paid',
+          providerId: 'provider-1',
+          provider: { name: 'Taller Terra' },
+          subtotalAmount: 25,
+          items: [
+            { quantity: 2, priceAtPurchase: 12.5, unitBasePriceSnapshot: 14 },
+          ],
+          status: ProviderOrderStatus.PAID,
+          paymentStatus: ProviderPaymentStatus.PAID,
+        },
+        {
+          id: 'po-open',
+          providerId: 'provider-2',
+          provider: { name: 'Luz de Barrio' },
+          subtotalAmount: 40,
+          items: [
+            { quantity: 2, priceAtPurchase: 20, unitBasePriceSnapshot: 20 },
+          ],
+          status: ProviderOrderStatus.PENDING,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+        },
+      ],
+      deliveryOrder: {
+        id: 'delivery-1',
+        runnerId: 'runner-1',
+        status: 'RUNNER_ASSIGNED',
+        paymentStatus: 'PENDING',
+        currency: 'EUR',
+        paymentSessions: [],
+      },
+    });
+
+    const prepareProviderOrderPaymentSpy = jest
+      .spyOn(service, 'prepareProviderOrderPayment')
+      .mockResolvedValue({
+        providerOrderId: 'po-open',
+        paymentSessionId: 'session-open',
+        orderId: 'order-1',
+        subtotalAmount: 40,
+        externalSessionId: 'pi_open',
+        clientSecret: 'pi_open_secret',
+        stripeAccountId: 'acct_provider_2',
+        expiresAt: new Date('2026-03-20T10:00:00.000Z'),
+        paymentStatus: ProviderPaymentStatus.PAYMENT_READY,
+      } as any);
+
+    const result = await service.prepareOrderProviderPayments(
+      'order-1',
+      'client-1',
+    );
+
+    expect(prepareProviderOrderPaymentSpy).toHaveBeenCalledTimes(1);
+    expect(prepareProviderOrderPaymentSpy).toHaveBeenCalledWith(
+      'po-open',
+      'client-1',
+    );
+    expect(result.providerOrders).toEqual([
+      {
+        providerOrderId: 'po-paid',
+        providerId: 'provider-1',
+        providerName: 'Taller Terra',
+        subtotalAmount: 25,
+        originalSubtotalAmount: 28,
+        discountAmount: 3,
+        status: ProviderOrderStatus.PAID,
+        paymentStatus: ProviderPaymentStatus.PAID,
+        paymentRequired: false,
+        paymentSession: null,
+      },
+      expect.objectContaining({
+        providerOrderId: 'po-open',
+        paymentRequired: true,
+      }),
+    ]);
+    expect(result.orderStatus).toBe(DeliveryStatus.CONFIRMED);
+    expect(result.providerPaymentStatus).toBe('PARTIALLY_PAID');
+    expect(result.paidProviderOrders).toBe(1);
+    expect(result.totalProviderOrders).toBe(2);
+    expect(result.runnerPayment).toEqual({
+      paymentMode: 'DELIVERY_ORDER_SESSION',
+      deliveryOrderId: 'delivery-1',
+      runnerId: 'runner-1',
+      deliveryStatus: 'RUNNER_ASSIGNED',
+      paymentStatus: 'PENDING',
+      paymentRequired: true,
+      sessionPrepared: false,
+      amount: 5.15,
+      currency: 'EUR',
+      pricingDistanceKm: 0.17,
+      pickupCount: 2,
+      additionalPickupCount: 1,
+      baseFee: 3.5,
+      perKmFee: 0.9,
+      distanceFee: 0.15,
+      extraPickupFee: 1.5,
+      extraPickupCharge: 1.5,
+    });
+  });
+
+  it('returns the aggregate without opening Stripe sessions when demo mode uses dummy Stripe credentials', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'STRIPE_SECRET_KEY') return 'sk_test_dummy';
+      if (key === 'DEMO_MODE') return 'true';
+      return 'dummy';
+    });
+
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      clientId: 'client-1',
+      status: DeliveryStatus.PENDING,
+      deliveryFee: 5.15,
+      deliveryDistanceKm: 0.17,
+      runnerBaseFee: 3.5,
+      runnerPerKmFee: 0.9,
+      runnerExtraPickupFee: 1.5,
+      providerOrders: [
+        {
+          id: 'po-1',
+          providerId: 'provider-1',
+          provider: { name: 'Taller Terra' },
+          subtotalAmount: 25,
+          items: [
+            { quantity: 2, priceAtPurchase: 12.5, unitBasePriceSnapshot: 14 },
+          ],
+          status: ProviderOrderStatus.PENDING,
+          paymentStatus: ProviderPaymentStatus.PENDING,
+        },
+      ],
+      deliveryOrder: null,
+    });
+
+    const prepareProviderOrderPaymentSpy = jest.spyOn(
+      service,
+      'prepareProviderOrderPayment',
+    );
+
+    const result = await service.prepareOrderProviderPayments(
+      'order-1',
+      'client-1',
+    );
+
+    expect(prepareProviderOrderPaymentSpy).not.toHaveBeenCalled();
+    expect(result.paymentEnvironment).toBe('UNAVAILABLE');
+    expect(result.paymentEnvironmentMessage).toContain(
+      'no puede preparar pagos Stripe reales por comercio',
+    );
+    expect(result.providerOrders).toEqual([
+      expect.objectContaining({
+        providerOrderId: 'po-1',
+        paymentRequired: true,
+        paymentSession: null,
+        paymentStatus: ProviderPaymentStatus.PENDING,
+      }),
+    ]);
   });
 
   it('generates a provider payment session using the provider connected account', async () => {

@@ -47,7 +47,13 @@ test.describe('multi-provider order aggregation', () => {
     const createdOrder = await apiPostJson<any>(
       request,
       '/cart/checkout',
-      {},
+      {
+        cityId: cart.cityId,
+        deliveryAddress: 'Calle Comercio 1',
+        postalCode: '45001',
+        addressReference: 'Portal Demo',
+        discoveryRadiusKm: 8,
+      },
       userToken,
       { 'Idempotency-Key': checkoutKey },
     );
@@ -148,7 +154,7 @@ test.describe('multi-provider order aggregation', () => {
       '/delivery/orders',
       {
         orderId: createdOrder.id,
-        deliveryFee: 4.5,
+        deliveryFee: Number(createdOrder.deliveryFee ?? 0),
         currency: 'EUR',
       },
       userToken,

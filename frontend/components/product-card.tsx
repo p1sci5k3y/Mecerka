@@ -11,8 +11,8 @@ import { TagChip } from "@/components/ui/tag-chip"
 export function ProductCard({ product }: { product: Readonly<Product> }) {
   const { addItem } = useCart()
 
-  const handleAdd = () => {
-    const conflictMessage = addItem(product)
+  const handleAdd = async () => {
+    const conflictMessage = await addItem(product)
     if (conflictMessage) {
       toast.error(conflictMessage)
       return
@@ -56,9 +56,18 @@ export function ProductCard({ product }: { product: Readonly<Product> }) {
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="font-display text-xl font-bold text-foreground">
-              {product.price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
-            </span>
+            <div className="flex flex-col">
+              {product.discountPrice != null &&
+              product.basePrice != null &&
+              product.discountPrice < product.basePrice ? (
+                <span className="text-sm text-muted-foreground line-through">
+                  {product.basePrice.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+                </span>
+              ) : null}
+              <span className="font-display text-xl font-bold text-foreground">
+                {product.price.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+              </span>
+            </div>
             <Button size="sm" variant="outline" onClick={handleAdd} className="gap-2 shrink-0 shadow-sm font-semibold rounded-full px-5 border-primary/20 bg-primary/5 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors">
               <Inbox className="h-4 w-4" />
               Añadir

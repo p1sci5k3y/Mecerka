@@ -8,6 +8,7 @@ import {
   Request,
   Param,
   ParseUUIDPipe,
+  Header,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -24,6 +25,11 @@ export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Post()
+  @Header('Deprecation', 'true')
+  @Header(
+    'Warning',
+    '299 - "Legacy single-provider order creation endpoint. Use /cart/items plus /cart/checkout for official marketplace checkout."',
+  )
   @Roles(Role.CLIENT)
   create(
     @Body() createOrderDto: CreateOrderDto,

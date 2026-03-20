@@ -10,8 +10,7 @@ import {
   X,
   Languages,
   Truck,
-  Inbox,
-  Search,
+  ShoppingCart,
 } from "lucide-react"
 import { useState, useTransition } from "react"
 import { useAuth } from "@/contexts/auth-context"
@@ -62,18 +61,6 @@ export function Navbar() {
           <BrandWordmark className="text-xl" />
         </Link>
 
-        {/* Central Search */}
-        <div className="hidden flex-1 items-center justify-center px-8 md:flex">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Busca artesanía, talleres o barrios..."
-              className="w-full rounded-full border border-border bg-card py-2 pl-10 pr-4 text-sm font-medium outline-none transition-shadow focus:border-ring focus:ring-1 focus:ring-ring placeholder:font-normal placeholder:opacity-70"
-            />
-          </div>
-        </div>
-
         {/* Desktop nav */}
         <div className="hidden items-center gap-1 md:flex">
           {publicLinks.map((link) => (
@@ -111,11 +98,15 @@ export function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link href="/cart">
-            <Button variant="ghost" size="sm" className="relative">
-              <Inbox className="h-5 w-5" />
+          <Link href="/cart" aria-label={t('cart')} className="block">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-10 w-10 rounded-full"
+            >
+              <ShoppingCart className="h-5 w-5" />
               {totalItems > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                <span className="absolute -right-1.5 -top-1.5 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground shadow-sm">
                   {totalItems}
                 </span>
               )}
@@ -228,8 +219,13 @@ export function Navbar() {
               className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
               onClick={() => setMobileOpen(false)}
             >
-              <Inbox className="h-4 w-4" />
-              {t('cart')} {totalItems > 0 && `(${totalItems})`}
+              <ShoppingCart className="h-4 w-4" />
+              <span>{t('cart')}</span>
+              {totalItems > 0 && (
+                <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
+                  {totalItems}
+                </span>
+              )}
             </Link>
             {isAuthenticated ? (
               <>

@@ -30,33 +30,92 @@ function transformOrder(bo: BackendOrder): Order {
     createdAt: bo.createdAt,
     updatedAt: bo.updatedAt || bo.createdAt,
     city: bo.city?.name,
-    deliveryAddress: (bo as any).deliveryAddress, // Typings might need this if we don't map it everywhere
+    deliveryAddress: bo.deliveryAddress,
+    postalCode: bo.postalCode,
+    addressReference: bo.addressReference ?? null,
     deliveryLat: bo.deliveryLat,
     deliveryLng: bo.deliveryLng,
+    discoveryRadiusKm: bo.discoveryRadiusKm ?? undefined,
+    deliveryDistanceKm:
+      bo.deliveryDistanceKm != null ? Number.parseFloat(bo.deliveryDistanceKm) : undefined,
+    runnerBaseFee:
+      bo.runnerBaseFee != null ? Number.parseFloat(bo.runnerBaseFee) : undefined,
+    runnerPerKmFee:
+      bo.runnerPerKmFee != null ? Number.parseFloat(bo.runnerPerKmFee) : undefined,
+    runnerExtraPickupFee:
+      bo.runnerExtraPickupFee != null
+        ? Number.parseFloat(bo.runnerExtraPickupFee)
+        : undefined,
+    deliveryOrder: bo.deliveryOrder
+      ? {
+          id: String(bo.deliveryOrder.id),
+          runnerId: bo.deliveryOrder.runnerId,
+          status: bo.deliveryOrder.status,
+          paymentStatus: bo.deliveryOrder.paymentStatus,
+        }
+      : null,
     items: flattenedItems,
-    providerOrders: bo.providerOrders?.map(po => ({
-      id: String(po.id),
-      providerId: String(po.providerId),
-      status: po.status,
-      subtotal: Number.parseFloat(po.subtotal),
-      items: (po.items || []).map(mapBackendItem),
-      createdAt: po.createdAt,
-      updatedAt: po.updatedAt || po.createdAt
-    })) || []
+    providerOrders:
+      bo.providerOrders?.map((po) => {
+        const items = (po.items || []).map(mapBackendItem)
+        const originalSubtotal = items.reduce(
+          (sum, item) => sum + item.baseUnitPrice * item.quantity,
+          0,
+        )
+        const subtotal = Number.parseFloat(po.subtotalAmount)
+
+        return {
+          id: String(po.id),
+          providerId: String(po.providerId),
+          providerName: po.provider?.name,
+          status: po.status,
+          paymentStatus: po.paymentStatus,
+          subtotal,
+          originalSubtotal,
+          discountAmount: Math.max(originalSubtotal - subtotal, 0),
+          items,
+          createdAt: po.createdAt,
+          updatedAt: po.updatedAt || po.createdAt,
+        }
+      }) || []
   }
 }
 
 function mapBackendItem(item: any): OrderItem {
+  const baseUnitPrice =
+    item.unitBasePriceSnapshot != null
+      ? Number.parseFloat(item.unitBasePriceSnapshot)
+      : Number.parseFloat(item.priceAtPurchase)
+  const unitPrice = Number.parseFloat(item.priceAtPurchase)
+  const appliedDiscountUnitPrice =
+    item.discountPriceSnapshot != null
+      ? Number.parseFloat(item.discountPriceSnapshot)
+      : baseUnitPrice > unitPrice
+        ? unitPrice
+        : null
+
   return {
     id: String(item.id),
     productId: String(item.productId),
     quantity: item.quantity,
-    unitPrice: Number.parseFloat(item.priceAtPurchase),
+    unitPrice,
+    baseUnitPrice,
+    appliedDiscountUnitPrice,
+    discountAmount: Math.max(baseUnitPrice - unitPrice, 0),
+    priceAtPurchase: item.priceAtPurchase,
     product: item.product ? {
       id: String(item.product.id),
       name: item.product.name,
       description: item.product.description || "",
-      price: Number.parseFloat(item.product.price),
+      price:
+        item.product.discountPrice != null
+          ? Number.parseFloat(item.product.discountPrice)
+          : Number.parseFloat(item.product.price),
+      basePrice: Number.parseFloat(item.product.price),
+      discountPrice:
+        item.product.discountPrice != null
+          ? Number.parseFloat(item.product.discountPrice)
+          : null,
       stock: item.product.stock,
       city: item.product.city?.name || "N/A",
       category: item.product.category?.name || "N/A",

@@ -46,8 +46,4 @@ export const authService = {
   async verifyEmail(token: string) {
     return api.get(`/auth/verify?token=${token}`);
   },
-
-  async verifyMagicLink(token: string) {
-    return api.post('/auth/magic-link/verify', { token });
-  }
 };

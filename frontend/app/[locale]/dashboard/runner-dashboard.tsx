@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Route, CheckCircle, Clock, Navigation, MapPin, Truck, CheckCircle2, Package, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
 export function RunnerDashboard() {
     const { user } = useAuth();
@@ -41,7 +42,7 @@ export function RunnerDashboard() {
 
     const handleStripeConnect = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/connect/link`, {
+            const res = await fetch(`${getApiBaseUrl()}/payments/connect/link`, {
                 credentials: 'include',
             });
             if (!res.ok) throw new Error('Failed to get onboarding link');

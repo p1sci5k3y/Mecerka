@@ -180,7 +180,7 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-2 py-2">
                   <input type="checkbox" id="terms" required className="rounded border-[#e07d61]/30 text-[#e07d61] focus:ring-[#e07d61]" />
                   <label htmlFor="terms" className="text-sm text-slate-600 dark:text-slate-400">
-                    {t('agreeTerms')} <Link href="#" className="text-[#e07d61] hover:underline">{t('termsLink')}</Link> {t('and')} <Link href="#" className="text-[#e07d61] hover:underline">{t('privacyLink')}</Link>
+                    {t('agreeTerms')} {t('termsLink')} {t('and')} {t('privacyLink')}
                   </label>
                 </div>
 

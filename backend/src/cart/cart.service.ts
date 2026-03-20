@@ -10,6 +10,29 @@ import { AddCartItemDto } from './dto/add-cart-item.dto';
 export class CartService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private resolveAppliedDiscountPrice(
+    basePrice: number,
+    publicDiscountPrice?: number | null,
+    clientDiscountPrice?: number | null,
+  ) {
+    const discountCandidates = [
+      publicDiscountPrice,
+      clientDiscountPrice,
+    ].filter(
+      (value): value is number =>
+        value != null &&
+        Number.isFinite(value) &&
+        value > 0 &&
+        value < basePrice,
+    );
+
+    if (discountCandidates.length === 0) {
+      return null;
+    }
+
+    return Math.min(...discountCandidates);
+  }
+
   private buildCartInclude() {
     return {
       city: true,
@@ -104,6 +127,19 @@ export class CartService {
         imageUrl: true,
         price: true,
         discountPrice: true,
+        clientDiscounts: {
+          where: {
+            clientId,
+            active: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+          select: {
+            discountPrice: true,
+          },
+        },
       },
     });
 
@@ -118,7 +154,16 @@ export class CartService {
       );
     }
 
-    const effectiveUnitPrice = Number(product.discountPrice ?? product.price);
+    const clientDiscountPrice =
+      product.clientDiscounts[0]?.discountPrice != null
+        ? Number(product.clientDiscounts[0].discountPrice)
+        : null;
+    const appliedDiscountPrice = this.resolveAppliedDiscountPrice(
+      Number(product.price),
+      product.discountPrice != null ? Number(product.discountPrice) : null,
+      clientDiscountPrice,
+    );
+    const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
 
     await this.prisma.$transaction(async (tx: any) => {
       if (!cartGroup.cityId) {
@@ -165,7 +210,7 @@ export class CartService {
             productNameSnapshot: product.name,
             imageUrlSnapshot: product.imageUrl,
             unitPriceSnapshot: product.price,
-            discountPriceSnapshot: product.discountPrice,
+            discountPriceSnapshot: appliedDiscountPrice,
             effectiveUnitPriceSnapshot: effectiveUnitPrice,
           },
         });
@@ -179,7 +224,7 @@ export class CartService {
             productNameSnapshot: product.name,
             imageUrlSnapshot: product.imageUrl,
             unitPriceSnapshot: product.price,
-            discountPriceSnapshot: product.discountPrice,
+            discountPriceSnapshot: appliedDiscountPrice,
             effectiveUnitPriceSnapshot: effectiveUnitPrice,
           },
         });
@@ -242,6 +287,19 @@ export class CartService {
         imageUrl: true,
         price: true,
         discountPrice: true,
+        clientDiscounts: {
+          where: {
+            clientId,
+            active: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+          select: {
+            discountPrice: true,
+          },
+        },
       },
     });
 
@@ -249,7 +307,16 @@ export class CartService {
       throw new NotFoundException('Product not available');
     }
 
-    const effectiveUnitPrice = Number(product.discountPrice ?? product.price);
+    const clientDiscountPrice =
+      product.clientDiscounts[0]?.discountPrice != null
+        ? Number(product.clientDiscounts[0].discountPrice)
+        : null;
+    const appliedDiscountPrice = this.resolveAppliedDiscountPrice(
+      Number(product.price),
+      product.discountPrice != null ? Number(product.discountPrice) : null,
+      clientDiscountPrice,
+    );
+    const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
 
     await this.prisma.$transaction(async (tx: any) => {
       await tx.cartItem.update({
@@ -260,7 +327,7 @@ export class CartService {
           productNameSnapshot: product.name,
           imageUrlSnapshot: product.imageUrl,
           unitPriceSnapshot: product.price,
-          discountPriceSnapshot: product.discountPrice,
+          discountPriceSnapshot: appliedDiscountPrice,
           effectiveUnitPriceSnapshot: effectiveUnitPrice,
         },
       });

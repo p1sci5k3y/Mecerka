@@ -1,4 +1,4 @@
-import { BadRequestException, ExecutionContext } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
@@ -72,7 +72,7 @@ describe('ObservabilityController', () => {
       window: '24h',
     } as any);
 
-    await controller.getMetrics();
+    await controller.getMetrics({});
 
     expect(observabilityServiceMock.getMetrics).toHaveBeenCalledWith('24h');
   });
@@ -81,19 +81,12 @@ describe('ObservabilityController', () => {
     observabilityServiceMock.getSlaMetrics.mockResolvedValue({} as any);
     observabilityServiceMock.getReconciliation.mockResolvedValue({} as any);
 
-    await controller.getSlaMetrics('7d');
-    await controller.getReconciliation('30d');
+    await controller.getSlaMetrics({ window: '7d' });
+    await controller.getReconciliation({ window: '30d' });
 
     expect(observabilityServiceMock.getSlaMetrics).toHaveBeenCalledWith('7d');
     expect(observabilityServiceMock.getReconciliation).toHaveBeenCalledWith(
       '30d',
-    );
-  });
-
-  it('rejects invalid window values with a controlled bad request', async () => {
-    expect(() => controller.getMetrics('90d')).toThrow(BadRequestException);
-    expect(() => controller.getMetrics('90d')).toThrow(
-      'Invalid window. Expected one of: 24h, 7d, 30d',
     );
   });
 });

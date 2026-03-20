@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getTrackingBaseUrl } from '@/lib/runtime-config';
 
 interface RunnerSimulatorProps {
     readonly orderId: number;
@@ -20,7 +21,7 @@ export default function RunnerSimulator({ orderId }: RunnerSimulatorProps) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
 
     useEffect(() => {
-        const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/tracking`, {
+        const newSocket = io(`${getTrackingBaseUrl()}/tracking`, {
             path: '/socket.io',
             transports: ['websocket'],
             withCredentials: true,

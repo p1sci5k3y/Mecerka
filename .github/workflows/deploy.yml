@@ -1,4 +1,4 @@
-name: Deploy to Production (AWS EC2)
+name: Deploy Dual Environment (AWS EC2)
 
 on:
   workflow_run:
@@ -7,14 +7,74 @@ on:
     branches: [main]
   workflow_dispatch:
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    # Only deploy if CI passed (or if triggered manually)
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+jobs:
+  build-images:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.image_tag }}
+      git_ref: ${{ steps.meta.outputs.git_ref }}
+      backend_image: ${{ steps.meta.outputs.backend_image }}
+      frontend_image: ${{ steps.meta.outputs.frontend_image }}
+    steps:
+      - name: Resolve deploy metadata
+        id: meta
+        run: |
+          set -eu
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            GIT_REF="${GITHUB_SHA}"
+          else
+            GIT_REF="${{ github.event.workflow_run.head_sha }}"
+          fi
+          OWNER_LC=$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          echo "git_ref=${GIT_REF}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${GIT_REF}" >> "$GITHUB_OUTPUT"
+          echo "backend_image=ghcr.io/${OWNER_LC}/mecerka-backend:${GIT_REF}" >> "$GITHUB_OUTPUT"
+          echo "frontend_image=ghcr.io/${OWNER_LC}/mecerka-frontend:${GIT_REF}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.git_ref }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.backend_image }}
+          provenance: false
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.frontend_image }}
+          provenance: false
+
+  deploy-dual:
+    runs-on: ubuntu-latest
+    needs: build-images
+    permissions:
+      contents: read
     steps:
       - name: Get Public IP
         id: ip
@@ -35,130 +95,121 @@ jobs:
             --port 22 \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
 
-      - name: Deploy to EC2 via SSH
+      - name: Deploy prod and demo from the same image tag
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_DB,JWT_SECRET,JWT_SECRET_CURRENT,FISCAL_PEPPER,NEXT_PUBLIC_API_URL,NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,CORS_ORIGIN,FRONTEND_URL,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET,DELIVERY_STRIPE_WEBHOOK_SECRET,DONATIONS_STRIPE_WEBHOOK_SECRET,BACKEND_URL,MAIL_HOST,MAIL_PORT,MAIL_USER,MAIL_PASS,MAIL_FROM,DEMO_MODE,DEMO_PASSWORD
-          command_timeout: 20m
+          command_timeout: 30m
+          envs: DEPLOY_GIT_REF,GHCR_USERNAME,GHCR_TOKEN,PROD_POSTGRES_USER,PROD_POSTGRES_PASSWORD,PROD_POSTGRES_DB,PROD_JWT_SECRET,PROD_JWT_SECRET_CURRENT,PROD_FISCAL_PEPPER,PROD_NEXT_PUBLIC_API_URL,PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,PROD_NEXT_PUBLIC_REQUIRE_MFA,PROD_CORS_ORIGIN,PROD_FRONTEND_URL,PROD_BACKEND_URL,PROD_STRIPE_SECRET_KEY,PROD_STRIPE_WEBHOOK_SECRET,PROD_DELIVERY_STRIPE_WEBHOOK_SECRET,PROD_DONATIONS_STRIPE_WEBHOOK_SECRET,PROD_MAIL_HOST,PROD_MAIL_PORT,PROD_MAIL_USER,PROD_MAIL_PASS,PROD_MAIL_FROM,PROD_DEMO_MODE,PROD_DEMO_PASSWORD,PROD_BACKEND_IMAGE,PROD_FRONTEND_IMAGE,PROD_BACKEND_HOST_PORT,PROD_FRONTEND_HOST_PORT,DEMO_POSTGRES_USER,DEMO_POSTGRES_PASSWORD,DEMO_POSTGRES_DB,DEMO_JWT_SECRET,DEMO_JWT_SECRET_CURRENT,DEMO_FISCAL_PEPPER,DEMO_NEXT_PUBLIC_API_URL,DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,DEMO_NEXT_PUBLIC_REQUIRE_MFA,DEMO_CORS_ORIGIN,DEMO_FRONTEND_URL,DEMO_BACKEND_URL,DEMO_STRIPE_SECRET_KEY,DEMO_STRIPE_WEBHOOK_SECRET,DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET,DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET,DEMO_MAIL_HOST,DEMO_MAIL_PORT,DEMO_MAIL_USER,DEMO_MAIL_PASS,DEMO_MAIL_FROM,DEMO_DEMO_MODE,DEMO_DEMO_PASSWORD,DEMO_BACKEND_IMAGE,DEMO_FRONTEND_IMAGE,DEMO_BACKEND_HOST_PORT,DEMO_FRONTEND_HOST_PORT
           script: |
             set -eu
-            echo "Starting deployment..."
 
             APP_DIR="/opt/mecerka"
-            COMPOSE_FILE="docker-compose.prod.yml"
             REPO_URL="https://github.com/p1sci5k3y/Mecerka.git"
-            REQUIRED_VARS="POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB JWT_SECRET JWT_SECRET_CURRENT FISCAL_PEPPER NEXT_PUBLIC_API_URL NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY CORS_ORIGIN FRONTEND_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET DELIVERY_STRIPE_WEBHOOK_SECRET DONATIONS_STRIPE_WEBHOOK_SECRET BACKEND_URL MAIL_HOST MAIL_PORT MAIL_USER MAIL_PASS MAIL_FROM DEMO_MODE DEMO_PASSWORD"
+            PROD_ENV_FILE="${APP_DIR}/deploy/prod.env"
+            DEMO_ENV_FILE="${APP_DIR}/deploy/demo.env"
 
-            # 1. Setup /opt/mecerka if missing
             if [ ! -d "${APP_DIR}/.git" ]; then
-              echo "Directory ${APP_DIR} not found or not a git repo. Setting up..."
               sudo mkdir -p "${APP_DIR}"
-              # Give current user permissions
               sudo chown -R "$USER:$USER" "${APP_DIR}"
               git clone "${REPO_URL}" "${APP_DIR}"
             fi
 
-            # 2. Pull latest application code
             cd "${APP_DIR}"
             git fetch origin main --prune
-            git reset --hard origin/main
+            git checkout --detach "${DEPLOY_GIT_REF}"
 
-            # 3. Validate required deployment environment
-            missing_vars=""
-            for var_name in ${REQUIRED_VARS}; do
-              eval "var_value=\${${var_name}:-}"
-              if [ -z "${var_value}" ]; then
-                missing_vars="${missing_vars} ${var_name}"
-              fi
-            done
+            mkdir -p "${APP_DIR}/deploy"
+            chmod +x scripts/render-deploy-env.sh scripts/smoke-check-stack.sh
 
-            if [ -n "${missing_vars}" ]; then
-              echo "Missing required deployment variables:${missing_vars}" >&2
-              exit 1
-            fi
+            echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
 
-            ENCODED_PG_PASS=$(python3 -c "import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1],safe=''))" "${POSTGRES_PASSWORD}")
-            DATABASE_URL="postgresql://${POSTGRES_USER}:${ENCODED_PG_PASS}@postgres:5432/${POSTGRES_DB}"
+            ./scripts/render-deploy-env.sh PROD "${PROD_ENV_FILE}"
+            ./scripts/render-deploy-env.sh DEMO "${DEMO_ENV_FILE}"
 
-            # 4. Write a complete .env with restrictive permissions
-            umask 077
-            ENV_FILE="${APP_DIR}/.env"
-            TEMP_ENV_FILE="${ENV_FILE}.tmp"
-            : > "${TEMP_ENV_FILE}"
-            printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}" >> "${TEMP_ENV_FILE}"
-            printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}" >> "${TEMP_ENV_FILE}"
-            printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}" >> "${TEMP_ENV_FILE}"
-            printf 'DATABASE_URL=%s\n' "${DATABASE_URL}" >> "${TEMP_ENV_FILE}"
-            printf 'JWT_SECRET=%s\n' "${JWT_SECRET}" >> "${TEMP_ENV_FILE}"
-            printf 'JWT_SECRET_CURRENT=%s\n' "${JWT_SECRET_CURRENT}" >> "${TEMP_ENV_FILE}"
-            printf 'FISCAL_PEPPER=%s\n' "${FISCAL_PEPPER}" >> "${TEMP_ENV_FILE}"
-            printf 'NEXT_PUBLIC_API_URL=%s\n' "${NEXT_PUBLIC_API_URL}" >> "${TEMP_ENV_FILE}"
-            printf 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=%s\n' "${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}" >> "${TEMP_ENV_FILE}"
-            printf 'CORS_ORIGIN=%s\n' "${CORS_ORIGIN}" >> "${TEMP_ENV_FILE}"
-            printf 'FRONTEND_URL=%s\n' "${FRONTEND_URL}" >> "${TEMP_ENV_FILE}"
-            printf 'STRIPE_SECRET_KEY=%s\n' "${STRIPE_SECRET_KEY}" >> "${TEMP_ENV_FILE}"
-            printf 'STRIPE_WEBHOOK_SECRET=%s\n' "${STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
-            printf 'DELIVERY_STRIPE_WEBHOOK_SECRET=%s\n' "${DELIVERY_STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
-            printf 'DONATIONS_STRIPE_WEBHOOK_SECRET=%s\n' "${DONATIONS_STRIPE_WEBHOOK_SECRET}" >> "${TEMP_ENV_FILE}"
-            printf 'BACKEND_URL=%s\n' "${BACKEND_URL}" >> "${TEMP_ENV_FILE}"
-            printf 'MAIL_HOST=%s\n' "${MAIL_HOST}" >> "${TEMP_ENV_FILE}"
-            printf 'MAIL_PORT=%s\n' "${MAIL_PORT}" >> "${TEMP_ENV_FILE}"
-            printf 'MAIL_USER=%s\n' "${MAIL_USER}" >> "${TEMP_ENV_FILE}"
-            printf 'MAIL_PASS=%s\n' "${MAIL_PASS}" >> "${TEMP_ENV_FILE}"
-            printf 'MAIL_FROM=%s\n' "${MAIL_FROM}" >> "${TEMP_ENV_FILE}"
-            printf 'DEMO_MODE=%s\n' "${DEMO_MODE}" >> "${TEMP_ENV_FILE}"
-            printf 'DEMO_PASSWORD=%s\n' "${DEMO_PASSWORD}" >> "${TEMP_ENV_FILE}"
-            mv "${TEMP_ENV_FILE}" "${ENV_FILE}"
-            chmod 600 "${ENV_FILE}"
+            sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml config >/dev/null
+            sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml config >/dev/null
 
-            # 5. Validate compose configuration and restart containers idempotently
-            sudo docker compose -f "${COMPOSE_FILE}" config >/dev/null
-            sudo docker compose -f "${COMPOSE_FILE}" down --remove-orphans
+            sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml down -v --remove-orphans || true
 
-            for legacy_container in mecerka_postgres_prod mecerka_backend_prod mecerka_frontend_prod; do
-              if sudo docker container inspect "${legacy_container}" >/dev/null 2>&1; then
-                sudo docker rm -f "${legacy_container}" >/dev/null
-              fi
-            done
+            sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml pull
+            sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml pull
 
-            sudo docker compose -f "${COMPOSE_FILE}" build --pull
-            sudo docker compose -f "${COMPOSE_FILE}" up -d --force-recreate --remove-orphans
+            sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+            sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
-            # 6. Configure Nginx Reverse Proxy
             sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
             sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
             sudo rm -f /etc/nginx/sites-enabled/default
             sudo nginx -t
             sudo systemctl reload nginx
 
-            # 7. Prune old dangling images
+            ./scripts/smoke-check-stack.sh "${PROD_ENV_FILE}"
+            ./scripts/smoke-check-stack.sh "${DEMO_ENV_FILE}"
+
             sudo docker image prune -f >/dev/null
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB: marketplace
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_SECRET_CURRENT: ${{ secrets.JWT_SECRET_CURRENT }}
-          FISCAL_PEPPER: ${{ secrets.FISCAL_PEPPER }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
-          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
-          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}
-          DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}
-          BACKEND_URL: "https://mecerka.me"
-          MAIL_HOST: ${{ secrets.MAIL_HOST }}
-          MAIL_PORT: ${{ secrets.MAIL_PORT }}
-          MAIL_USER: ${{ secrets.MAIL_USER }}
-          MAIL_PASS: ${{ secrets.MAIL_PASS }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-          DEMO_MODE: "true"
-          DEMO_PASSWORD: ${{ secrets.DEMO_PASSWORD }}
+          DEPLOY_GIT_REF: ${{ needs.build-images.outputs.git_ref }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+
+          PROD_POSTGRES_USER: ${{ vars.PROD_POSTGRES_USER || 'postgres' }}
+          PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          PROD_POSTGRES_DB: ${{ vars.PROD_POSTGRES_DB || 'marketplace_prod' }}
+          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
+          PROD_JWT_SECRET_CURRENT: ${{ secrets.PROD_JWT_SECRET_CURRENT }}
+          PROD_FISCAL_PEPPER: ${{ secrets.PROD_FISCAL_PEPPER }}
+          PROD_NEXT_PUBLIC_API_URL: ${{ vars.PROD_NEXT_PUBLIC_API_URL || 'https://mecerka.me/api' }}
+          PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          PROD_NEXT_PUBLIC_REQUIRE_MFA: ${{ vars.PROD_NEXT_PUBLIC_REQUIRE_MFA || 'false' }}
+          PROD_CORS_ORIGIN: ${{ vars.PROD_CORS_ORIGIN || 'https://mecerka.me' }}
+          PROD_FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://mecerka.me' }}
+          PROD_BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://mecerka.me/api' }}
+          PROD_STRIPE_SECRET_KEY: ${{ secrets.PROD_STRIPE_SECRET_KEY }}
+          PROD_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}
+          PROD_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET }}
+          PROD_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET }}
+          PROD_MAIL_HOST: ${{ secrets.PROD_MAIL_HOST }}
+          PROD_MAIL_PORT: ${{ secrets.PROD_MAIL_PORT }}
+          PROD_MAIL_USER: ${{ secrets.PROD_MAIL_USER }}
+          PROD_MAIL_PASS: ${{ secrets.PROD_MAIL_PASS }}
+          PROD_MAIL_FROM: ${{ secrets.PROD_MAIL_FROM }}
+          PROD_DEMO_MODE: "false"
+          PROD_DEMO_PASSWORD: ""
+          PROD_BACKEND_IMAGE: ${{ needs.build-images.outputs.backend_image }}
+          PROD_FRONTEND_IMAGE: ${{ needs.build-images.outputs.frontend_image }}
+          PROD_BACKEND_HOST_PORT: "3000"
+          PROD_FRONTEND_HOST_PORT: "3001"
+
+          DEMO_POSTGRES_USER: ${{ vars.DEMO_POSTGRES_USER || 'postgres' }}
+          DEMO_POSTGRES_PASSWORD: ${{ secrets.DEMO_POSTGRES_PASSWORD }}
+          DEMO_POSTGRES_DB: ${{ vars.DEMO_POSTGRES_DB || 'marketplace_demo' }}
+          DEMO_JWT_SECRET: ${{ secrets.DEMO_JWT_SECRET }}
+          DEMO_JWT_SECRET_CURRENT: ${{ secrets.DEMO_JWT_SECRET_CURRENT }}
+          DEMO_FISCAL_PEPPER: ${{ secrets.DEMO_FISCAL_PEPPER }}
+          DEMO_NEXT_PUBLIC_API_URL: ${{ vars.DEMO_NEXT_PUBLIC_API_URL || 'https://demo.mecerka.me/api' }}
+          DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          DEMO_NEXT_PUBLIC_REQUIRE_MFA: ${{ vars.DEMO_NEXT_PUBLIC_REQUIRE_MFA || 'false' }}
+          DEMO_CORS_ORIGIN: ${{ vars.DEMO_CORS_ORIGIN || 'https://demo.mecerka.me' }}
+          DEMO_FRONTEND_URL: ${{ vars.DEMO_FRONTEND_URL || 'https://demo.mecerka.me' }}
+          DEMO_BACKEND_URL: ${{ vars.DEMO_BACKEND_URL || 'https://demo.mecerka.me/api' }}
+          DEMO_STRIPE_SECRET_KEY: ${{ secrets.DEMO_STRIPE_SECRET_KEY }}
+          DEMO_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET }}
+          DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET }}
+          DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET }}
+          DEMO_MAIL_HOST: ${{ secrets.DEMO_MAIL_HOST }}
+          DEMO_MAIL_PORT: ${{ secrets.DEMO_MAIL_PORT }}
+          DEMO_MAIL_USER: ${{ secrets.DEMO_MAIL_USER }}
+          DEMO_MAIL_PASS: ${{ secrets.DEMO_MAIL_PASS }}
+          DEMO_MAIL_FROM: ${{ secrets.DEMO_MAIL_FROM }}
+          DEMO_DEMO_MODE: "true"
+          DEMO_DEMO_PASSWORD: ${{ secrets.DEMO_DEMO_PASSWORD }}
+          DEMO_BACKEND_IMAGE: ${{ needs.build-images.outputs.backend_image }}
+          DEMO_FRONTEND_IMAGE: ${{ needs.build-images.outputs.frontend_image }}
+          DEMO_BACKEND_HOST_PORT: "3010"
+          DEMO_FRONTEND_HOST_PORT: "3011"
 
       - name: Revoke GitHub Runner IP
         if: always()

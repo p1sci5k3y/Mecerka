@@ -45,6 +45,8 @@ export class DeliveryService {
   private static readonly WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
   private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
   private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
+  private static readonly DEMO_RUNNER_PAYMENT_UNAVAILABLE_MESSAGE =
+    'Este entorno demo no puede preparar el pago Stripe del reparto. El importe y el estado del reparto siguen siendo válidos, pero el cobro requiere credenciales Stripe operativas.';
 
   constructor(
     private readonly prisma: PrismaService,
@@ -614,10 +616,16 @@ export class DeliveryService {
       return this.stripe;
     }
 
+    const demoMode = this.configService.get<string>('DEMO_MODE') === 'true';
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
-    if (!stripeSecretKey) {
+    if (
+      !stripeSecretKey ||
+      (demoMode && stripeSecretKey.trim().includes('dummy'))
+    ) {
       throw new ConflictException(
-        'Stripe is not configured for delivery payments',
+        demoMode
+          ? DeliveryService.DEMO_RUNNER_PAYMENT_UNAVAILABLE_MESSAGE
+          : 'Stripe is not configured for delivery payments',
       );
     }
 
@@ -755,6 +763,7 @@ export class DeliveryService {
         select: {
           id: true,
           clientId: true,
+          deliveryFee: true,
           deliveryOrder: {
             include: {
               order: {
@@ -779,10 +788,17 @@ export class DeliveryService {
         );
       }
 
+      const officialDeliveryFee = Number(order.deliveryFee ?? 0);
+      if (Math.abs(officialDeliveryFee - dto.deliveryFee) > 0.009) {
+        throw new ConflictException(
+          'Delivery fee must match the official order delivery fee',
+        );
+      }
+
       const deliveryOrder = await tx.deliveryOrder.create({
         data: {
           orderId: dto.orderId,
-          deliveryFee: dto.deliveryFee,
+          deliveryFee: officialDeliveryFee,
           currency: dto.currency,
           status: DeliveryOrderStatus.PENDING,
           paymentStatus: RunnerPaymentStatus.PENDING,
@@ -799,7 +815,7 @@ export class DeliveryService {
       await tx.order.update({
         where: { id: dto.orderId },
         data: {
-          deliveryFee: dto.deliveryFee,
+          deliveryFee: officialDeliveryFee,
         },
       });
 

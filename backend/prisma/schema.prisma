@@ -242,9 +242,10 @@ model User {
   lastEmailSentAt            DateTime?
 
   // Geolocation
-  address   String?
-  latitude  Float?
-  longitude Float?
+  address                String?
+  latitude               Float?
+  longitude              Float?
+  providerServiceRadiusKm Float   @default(10.0)
 
   // Relations
   orders         Order[]         @relation("ClientOrders")
@@ -257,6 +258,8 @@ model User {
   cartGroups     CartGroup[]
   cartProviders  CartProvider[]
   paymentAccounts PaymentAccount[]
+  grantedClientDiscounts ProviderClientProductDiscount[] @relation("ProviderClientProductDiscounts")
+  receivedProviderDiscounts ProviderClientProductDiscount[] @relation("ClientProviderProductDiscounts")
   donations      PlatformDonation[]
   runnerDeliveries DeliveryOrder[] @relation("RunnerDeliveries")
   deliveryJobClaims DeliveryJobClaim[]
@@ -274,6 +277,10 @@ model City {
   name      String   @unique
   slug      String   @unique
   active    Boolean  @default(true)
+  maxDeliveryRadiusKm Float?
+  baseDeliveryFee   Decimal  @default(3.50) @db.Decimal(10, 2)
+  deliveryPerKmFee  Decimal  @default(0.90) @db.Decimal(10, 2)
+  extraPickupFee    Decimal  @default(1.50) @db.Decimal(10, 2)
   createdAt DateTime @default(now())
 
   // Relations
@@ -345,6 +352,7 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
   stockReservations StockReservation[]
+  clientDiscounts ProviderClientProductDiscount[]
 
   @@index([providerId])
   @@index([cityId])
@@ -413,6 +421,26 @@ model CartItem {
   @@index([productId])
 }
 
+model ProviderClientProductDiscount {
+  id            String   @id @default(uuid()) @db.Uuid
+  providerId    String   @db.Uuid
+  clientId      String   @db.Uuid
+  productId     String   @db.Uuid
+  discountPrice Decimal  @db.Decimal(10, 2)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  provider User    @relation("ProviderClientProductDiscounts", fields: [providerId], references: [id])
+  client   User    @relation("ClientProviderProductDiscounts", fields: [clientId], references: [id])
+  product  Product @relation(fields: [productId], references: [id])
+
+  @@unique([providerId, clientId, productId])
+  @@index([providerId, active])
+  @@index([clientId, active])
+  @@index([productId, active])
+}
+
 model Order {
   id         String         @id @default(uuid()) @db.Uuid
   totalPrice Decimal        @db.Decimal(10, 2)
@@ -436,9 +464,12 @@ model Order {
   deliveryOrder  DeliveryOrder?
 
   // Delivery Information
-  deliveryAddress String?
-  deliveryLat     Float?
-  deliveryLng     Float?
+  deliveryAddress   String?
+  postalCode        String?
+  addressReference  String?
+  deliveryLat       Float?
+  deliveryLng       Float?
+  discoveryRadiusKm Float?
 
   // Payment Tracking (Idempotency)
   paymentRef      String?  @unique
@@ -449,6 +480,7 @@ model Order {
   deliveryDistanceKm Decimal? @db.Decimal(10, 2)
   runnerBaseFee      Decimal? @db.Decimal(10, 2)
   runnerPerKmFee     Decimal? @db.Decimal(10, 2)
+  runnerExtraPickupFee Decimal? @db.Decimal(10, 2)
 
   @@index([clientId])
   @@index([clientId, createdAt])
@@ -469,6 +501,8 @@ model ProviderOrder {
   paymentExpiresAt DateTime?
   externalInvoiceUrl String?
   externalInvoiceNumber String?
+  deliveryDistanceKm Decimal? @db.Decimal(10, 2)
+  coverageLimitKm   Decimal? @db.Decimal(10, 2)
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
 
@@ -809,6 +843,8 @@ model OrderItem {
   id              String  @id @default(uuid()) @db.Uuid
   quantity        Int
   priceAtPurchase Decimal @db.Decimal(10, 2)
+  unitBasePriceSnapshot Decimal? @db.Decimal(10, 2)
+  discountPriceSnapshot Decimal? @db.Decimal(10, 2)
 
   // Foreign Keys
   providerOrderId String @db.Uuid

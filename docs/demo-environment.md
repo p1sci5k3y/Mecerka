@@ -23,6 +23,21 @@ DEMO_PASSWORD=choose-a-demo-password
 
 `DEMO_PASSWORD` is mandatory when demo mode is enabled. The backend no longer embeds a default demo password.
 
+For a clean and reproducible local demo reset, the repository provides:
+
+```bash
+make demo-reset
+```
+
+This command:
+
+- enables `DEMO_MODE=true` locally;
+- destroys the local PostgreSQL volume for the default Compose stack;
+- rebuilds the stack from scratch;
+- verifies backend health;
+- verifies that the public catalog is not empty;
+- verifies that `user.demo@local.test` can log in with `DEMO_PASSWORD`.
+
 ## Data seeding strategy
 
 The system separates:
@@ -67,6 +82,8 @@ The endpoints are not public and are intended for controlled demonstration or re
 When demo mode is enabled, the backend may auto-seed the demo dataset on startup if demo data does not already exist.
 
 This behavior is disabled by default because demo mode is not enabled unless explicitly configured.
+
+In the dual deployment workflow, the demo stack is recreated from a clean volume on each deploy so that the public demo does not accumulate stale or mixed data between releases.
 
 ## Demo users
 

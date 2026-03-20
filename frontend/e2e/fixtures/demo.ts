@@ -209,7 +209,7 @@ export async function createAssignedDeliveryForRunner(
     '/delivery/orders',
     {
       orderId: order.id,
-      deliveryFee: 4.5,
+      deliveryFee: Number(order.deliveryFee ?? 0),
       currency: 'EUR',
     },
     clientToken,

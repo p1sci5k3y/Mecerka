@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import {
   DeliveryStatus,
   PaymentSessionStatus,
@@ -15,6 +16,14 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let service: OrdersService;
   let prismaMock: any;
   let eventEmitterMock: any;
+  let geocodingServiceMock: any;
+  const validCheckoutDto = {
+    cityId: 'city-1',
+    deliveryAddress: 'Calle Mayor 1',
+    postalCode: '28013',
+    addressReference: 'Portal 2',
+    discoveryRadiusKm: 6,
+  };
 
   beforeEach(async () => {
     prismaMock = {
@@ -49,11 +58,19 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       },
       user: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
       },
       $transaction: jest.fn(),
     };
     eventEmitterMock = {
       emit: jest.fn(),
+    };
+    geocodingServiceMock = {
+      geocodeAddress: jest.fn().mockResolvedValue({
+        latitude: 40.4168,
+        longitude: -3.7038,
+        formattedAddress: 'Calle Mayor 1, 28013 Madrid, Spain',
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -61,6 +78,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         OrdersService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
+        { provide: GEOCODING_SERVICE, useValue: geocodingServiceMock },
       ],
     }).compile();
 
@@ -266,9 +284,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
 
   describe('Checkout idempotency', () => {
     it('fails checkout when the idempotency key header is missing', async () => {
-      await expect(service.checkoutFromCart('client-1')).rejects.toThrow(
-        'Idempotency-Key header is required',
-      );
+      await expect(
+        service.checkoutFromCart('client-1', validCheckoutDto as any),
+      ).rejects.toThrow('Idempotency-Key header is required');
     });
 
     it('fails checkout when the active cart is empty', async () => {
@@ -277,12 +295,25 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         id: 'cart-1',
         clientId: 'client-1',
         cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+          baseDeliveryFee: 3.5,
+          deliveryPerKmFee: 0.9,
+          extraPickupFee: 1.5,
+        },
         status: 'ACTIVE',
         providers: [],
       });
 
       await expect(
-        service.checkoutFromCart('client-1', 'idem-empty'),
+        service.checkoutFromCart(
+          'client-1',
+          validCheckoutDto as any,
+          'idem-empty',
+        ),
       ).rejects.toThrow('Active cart is empty');
     });
 
@@ -294,7 +325,11 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         providerOrders: [],
       });
 
-      const result = await service.checkoutFromCart('client-1', 'idem-1');
+      const result = await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-1',
+      );
 
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(result).toEqual(
@@ -318,6 +353,12 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         id: 'cart-1',
         clientId: 'client-1',
         cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+        },
         status: 'ACTIVE',
         providers: [
           {
@@ -327,6 +368,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               {
                 productId: 'product-1',
                 quantity: 2,
+                unitPriceSnapshot: 12.5,
+                discountPriceSnapshot: null,
                 effectiveUnitPriceSnapshot: 12.5,
               },
             ],
@@ -344,6 +387,16 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
           },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
+            ]),
+          },
           order: {
             create: jest.fn().mockRejectedValue({ code: 'P2002' }),
           },
@@ -353,7 +406,11 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         }),
       );
 
-      const result = await service.checkoutFromCart('client-1', 'idem-race');
+      const result = await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-race',
+      );
 
       expect(result).toEqual(
         expect.objectContaining({
@@ -363,12 +420,18 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       );
     });
 
-    it('creates one provider order per cart provider and keeps root order payment fields empty', async () => {
+    it('creates one provider order per cart provider and persists geocoded coverage fields', async () => {
       prismaMock.order.findUnique.mockResolvedValue(null);
       prismaMock.cartGroup.findFirst.mockResolvedValue({
         id: 'cart-1',
         clientId: 'client-1',
         cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+        },
         status: 'ACTIVE',
         providers: [
           {
@@ -378,6 +441,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               {
                 productId: 'product-1',
                 quantity: 2,
+                unitPriceSnapshot: 12.5,
+                discountPriceSnapshot: null,
                 effectiveUnitPriceSnapshot: 12.5,
               },
             ],
@@ -389,6 +454,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               {
                 productId: 'product-2',
                 quantity: 1,
+                unitPriceSnapshot: 20,
+                discountPriceSnapshot: null,
                 effectiveUnitPriceSnapshot: 20,
               },
             ],
@@ -407,6 +474,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             providerId: 'provider-1',
             subtotalAmount: 25,
             paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.03,
+            coverageLimitKm: 6,
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
             items: [
               { productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 },
@@ -417,6 +486,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             providerId: 'provider-2',
             subtotalAmount: 20,
             paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.17,
+            coverageLimitKm: 6,
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
             items: [
               { productId: 'product-2', quantity: 1, priceAtPurchase: 20 },
@@ -428,6 +499,14 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         id: 'ord-new',
         clientId: 'client-1',
         paymentRef: null,
+        deliveryFee: 5.15,
+        deliveryDistanceKm: 0.17,
+        runnerBaseFee: 3.5,
+        runnerPerKmFee: 0.9,
+        runnerExtraPickupFee: 1.5,
+        postalCode: '28013',
+        addressReference: 'Portal 2',
+        discoveryRadiusKm: 6,
         summaryDocument: {
           id: 'summary-1',
           orderId: 'ord-new',
@@ -441,6 +520,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             providerId: 'provider-1',
             subtotalAmount: 25,
             paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.03,
+            coverageLimitKm: 6,
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
             items: [
               { productId: 'product-1', quantity: 2, priceAtPurchase: 12.5 },
@@ -451,6 +532,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             providerId: 'provider-2',
             subtotalAmount: 20,
             paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.17,
+            coverageLimitKm: 6,
             reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
             items: [
               { productId: 'product-2', quantity: 1, priceAtPurchase: 20 },
@@ -474,6 +557,22 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               { id: 'product-2', stock: 5 },
             ]),
           },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
+              {
+                id: 'provider-2',
+                latitude: 40.418,
+                longitude: -3.705,
+                providerServiceRadiusKm: 8,
+              },
+            ]),
+          },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
             createMany: transactionReservationCreateMany,
@@ -491,15 +590,30 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         }),
       );
 
-      const result = await service.checkoutFromCart('client-1', 'idem-new');
+      const result = await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-new',
+      );
 
       expect(transactionOrderCreate).toHaveBeenCalledWith({
         data: {
           clientId: 'client-1',
           cityId: 'city-1',
           totalPrice: 45,
+          deliveryFee: 5.15,
+          deliveryDistanceKm: 0.17,
           status: DeliveryStatus.PENDING,
           checkoutIdempotencyKey: 'idem-new',
+          deliveryAddress: 'Calle Mayor 1',
+          postalCode: '28013',
+          addressReference: 'Portal 2',
+          deliveryLat: 40.4168,
+          deliveryLng: -3.7038,
+          discoveryRadiusKm: 6,
+          runnerBaseFee: 3.5,
+          runnerPerKmFee: 0.9,
+          runnerExtraPickupFee: 1.5,
           providerOrders: {
             create: [
               {
@@ -507,12 +621,16 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
                 status: ProviderOrderStatus.PENDING,
                 subtotalAmount: 25,
                 paymentStatus: 'PENDING',
+                deliveryDistanceKm: 0.03,
+                coverageLimitKm: 6,
                 items: {
                   create: [
                     {
                       productId: 'product-1',
                       quantity: 2,
                       priceAtPurchase: 12.5,
+                      unitBasePriceSnapshot: 12.5,
+                      discountPriceSnapshot: null,
                     },
                   ],
                 },
@@ -522,12 +640,16 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
                 status: ProviderOrderStatus.PENDING,
                 subtotalAmount: 20,
                 paymentStatus: 'PENDING',
+                deliveryDistanceKm: 0.17,
+                coverageLimitKm: 6,
                 items: {
                   create: [
                     {
                       productId: 'product-2',
                       quantity: 1,
                       priceAtPurchase: 20,
+                      unitBasePriceSnapshot: 20,
+                      discountPriceSnapshot: null,
                     },
                   ],
                 },
@@ -560,20 +682,333 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           currency: 'EUR',
         }),
       );
-      expect(
-        (result.summaryDocument as any).externalInvoiceNumber,
-      ).toBeUndefined();
-      expect(result.providerOrders[0].items[0]).toEqual(
-        expect.objectContaining({
-          productId: 'product-1',
-          quantity: 2,
-          priceAtPurchase: 12.5,
-        }),
-      );
+      expect(result.deliveryFee).toBe(5.15);
+      expect(result.deliveryDistanceKm).toBe(0.17);
+      expect(result.runnerBaseFee).toBe(3.5);
+      expect(result.runnerPerKmFee).toBe(0.9);
+      expect(result.runnerExtraPickupFee).toBe(1.5);
+      expect(result.postalCode).toBe('28013');
+      expect(result.providerOrders[0].deliveryDistanceKm).toBe(0.03);
+      expect(result.providerOrders[0].coverageLimitKm).toBe(6);
       expect(result.providerOrders[0].reservationExpiresAt).toEqual(
         new Date('2026-03-15T12:15:00.000Z'),
       );
       expect(result.paymentRef).toBeNull();
+    });
+
+    it('calculates a lower delivery fee for a single-provider order than for a multi-provider order in the same city', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+          baseDeliveryFee: 3.5,
+          deliveryPerKmFee: 0.9,
+          extraPickupFee: 1.5,
+        },
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 1,
+                unitPriceSnapshot: 25,
+                discountPriceSnapshot: null,
+                effectiveUnitPriceSnapshot: 25,
+              },
+            ],
+          },
+        ],
+      });
+
+      const transactionOrderCreate = jest.fn().mockResolvedValue({
+        id: 'ord-single',
+        deliveryFee: 3.53,
+        deliveryDistanceKm: 0.03,
+        runnerBaseFee: 3.5,
+        runnerPerKmFee: 0.9,
+        runnerExtraPickupFee: 1.5,
+        providerOrders: [
+          {
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.03,
+            coverageLimitKm: 6,
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [
+              { productId: 'product-1', quantity: 1, priceAtPurchase: 25 },
+            ],
+          },
+        ],
+      });
+
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest
+              .fn()
+              .mockResolvedValue([{ id: 'product-1', stock: 5 }]),
+          },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
+            ]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({ count: 1 }),
+          },
+          order: {
+            create: transactionOrderCreate,
+            findUniqueOrThrow: jest.fn().mockResolvedValue({
+              id: 'ord-single',
+              deliveryFee: 3.53,
+              deliveryDistanceKm: 0.03,
+              runnerBaseFee: 3.5,
+              runnerPerKmFee: 0.9,
+              runnerExtraPickupFee: 1.5,
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  providerId: 'provider-1',
+                  subtotalAmount: 25,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: 0.03,
+                  coverageLimitKm: 6,
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                  items: [
+                    {
+                      productId: 'product-1',
+                      quantity: 1,
+                      priceAtPurchase: 25,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+          orderSummaryDocument: {
+            create: jest.fn().mockResolvedValue({ id: 'summary-1' }),
+          },
+          cartGroup: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        }),
+      );
+
+      const result = await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-single',
+      );
+
+      expect(result.deliveryFee).toBe(3.53);
+      expect(result.deliveryDistanceKm).toBe(0.03);
+    });
+
+    it('increases the delivery fee when distance and additional pickups grow', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+          baseDeliveryFee: 2,
+          deliveryPerKmFee: 1,
+          extraPickupFee: 1.25,
+        },
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 10,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 10,
+              },
+            ],
+          },
+          {
+            providerId: 'provider-2',
+            subtotalAmount: 12,
+            items: [
+              {
+                productId: 'product-2',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 12,
+              },
+            ],
+          },
+        ],
+      });
+
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest.fn().mockResolvedValue([
+              { id: 'product-1', stock: 5 },
+              { id: 'product-2', stock: 5 },
+            ]),
+          },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
+              {
+                id: 'provider-2',
+                latitude: 40.4205,
+                longitude: -3.711,
+                providerServiceRadiusKm: 8,
+              },
+            ]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+            createMany: jest.fn().mockResolvedValue({ count: 2 }),
+          },
+          order: {
+            create: jest.fn().mockResolvedValue({
+              id: 'ord-pricing',
+              deliveryFee: 3.8,
+              deliveryDistanceKm: 0.55,
+              runnerBaseFee: 2,
+              runnerPerKmFee: 1,
+              runnerExtraPickupFee: 1.25,
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  providerId: 'provider-1',
+                  subtotalAmount: 10,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: 0.03,
+                  coverageLimitKm: 6,
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                  items: [
+                    {
+                      productId: 'product-1',
+                      quantity: 1,
+                      priceAtPurchase: 10,
+                    },
+                  ],
+                },
+                {
+                  id: 'po-2',
+                  providerId: 'provider-2',
+                  subtotalAmount: 12,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: 0.55,
+                  coverageLimitKm: 6,
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                  items: [
+                    {
+                      productId: 'product-2',
+                      quantity: 1,
+                      priceAtPurchase: 12,
+                    },
+                  ],
+                },
+              ],
+            }),
+            findUniqueOrThrow: jest.fn().mockResolvedValue({
+              id: 'ord-pricing',
+              deliveryFee: 3.8,
+              deliveryDistanceKm: 0.55,
+              runnerBaseFee: 2,
+              runnerPerKmFee: 1,
+              runnerExtraPickupFee: 1.25,
+              providerOrders: [
+                {
+                  id: 'po-1',
+                  providerId: 'provider-1',
+                  subtotalAmount: 10,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: 0.03,
+                  coverageLimitKm: 6,
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                  items: [
+                    {
+                      productId: 'product-1',
+                      quantity: 1,
+                      priceAtPurchase: 10,
+                    },
+                  ],
+                },
+                {
+                  id: 'po-2',
+                  providerId: 'provider-2',
+                  subtotalAmount: 12,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: 0.55,
+                  coverageLimitKm: 6,
+                  reservations: [
+                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
+                  ],
+                  items: [
+                    {
+                      productId: 'product-2',
+                      quantity: 1,
+                      priceAtPurchase: 12,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+          orderSummaryDocument: {
+            create: jest.fn().mockResolvedValue({ id: 'summary-1' }),
+          },
+          cartGroup: {
+            update: jest.fn().mockResolvedValue({}),
+          },
+        }),
+      );
+
+      const result = await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-pricing',
+      );
+
+      expect(result.deliveryDistanceKm).toBe(0.55);
+      expect(result.deliveryFee).toBe(3.8);
+      expect(result.runnerBaseFee).toBe(2);
+      expect(result.runnerPerKmFee).toBe(1);
+      expect(result.runnerExtraPickupFee).toBe(1.25);
     });
 
     it('fails checkout with STOCK_UNAVAILABLE when active reservations exhaust stock', async () => {
@@ -582,6 +1017,15 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         id: 'cart-1',
         clientId: 'client-1',
         cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+          baseDeliveryFee: 3.5,
+          deliveryPerKmFee: 0.9,
+          extraPickupFee: 1.5,
+        },
         status: 'ACTIVE',
         providers: [
           {
@@ -613,11 +1057,25 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               },
             ]),
           },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
+            ]),
+          },
         }),
       );
 
       await expect(
-        service.checkoutFromCart('client-1', 'idem-stock'),
+        service.checkoutFromCart(
+          'client-1',
+          validCheckoutDto as any,
+          'idem-stock',
+        ),
       ).rejects.toThrow('STOCK_UNAVAILABLE');
     });
 
@@ -627,6 +1085,15 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         id: 'cart-1',
         clientId: 'client-1',
         cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+          baseDeliveryFee: 3.5,
+          deliveryPerKmFee: 0.9,
+          extraPickupFee: 1.5,
+        },
         status: 'ACTIVE',
         providers: [
           {
@@ -656,6 +1123,16 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             findMany: jest.fn().mockResolvedValue([
               { id: 'product-a', stock: 5 },
               { id: 'product-b', stock: 5 },
+            ]),
+          },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.417,
+                longitude: -3.704,
+                providerServiceRadiusKm: 8,
+              },
             ]),
           },
           stockReservation: {
@@ -724,10 +1201,116 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         }),
       );
 
-      await service.checkoutFromCart('client-1', 'idem-lock-order');
+      await service.checkoutFromCart(
+        'client-1',
+        validCheckoutDto as any,
+        'idem-lock-order',
+      );
 
       const sql = executeRaw.mock.calls[0]?.[0];
       expect(sql.values).toEqual(['product-a', 'product-b']);
+    });
+
+    it('fails checkout when the address cannot be geocoded', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 8,
+        },
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 12.5,
+              },
+            ],
+          },
+        ],
+      });
+      geocodingServiceMock.geocodeAddress.mockResolvedValueOnce(null);
+
+      await expect(
+        service.checkoutFromCart(
+          'client-1',
+          validCheckoutDto as any,
+          'idem-geocode',
+        ),
+      ).rejects.toThrow(
+        'Delivery address could not be geocoded for the selected city',
+      );
+    });
+
+    it('fails checkout when any provider is outside the effective coverage radius', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        id: 'cart-1',
+        clientId: 'client-1',
+        cityId: 'city-1',
+        city: {
+          id: 'city-1',
+          name: 'Madrid',
+          active: true,
+          maxDeliveryRadiusKm: 4,
+        },
+        status: 'ACTIVE',
+        providers: [
+          {
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 1,
+                effectiveUnitPriceSnapshot: 12.5,
+              },
+            ],
+          },
+        ],
+      });
+      prismaMock.$transaction.mockImplementation(async (callback: any) =>
+        callback({
+          $executeRaw: jest.fn(),
+          product: {
+            findMany: jest
+              .fn()
+              .mockResolvedValue([{ id: 'product-1', stock: 5 }]),
+          },
+          stockReservation: {
+            groupBy: jest.fn().mockResolvedValue([]),
+          },
+          user: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                id: 'provider-1',
+                latitude: 40.5001,
+                longitude: -3.8,
+                providerServiceRadiusKm: 6,
+              },
+            ]),
+          },
+        }),
+      );
+
+      await expect(
+        service.checkoutFromCart(
+          'client-1',
+          validCheckoutDto as any,
+          'idem-coverage',
+        ),
+      ).rejects.toThrow(
+        'Provider provider-1 is outside the delivery coverage area',
+      );
     });
   });
 

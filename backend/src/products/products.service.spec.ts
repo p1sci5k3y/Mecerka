@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -12,6 +12,16 @@ describe('ProductsService', () => {
       product: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
+        findUnique: jest.fn(),
+      },
+      providerClientProductDiscount: {
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        upsert: jest.fn(),
+        update: jest.fn(),
+      },
+      user: {
+        findUnique: jest.fn(),
       },
       stockReservation: {
         groupBy: jest.fn(),
@@ -120,5 +130,81 @@ describe('ProductsService', () => {
     prismaMock.product.findFirst.mockResolvedValue(null);
 
     await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
+  });
+
+  it('upserts a provider-owned client discount for a concrete client', async () => {
+    prismaMock.product.findUnique.mockResolvedValue({
+      id: 'prod-1',
+      providerId: 'provider-1',
+      price: 20,
+      discountPrice: 18,
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'client-1',
+      active: true,
+      roles: ['CLIENT'],
+      name: 'Buyer',
+      email: 'buyer@example.com',
+    });
+    prismaMock.providerClientProductDiscount.upsert.mockResolvedValue({
+      id: 'discount-1',
+      providerId: 'provider-1',
+      clientId: 'client-1',
+      productId: 'prod-1',
+      discountPrice: 15,
+      active: true,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      client: {
+        id: 'client-1',
+        name: 'Buyer',
+        email: 'buyer@example.com',
+      },
+    });
+
+    const result = await service.upsertClientDiscount('prod-1', 'provider-1', {
+      clientId: 'client-1',
+      discountPrice: 15,
+    });
+
+    expect(
+      prismaMock.providerClientProductDiscount.upsert,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          providerId_clientId_productId: {
+            providerId: 'provider-1',
+            clientId: 'client-1',
+            productId: 'prod-1',
+          },
+        },
+      }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'discount-1',
+        providerId: 'provider-1',
+        clientId: 'client-1',
+        productId: 'prod-1',
+        discountPrice: 15,
+        active: true,
+      }),
+    );
+  });
+
+  it('rejects client discounts for products owned by another provider', async () => {
+    prismaMock.product.findUnique.mockResolvedValue({
+      id: 'prod-1',
+      providerId: 'provider-2',
+      price: 20,
+      discountPrice: null,
+    });
+
+    await expect(
+      service.upsertClientDiscount('prod-1', 'provider-1', {
+        clientId: 'client-1',
+        discountPrice: 15,
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

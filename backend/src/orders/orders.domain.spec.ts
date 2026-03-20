@@ -13,6 +13,7 @@ import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { assertTestEnvironment } from '../../test/test-env';
 
 jest.setTimeout(20000);
@@ -31,6 +32,12 @@ describe('OrdersService - Provider Payment Domain', () => {
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
+          provide: GEOCODING_SERVICE,
+          useValue: {
+            geocodeAddress: jest.fn(),
+          },
+        },
+        {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('dummy') },
         },
@@ -45,7 +52,7 @@ describe('OrdersService - Provider Payment Domain', () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    await prisma?.$disconnect();
   });
 
   async function setupTestData(stockA: number, stockB: number) {
