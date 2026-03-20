@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { ShoppingBag, TrendingUp, TrendingDown, Calendar, Receipt, Package, Loader2, CreditCard, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/runtime-config';
 
 export function ProviderDashboard() {
     const { user } = useAuth();
@@ -47,7 +48,7 @@ export function ProviderDashboard() {
 
     const handleStripeConnect = async () => {
         try {
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/payments/connect/link`, {
+            const res = await fetch(`${getApiBaseUrl()}/payments/connect/link`, {
                 credentials: 'include',
             });
             if (!res.ok) throw new Error('Failed to get onboarding link');

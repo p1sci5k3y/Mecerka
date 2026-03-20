@@ -170,6 +170,7 @@ describe('CartService', () => {
       imageUrl: 'https://cdn.example.com/chair.jpg',
       price: 149,
       discountPrice: 129,
+      clientDiscounts: [],
     });
     prismaMock.cartGroup.findFirst.mockResolvedValue({
       id: 'cart-1',
@@ -233,7 +234,152 @@ describe('CartService', () => {
         imageUrl: true,
         price: true,
         discountPrice: true,
+        clientDiscounts: {
+          where: {
+            clientId: 'client-1',
+            active: true,
+          },
+          orderBy: {
+            updatedAt: 'desc',
+          },
+          take: 1,
+          select: {
+            discountPrice: true,
+          },
+        },
       },
+    });
+  });
+
+  it('applies a provider-owned client discount only for the assigned client', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: 'product-1',
+      providerId: 'provider-1',
+      cityId: 'city-1',
+      reference: 'CHAIR-001',
+      name: 'Oak Chair',
+      imageUrl: 'https://cdn.example.com/chair.jpg',
+      price: 149,
+      discountPrice: 139,
+      clientDiscounts: [{ discountPrice: 119 }],
+    });
+    prismaMock.cartGroup.findFirst.mockResolvedValue({
+      id: 'cart-1',
+      clientId: 'client-1',
+      cityId: null,
+      status: 'ACTIVE',
+      city: null,
+      providers: [],
+    });
+
+    const transactionCartItemCreate = jest.fn().mockResolvedValue({});
+
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        cartGroup: {
+          update: jest
+            .fn()
+            .mockResolvedValue({ id: 'cart-1', cityId: 'city-1' }),
+        },
+        cartProvider: {
+          upsert: jest.fn().mockResolvedValue({ id: 'cart-provider-1' }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cartItem: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: transactionCartItemCreate,
+          update: jest.fn(),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { quantity: 1, effectiveUnitPriceSnapshot: 119 },
+            ]),
+        },
+      }),
+    );
+    prismaMock.cartGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'cart-1',
+      cityId: 'city-1',
+      providers: [],
+    });
+
+    await service.addItem('client-1', {
+      productId: 'product-1',
+      quantity: 1,
+    });
+
+    expect(transactionCartItemCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        unitPriceSnapshot: 149,
+        discountPriceSnapshot: 119,
+        effectiveUnitPriceSnapshot: 119,
+      }),
+    });
+  });
+
+  it('ignores a provider client discount when the current client is not assigned to it', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: 'product-1',
+      providerId: 'provider-1',
+      cityId: 'city-1',
+      reference: 'CHAIR-001',
+      name: 'Oak Chair',
+      imageUrl: 'https://cdn.example.com/chair.jpg',
+      price: 149,
+      discountPrice: 139,
+      clientDiscounts: [],
+    });
+    prismaMock.cartGroup.findFirst.mockResolvedValue({
+      id: 'cart-1',
+      clientId: 'client-2',
+      cityId: null,
+      status: 'ACTIVE',
+      city: null,
+      providers: [],
+    });
+
+    const transactionCartItemCreate = jest.fn().mockResolvedValue({});
+
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        cartGroup: {
+          update: jest
+            .fn()
+            .mockResolvedValue({ id: 'cart-1', cityId: 'city-1' }),
+        },
+        cartProvider: {
+          upsert: jest.fn().mockResolvedValue({ id: 'cart-provider-1' }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        cartItem: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: transactionCartItemCreate,
+          update: jest.fn(),
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { quantity: 1, effectiveUnitPriceSnapshot: 139 },
+            ]),
+        },
+      }),
+    );
+    prismaMock.cartGroup.findUniqueOrThrow.mockResolvedValue({
+      id: 'cart-1',
+      cityId: 'city-1',
+      providers: [],
+    });
+
+    await service.addItem('client-2', {
+      productId: 'product-1',
+      quantity: 1,
+    });
+
+    expect(transactionCartItemCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        unitPriceSnapshot: 149,
+        discountPriceSnapshot: 139,
+        effectiveUnitPriceSnapshot: 139,
+      }),
     });
   });
 
@@ -247,6 +393,7 @@ describe('CartService', () => {
       imageUrl: 'https://cdn.example.com/chair-new.jpg',
       price: 159,
       discountPrice: 139,
+      clientDiscounts: [],
     });
     prismaMock.cartGroup.findFirst.mockResolvedValue({
       id: 'cart-1',
@@ -333,6 +480,7 @@ describe('CartService', () => {
       imageUrl: 'https://cdn.example.com/chair-repriced.jpg',
       price: 160,
       discountPrice: 140,
+      clientDiscounts: [],
     });
 
     const transactionCartItemUpdate = jest.fn().mockResolvedValue({});

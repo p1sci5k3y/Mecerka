@@ -20,6 +20,8 @@ import type { Response } from 'express';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { UpsertClientProductDiscountDto } from './dto/upsert-client-product-discount.dto';
+import { UpdateClientProductDiscountDto } from './dto/update-client-product-discount.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -151,5 +153,43 @@ export class ProductsController {
     @Request() req: { user: UserFromJwt },
   ) {
     return this.productsService.remove(id, req.user.userId);
+  }
+
+  @Get(':id/client-discounts')
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
+  @Roles(Role.PROVIDER)
+  listClientDiscounts(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.productsService.listClientDiscounts(id, req.user.userId);
+  }
+
+  @Post(':id/client-discounts')
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
+  @Roles(Role.PROVIDER)
+  upsertClientDiscount(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpsertClientProductDiscountDto,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.productsService.upsertClientDiscount(id, req.user.userId, dto);
+  }
+
+  @Patch(':id/client-discounts/:discountId')
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
+  @Roles(Role.PROVIDER)
+  updateClientDiscount(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('discountId', ParseUUIDPipe) discountId: string,
+    @Body() dto: UpdateClientProductDiscountDto,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.productsService.updateClientDiscount(
+      id,
+      discountId,
+      req.user.userId,
+      dto,
+    );
   }
 }

@@ -6,26 +6,9 @@ import { Footer } from "@/components/footer"
 import { SectionHeader } from "@/components/ui/section-header"
 import { SealBadge } from "@/components/ui/seal-badge"
 import { TagChip } from "@/components/ui/tag-chip"
-
-
 import { Link } from '@/lib/navigation';
 
 export default function Home() {
-
-
-  // Mocks for Editorial layout (Etapa 2)
-  const highlightedProducts = [
-    { id: 1, name: "Cuenco de Cerámica Esmaltada", artisan: "Alfarería del Sur", price: "45.00 €", tag: "Cerámica" },
-    { id: 2, name: "Bolso de Cuero Cosido a Mano", artisan: "Taller Marroquinería", price: "120.00 €", tag: "Cuero" },
-    { id: 3, name: "Vela de Soja Botánica", artisan: "Luz de Alba", price: "18.50 €", tag: "Hogar" },
-    { id: 4, name: "Tabla de Olivo Tallada", artisan: "Carpintería Raíces", price: "35.00 €", tag: "Madera" },
-  ]
-
-  const highlightedWorkshops = [
-    { id: "talleres-del-sur", name: "Alfarería del Sur", desc: "Tres generaciones dando forma al barro con pasión, recuperando técnicas tradicionales andaluzas." },
-    { id: "hilos-y-nudos", name: "Hilos y Nudos", desc: "Textiles tejidos en telar manual con fibras naturales de proximidad y teñidos orgánicos." },
-  ]
-
   return (
     <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20">
       <Navbar />
@@ -69,60 +52,56 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Hoy en tu barrio Section */}
         <section className="container px-4 py-20 md:px-6">
           <SectionHeader
-            title="Hoy en tu barrio"
-            subtitle="Piezas únicas seleccionadas por nuestro equipo."
+            title="Lo que ya puedes hacer"
+            subtitle="Superficie pública real del MVP, sin dependencias ocultas ni recorridos simulados."
             className="mb-12"
           />
-          <div className="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-            {highlightedProducts.map((p) => (
-              <Link key={p.id} href={`/products/${p.id}`} className="group flex flex-col gap-3">
-                <div className="aspect-[4/5] w-full overflow-hidden rounded-md bg-muted/40 border border-border/60 relative p-4 flex items-center justify-center transition-colors group-hover:bg-muted/60">
-                  < Hammer className="h-12 w-12 text-muted-foreground/30" />
-                  <div className="absolute top-3 left-3">
-                    <TagChip variant="outline" className="bg-background/90 backdrop-blur-sm">{p.tag}</TagChip>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-lg group-hover:text-primary transition-colors leading-tight">{p.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1.5 flex items-center gap-1.5 line-clamp-1">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {p.artisan}
-                  </p>
-                  <p className="mt-2.5 font-medium">{p.price}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* Tiendas con historia Section */}
-        <section className="bg-secondary/10 border-y border-border py-20 relative">
-          {/* Decorative background paper grain overlay could go here */}
-          <div className="container px-4 md:px-6 relative z-10">
-            <SectionHeader
-              title="Talleres con historia"
-              subtitle="Conoce las manos y las historias detrás de cada producto."
-              className="mb-12 text-center"
-            />
-            <div className="grid gap-8 md:grid-cols-2 max-w-5xl mx-auto">
-              {highlightedWorkshops.map((w) => (
-                <Link key={w.id} href={`/store/${w.id}`} className="group flex flex-col sm:flex-row gap-6 bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="h-32 w-32 shrink-0 rounded-full bg-muted/30 border-4 border-background shadow-inner flex items-center justify-center">
-                    <ShieldCheck className="h-8 w-8 text-muted-foreground/50" />
-                  </div>
-                  <div className="flex flex-col justify-center">
-                    <SealBadge className="w-fit mb-3 bg-secondary/10 border-secondary/30 text-secondary-foreground">{w.name}</SealBadge>
-                    <p className="text-muted-foreground text-sm leading-relaxed">{w.desc}</p>
-                    <span className="mt-4 text-sm font-semibold text-primary group-hover:underline flex items-center gap-1">
-                      Visitar taller <ArrowRight className="h-3 w-3" />
-                    </span>
-                  </div>
+          <div className="grid gap-8 md:grid-cols-3">
+            <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Hammer className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-display text-xl font-bold">Explorar catálogo real</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                El catálogo público consume productos reales del backend. Desde ahí puedes añadir piezas al carrito y preparar tu compra.
+              </p>
+              <div className="mt-5">
+                <Link href="/products">
+                  <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
+                    Ver catálogo
+                  </Button>
                 </Link>
-              ))}
-            </div>
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <ShieldCheck className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-display text-xl font-bold">Crear cuenta cliente</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                El alta pública crea cuentas cliente. Si después quieres vender o repartir, la solicitud de rol se hace desde tu perfil autenticado.
+              </p>
+              <div className="mt-5">
+                <Link href="/register">
+                  <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
+                    Crear cuenta
+                  </Button>
+                </Link>
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <MapPin className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-display text-xl font-bold">Comprar de forma local</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                Puedes preparar tu cesta sin sesión y autenticarte justo antes del checkout. El flujo online actual admite un solo taller por pedido.
+              </p>
+            </article>
           </div>
         </section>
 

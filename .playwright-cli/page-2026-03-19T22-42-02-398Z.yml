@@ -1,0 +1,44 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - link "Mecerka" [ref=e5] [cursor=pointer]:
+          - /url: /es
+          - img [ref=e6]
+          - generic [ref=e11]: Mecerka
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - heading "Bienvenido de nuevo" [level=2] [ref=e14]
+          - paragraph [ref=e15]: Inicia sesión para acceder a tu colección de tesoros artesanales.
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - text: Correo Electrónico
+            - textbox "Correo Electrónico" [ref=e19]:
+              - /placeholder: artesano@mercadovivo.com
+          - generic [ref=e20]:
+            - generic [ref=e21]:
+              - generic [ref=e22]: Contraseña
+              - link "¿Olvidaste tu contraseña?" [ref=e23] [cursor=pointer]:
+                - /url: /es/forgot-password
+            - generic [ref=e24]:
+              - textbox "Contraseña" [ref=e25]:
+                - /placeholder: ••••••••
+              - button [ref=e26] [cursor=pointer]:
+                - img [ref=e27]
+          - button "Iniciar Sesión" [ref=e31] [cursor=pointer]:
+            - text: Iniciar Sesión
+            - img [ref=e32]
+        - paragraph [ref=e34]:
+          - text: ¿Nuevo en nuestro mercado?
+          - link "Crear una cuenta" [ref=e35] [cursor=pointer]:
+            - /url: /es/register
+      - generic [ref=e36]: "Acceso disponible en esta versión: correo, contraseña y MFA."
+    - generic [ref=e40]:
+      - generic [ref=e43]: Featured Artisan
+      - heading "Elena Rossi" [level=3] [ref=e44]
+      - paragraph [ref=e45]: "\"Every piece of pottery tells a story of the earth it came from and the hands that shaped its destiny.\""
+      - generic [ref=e47]:
+        - generic [ref=e48]: location_on
+        - generic [ref=e49]: Florence, Italy
+  - region "Notifications alt+T"
+  - alert [ref=e50]

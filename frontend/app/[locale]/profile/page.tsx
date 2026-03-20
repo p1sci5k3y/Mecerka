@@ -5,10 +5,6 @@ import {
 
   Mail,
   Shield,
-
-  Clock,
-  Monitor,
-  Smartphone,
   Info,
 
   CheckCircle2,
@@ -30,17 +26,6 @@ import { SealBadge } from "@/components/ui/seal-badge"
 import { SectionHeader } from "@/components/ui/section-header"
 import { Link } from "@/lib/navigation"
 import { usersService } from "@/lib/services/users-service"
-
-const mockSessions = [
-  { device: "Chrome en macOS", icon: Monitor, lastActive: "Ahora", current: true },
-  { device: "Safari en iPhone", icon: Smartphone, lastActive: "Hace 2h", current: false },
-]
-
-const mockAccessHistory = [
-  { date: "10 Feb 2026, 09:30", action: "Inicio de sesión", ip: "192.168.1.***" },
-  { date: "9 Feb 2026, 14:15", action: "Inicio de sesión", ip: "10.0.0.***" },
-  { date: "8 Feb 2026, 20:00", action: "Cambio de contraseña", ip: "192.168.1.***" },
-]
 
 const roleLabel: Record<string, string> = {
   ADMIN: "Admin",
@@ -381,56 +366,6 @@ function ProfileContent() {
               )}
             </div>
           </section>
-
-          {/* Devices and Sessions */}
-          <div className="grid sm:grid-cols-2 gap-8">
-            <section>
-              <h2 className="flex items-center gap-2 font-display text-lg font-bold text-foreground mb-4 border-b border-border/50 pb-2">
-                <Monitor className="h-5 w-5 text-muted-foreground" />
-                Dispositivos Vinculados
-              </h2>
-              <div className="flex flex-col gap-3">
-                {mockSessions.map((s) => (
-                  <div key={s.device} className="flex items-center justify-between rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 flex items-center justify-center rounded-lg bg-muted/50">
-                        <s.icon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-foreground leading-tight">{s.device}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{s.lastActive}</p>
-                      </div>
-                    </div>
-                    {s.current ? (
-                      <TagChip variant="outline" className="text-[10px] px-2 py-0.5 whitespace-nowrap">Actual</TagChip>
-                    ) : (
-                      <button className="text-xs font-bold text-destructive hover:underline">Revocar</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <h2 className="flex items-center gap-2 font-display text-lg font-bold text-foreground mb-4 border-b border-border/50 pb-2">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                Bitácora de Accesos
-              </h2>
-              <div className="overflow-x-auto rounded-xl border border-border/80 bg-card p-0 shadow-sm">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-border/60">
-                    {mockAccessHistory.map((entry, idx) => (
-                      <tr key={`${entry.date}-${idx}`} className="hover:bg-muted/20 transition-colors">
-                        <td className="py-3 px-4 font-medium text-foreground">{entry.action}</td>
-                        <td className="py-3 px-4 text-muted-foreground text-right font-mono text-xs">{entry.date.split(",")[0]}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-
         </div>
       </main>
       <Footer />

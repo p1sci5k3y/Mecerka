@@ -46,4 +46,42 @@ describe('AppLoggerService', () => {
       ),
     );
   });
+
+  it('redacts common secrets in structured logs and traces', () => {
+    const stderrSpy = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+    service.error(
+      JSON.stringify({
+        event: 'auth.failure',
+        authorization: 'Bearer abc123',
+        password: 'super-secret',
+        nested: {
+          token: 'jwt-token',
+          apiKey: 'key-123',
+        },
+      }),
+      'Authorization=Bearer abc123 password=super-secret token=jwt-token',
+    );
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"authorization":"[redacted]"'),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"password":"[redacted]"'),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '"nested":{"token":"[redacted]","apiKey":"[redacted]"}',
+      ),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('"trace":"Authorization=[redacted]'),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('password=[redacted]'),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining('token=[redacted]"'),
+    );
+  });
 });

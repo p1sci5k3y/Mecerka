@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  DeliveryOrderStatus,
   DeliveryStatus,
   PaymentAccountOwnerType,
   PaymentAccountProvider,
@@ -17,6 +18,7 @@ import {
   ProviderPaymentStatus,
   Prisma,
   Role,
+  RunnerPaymentStatus,
 } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
@@ -38,6 +40,8 @@ export class PaymentsService {
   private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
   private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
   private static readonly DEFAULT_PROVIDER_ORDER_CURRENCY = 'eur';
+  private static readonly DEMO_PROVIDER_PAYMENT_UNAVAILABLE_MESSAGE =
+    'Este entorno demo no puede preparar pagos Stripe reales por comercio. El pedido y sus subpedidos siguen siendo válidos, pero el cobro requiere credenciales Stripe operativas.';
   private static readonly STALE_WEBHOOK_RECEIVED_MS = 5 * 60 * 1000;
   private static readonly FINAL_WEBHOOK_STATUSES = new Set<string>([
     PaymentsService.WEBHOOK_STATUS_PROCESSED,
@@ -121,6 +125,162 @@ export class PaymentsService {
       }
       throw error;
     }
+  }
+
+  private buildAggregateProviderPaymentStatus(providerOrders: any[]) {
+    const inactiveProviderStatuses = new Set<ProviderOrderStatus>([
+      ProviderOrderStatus.REJECTED,
+      ProviderOrderStatus.REJECTED_BY_STORE,
+      ProviderOrderStatus.CANCELLED,
+      ProviderOrderStatus.EXPIRED,
+      ProviderOrderStatus.DELIVERED,
+    ]);
+
+    const payableProviderOrders = providerOrders.filter(
+      (providerOrder) => !inactiveProviderStatuses.has(providerOrder.status),
+    );
+
+    if (payableProviderOrders.length === 0) {
+      return {
+        status: 'PAID',
+        paidProviderOrders: 0,
+        totalProviderOrders: 0,
+      };
+    }
+
+    const paidProviderOrders = payableProviderOrders.filter(
+      (providerOrder) =>
+        providerOrder.paymentStatus === ProviderPaymentStatus.PAID,
+    ).length;
+
+    if (paidProviderOrders === 0) {
+      return {
+        status: 'UNPAID',
+        paidProviderOrders,
+        totalProviderOrders: payableProviderOrders.length,
+      };
+    }
+
+    if (paidProviderOrders === payableProviderOrders.length) {
+      return {
+        status: 'PAID',
+        paidProviderOrders,
+        totalProviderOrders: payableProviderOrders.length,
+      };
+    }
+
+    return {
+      status: 'PARTIALLY_PAID',
+      paidProviderOrders,
+      totalProviderOrders: payableProviderOrders.length,
+    };
+  }
+
+  private roundMoney(value: number) {
+    return Number(value.toFixed(2));
+  }
+
+  private isDemoStripeCheckoutUnavailable() {
+    const demoMode = this.configService.get<string>('DEMO_MODE') === 'true';
+    const stripeSecretKey =
+      this.configService.get<string>('STRIPE_SECRET_KEY')?.trim() ?? '';
+
+    return demoMode && (!stripeSecretKey || stripeSecretKey.includes('dummy'));
+  }
+
+  private buildRunnerPaymentSummary(order: any) {
+    const deliveryOrder = order.deliveryOrder;
+    const pickupCount = order.providerOrders.length;
+    const additionalPickupCount = Math.max(pickupCount - 1, 0);
+    const pricingDistanceKm =
+      order.deliveryDistanceKm != null ? Number(order.deliveryDistanceKm) : 0;
+    const baseFee =
+      order.runnerBaseFee != null ? Number(order.runnerBaseFee) : 0;
+    const perKmFee =
+      order.runnerPerKmFee != null ? Number(order.runnerPerKmFee) : 0;
+    const extraPickupFee =
+      order.runnerExtraPickupFee != null
+        ? Number(order.runnerExtraPickupFee)
+        : 0;
+    const distanceFee = this.roundMoney(pricingDistanceKm * perKmFee);
+    const extraPickupCharge = this.roundMoney(
+      additionalPickupCount * extraPickupFee,
+    );
+    const amount = order.deliveryFee != null ? Number(order.deliveryFee) : 0;
+    const pricing = {
+      amount: this.roundMoney(amount),
+      currency: deliveryOrder?.currency ?? 'EUR',
+      pricingDistanceKm: this.roundMoney(pricingDistanceKm),
+      pickupCount,
+      additionalPickupCount,
+      baseFee: this.roundMoney(baseFee),
+      perKmFee: this.roundMoney(perKmFee),
+      distanceFee,
+      extraPickupFee: this.roundMoney(extraPickupFee),
+      extraPickupCharge,
+    };
+
+    if (!deliveryOrder) {
+      return {
+        paymentMode: 'DELIVERY_ORDER_SESSION',
+        deliveryOrderId: null,
+        runnerId: null,
+        deliveryStatus: null,
+        paymentStatus: 'NOT_CREATED',
+        paymentRequired: false,
+        sessionPrepared: false,
+        ...pricing,
+      };
+    }
+
+    const sessionPrepared = deliveryOrder.paymentSessions.some((session: any) =>
+      [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY].includes(
+        session.status,
+      ),
+    );
+    const paymentRequired =
+      Boolean(deliveryOrder.runnerId) &&
+      deliveryOrder.paymentStatus !== RunnerPaymentStatus.PAID &&
+      [
+        DeliveryOrderStatus.RUNNER_ASSIGNED,
+        DeliveryOrderStatus.PICKUP_PENDING,
+        DeliveryOrderStatus.PICKED_UP,
+        DeliveryOrderStatus.IN_TRANSIT,
+      ].includes(deliveryOrder.status);
+
+    return {
+      paymentMode: 'DELIVERY_ORDER_SESSION',
+      deliveryOrderId: deliveryOrder.id,
+      runnerId: deliveryOrder.runnerId,
+      deliveryStatus: deliveryOrder.status,
+      paymentStatus: deliveryOrder.paymentStatus,
+      paymentRequired,
+      sessionPrepared,
+      ...pricing,
+    };
+  }
+
+  private buildProviderOrderDiscountSummary(providerOrder: any) {
+    const originalSubtotalAmount = this.roundMoney(
+      providerOrder.items.reduce(
+        (sum: number, item: any) =>
+          sum +
+          Number(item.unitBasePriceSnapshot ?? item.priceAtPurchase) *
+            item.quantity,
+        0,
+      ),
+    );
+    const subtotalAmount = this.roundMoney(
+      Number(providerOrder.subtotalAmount),
+    );
+    const discountAmount = this.roundMoney(
+      Math.max(originalSubtotalAmount - subtotalAmount, 0),
+    );
+
+    return {
+      originalSubtotalAmount,
+      discountAmount,
+    };
   }
 
   private async markWebhookEventStatus(
@@ -348,6 +508,12 @@ export class PaymentsService {
   }
 
   async prepareProviderOrderPayment(providerOrderId: string, clientId: string) {
+    if (this.isDemoStripeCheckoutUnavailable()) {
+      throw new ConflictException(
+        PaymentsService.DEMO_PROVIDER_PAYMENT_UNAVAILABLE_MESSAGE,
+      );
+    }
+
     const now = new Date();
     const eligibleStatuses: ProviderOrderStatus[] = [
       ProviderOrderStatus.PENDING,
@@ -721,6 +887,139 @@ export class PaymentsService {
 
       throw error;
     }
+  }
+
+  async prepareOrderProviderPayments(orderId: string, clientId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        providerOrders: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            provider: {
+              select: {
+                name: true,
+              },
+            },
+            items: {
+              select: {
+                quantity: true,
+                priceAtPurchase: true,
+                unitBasePriceSnapshot: true,
+              },
+            },
+          },
+        },
+        deliveryOrder: {
+          include: {
+            paymentSessions: {
+              where: {
+                status: {
+                  in: [
+                    PaymentSessionStatus.CREATED,
+                    PaymentSessionStatus.READY,
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order || order.clientId !== clientId) {
+      throw new NotFoundException('Order not found or not owned by client');
+    }
+
+    if (order.providerOrders.length === 0) {
+      throw new ConflictException('Order has no provider items');
+    }
+
+    const aggregateProviderPayment = this.buildAggregateProviderPaymentStatus(
+      order.providerOrders,
+    );
+    const paymentsUnavailable = this.isDemoStripeCheckoutUnavailable();
+
+    const providerOrders = [];
+    const inactiveProviderStatuses = new Set<ProviderOrderStatus>([
+      ProviderOrderStatus.REJECTED,
+      ProviderOrderStatus.REJECTED_BY_STORE,
+      ProviderOrderStatus.CANCELLED,
+      ProviderOrderStatus.EXPIRED,
+      ProviderOrderStatus.DELIVERED,
+    ]);
+
+    for (const providerOrder of order.providerOrders) {
+      const isSettled =
+        providerOrder.paymentStatus === ProviderPaymentStatus.PAID;
+      const isInactive = inactiveProviderStatuses.has(providerOrder.status);
+      const pricing = this.buildProviderOrderDiscountSummary(providerOrder);
+
+      if (isSettled || isInactive) {
+        providerOrders.push({
+          providerOrderId: providerOrder.id,
+          providerId: providerOrder.providerId,
+          providerName: providerOrder.provider.name,
+          subtotalAmount: providerOrder.subtotalAmount,
+          originalSubtotalAmount: pricing.originalSubtotalAmount,
+          discountAmount: pricing.discountAmount,
+          status: providerOrder.status,
+          paymentStatus: providerOrder.paymentStatus,
+          paymentRequired: false,
+          paymentSession: null,
+        });
+        continue;
+      }
+
+      if (paymentsUnavailable) {
+        providerOrders.push({
+          providerOrderId: providerOrder.id,
+          providerId: providerOrder.providerId,
+          providerName: providerOrder.provider.name,
+          subtotalAmount: providerOrder.subtotalAmount,
+          originalSubtotalAmount: pricing.originalSubtotalAmount,
+          discountAmount: pricing.discountAmount,
+          status: providerOrder.status,
+          paymentStatus: providerOrder.paymentStatus,
+          paymentRequired: true,
+          paymentSession: null,
+        });
+        continue;
+      }
+
+      const session = await this.prepareProviderOrderPayment(
+        providerOrder.id,
+        clientId,
+      );
+
+      providerOrders.push({
+        providerOrderId: providerOrder.id,
+        providerId: providerOrder.providerId,
+        providerName: providerOrder.provider.name,
+        subtotalAmount: providerOrder.subtotalAmount,
+        originalSubtotalAmount: pricing.originalSubtotalAmount,
+        discountAmount: pricing.discountAmount,
+        status: ProviderOrderStatus.PAYMENT_READY,
+        paymentStatus: session.paymentStatus,
+        paymentRequired: true,
+        paymentSession: session,
+      });
+    }
+
+    return {
+      orderId: order.id,
+      orderStatus: order.status,
+      paymentMode: 'PROVIDER_ORDER_SESSIONS',
+      paymentEnvironment: paymentsUnavailable ? 'UNAVAILABLE' : 'READY',
+      paymentEnvironmentMessage: paymentsUnavailable
+        ? PaymentsService.DEMO_PROVIDER_PAYMENT_UNAVAILABLE_MESSAGE
+        : null,
+      providerPaymentStatus: aggregateProviderPayment.status,
+      paidProviderOrders: aggregateProviderPayment.paidProviderOrders,
+      totalProviderOrders: aggregateProviderPayment.totalProviderOrders,
+      providerOrders,
+      runnerPayment: this.buildRunnerPaymentSummary(order),
+    };
   }
   /**
    * Generates a Stripe Onboarding Link for Providers/Runners.

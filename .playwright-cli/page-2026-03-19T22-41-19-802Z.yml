@@ -1,0 +1,94 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e51]:
+    - banner [ref=e52]:
+      - navigation [ref=e53]:
+        - link "Mecerka" [ref=e54] [cursor=pointer]:
+          - /url: /es
+          - img [ref=e55]
+          - generic [ref=e60]: Mecerka
+        - link "Catálogo" [ref=e62] [cursor=pointer]:
+          - /url: /es/products
+        - generic [ref=e63]:
+          - button "Switch Language" [ref=e64] [cursor=pointer]:
+            - img
+            - generic [ref=e65]: Switch Language
+          - link [ref=e66] [cursor=pointer]:
+            - /url: /es/cart
+            - button [ref=e67]:
+              - img
+          - button "Discount Client Runtime" [ref=e68] [cursor=pointer]:
+            - img
+            - generic [ref=e69]: Discount Client Runtime
+    - main [ref=e70]:
+      - generic [ref=e72]:
+        - generic [ref=e73]:
+          - heading "Cuaderno de Pedidos - Discount" [level=1] [ref=e74]
+          - paragraph [ref=e75]: Tu rincón personal donde apoyas el talento y la artesanía local.
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - paragraph [ref=e79]: Inversión Local
+              - img [ref=e80]
+            - paragraph [ref=e82]: €0.00
+            - generic [ref=e83]: Reinvertido en tu comunidad.
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - paragraph [ref=e86]: Artesanos Apoyados
+              - img [ref=e87]
+            - paragraph [ref=e92]: "2"
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - paragraph [ref=e95]: Pedidos Activos
+              - img [ref=e96]
+            - paragraph [ref=e99]: "1"
+        - generic [ref=e102]:
+          - generic [ref=e103]:
+            - heading "Último Encargo" [level=2] [ref=e104]
+            - link "Historial Completo" [ref=e105] [cursor=pointer]:
+              - /url: /es/profile
+          - generic [ref=e110]:
+            - generic [ref=e111]:
+              - paragraph [ref=e112]:
+                - text: Ticket de Compra
+                - generic [ref=e113]: "#97028991"
+              - heading "Discount Product A 1773960037 y 1 más" [level=3] [ref=e114]
+              - generic [ref=e118]:
+                - generic [ref=e121]: Recibido
+                - generic [ref=e124]: Taller
+                - generic [ref=e127]: En Camino
+                - generic [ref=e130]: Entregado
+            - generic [ref=e131]:
+              - generic [ref=e132]:
+                - img [ref=e133]
+                - text: Recibo completo no disponible en esta vista
+              - link "Seguir Envío" [ref=e136] [cursor=pointer]:
+                - /url: /es/orders/97028991-364b-4edd-adba-3e3e219113fa/track
+                - text: Seguir Envío
+                - img
+    - contentinfo [ref=e137]:
+      - generic [ref=e138]:
+        - generic [ref=e139]:
+          - generic [ref=e140]:
+            - link "Mecerka" [ref=e141] [cursor=pointer]:
+              - /url: /es
+              - img [ref=e142]
+              - generic [ref=e147]: Mecerka
+            - paragraph [ref=e148]:
+              - text: El mercado vivo de tu ciudad.
+              - text: Donde la artesanía local, los talleres de barrio y la confianza de siempre encuentran su lugar en la red.
+            - paragraph [ref=e149]: La superficie pública actual del MVP se centra en catálogo, registro, acceso y compra local. La documentación legal pública y el centro de soporte ampliado no están publicados en esta versión.
+          - generic [ref=e150]:
+            - heading "Plataforma" [level=3] [ref=e151]
+            - list [ref=e152]:
+              - listitem [ref=e153]:
+                - link "Catálogo" [ref=e154] [cursor=pointer]:
+                  - /url: /es/products
+              - listitem [ref=e155]:
+                - link "Iniciar sesión" [ref=e156] [cursor=pointer]:
+                  - /url: /es/login
+              - listitem [ref=e157]:
+                - link "Registrarse" [ref=e158] [cursor=pointer]:
+                  - /url: /es/register
+        - paragraph [ref=e160]: 2026 Mecerka. Todos los derechos reservados.
+  - region "Notifications alt+T"
+  - alert [ref=e50]

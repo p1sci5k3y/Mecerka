@@ -43,9 +43,9 @@ export default function ProductDetailPage() {
       })
   }, [params.id])
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return
-    const conflictMessage = addItem(product, quantity)
+    const conflictMessage = await addItem(product, quantity)
     if (conflictMessage) {
       toast.error(conflictMessage)
       return
@@ -108,6 +108,13 @@ export default function ProductDetailPage() {
                 </p>
 
                 <div className="mt-6 flex items-baseline gap-2">
+                  {product.discountPrice != null &&
+                  product.basePrice != null &&
+                  product.discountPrice < product.basePrice ? (
+                    <span className="text-lg text-muted-foreground line-through">
+                      {product.basePrice.toFixed(2)} €
+                    </span>
+                  ) : null}
                   <span className="font-display text-4xl font-bold text-foreground">
                     {product.price.toFixed(2)}
                   </span>

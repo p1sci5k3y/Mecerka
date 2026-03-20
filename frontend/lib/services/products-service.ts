@@ -2,11 +2,17 @@ import { api } from "@/lib/api"
 import type { Product, BackendProduct, CreateProductDto, UpdateProductDto } from "@/lib/types"
 
 function transformProduct(bp: BackendProduct): Product {
+  const basePrice = Number.parseFloat(bp.price)
+  const discountPrice =
+    bp.discountPrice != null ? Number.parseFloat(bp.discountPrice) : null
+
   return {
     id: String(bp.id),
     name: bp.name,
     description: bp.description || "",
-    price: Number.parseFloat(bp.price),
+    price: discountPrice ?? basePrice,
+    basePrice,
+    discountPrice,
     stock: bp.stock,
     city: bp.city?.name || "Desconocida",
     category: bp.category?.name || "General",

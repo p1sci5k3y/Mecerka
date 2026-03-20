@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -9,6 +10,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   Role,
@@ -21,6 +23,11 @@ import {
   RiskCategory,
 } from '@prisma/client';
 import * as argon2 from 'argon2';
+import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
+import type {
+  GeocodedAddress,
+  GeocodingPort,
+} from '../geocoding/geocoding.types';
 import {
   canTransitionOrder,
   canTransitionProviderOrder,
@@ -35,6 +42,8 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(GEOCODING_SERVICE)
+    private readonly geocodingService: GeocodingPort,
     @Optional() private readonly riskService?: RiskService,
   ) {}
 
@@ -116,6 +125,110 @@ export class OrdersService {
 
   private roundCoordinate(value: number) {
     return Number(value.toFixed(3));
+  }
+
+  private roundDistance(value: number) {
+    return Number(value.toFixed(2));
+  }
+
+  private roundMoney(value: number) {
+    return Number(value.toFixed(2));
+  }
+
+  private calculateDistanceKm(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ) {
+    const R = 6371;
+    const dLat = this.deg2rad(lat2 - lat1);
+    const dLon = this.deg2rad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.deg2rad(lat1)) *
+        Math.cos(this.deg2rad(lat2)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private deg2rad(deg: number) {
+    return deg * (Math.PI / 180);
+  }
+
+  private resolveCoverageLimitKm(
+    discoveryRadiusKm: number,
+    providerServiceRadiusKm: number,
+    cityMaxDeliveryRadiusKm?: number | null,
+  ) {
+    const limits = [discoveryRadiusKm, providerServiceRadiusKm];
+    if (
+      cityMaxDeliveryRadiusKm != null &&
+      Number.isFinite(cityMaxDeliveryRadiusKm) &&
+      cityMaxDeliveryRadiusKm > 0
+    ) {
+      limits.push(cityMaxDeliveryRadiusKm);
+    }
+
+    return Math.min(...limits);
+  }
+
+  private buildDeliveryPricingSnapshot(
+    providerCoverage: Array<{ distanceKm: number }>,
+    providerCount: number,
+    city: {
+      baseDeliveryFee: Prisma.Decimal | number | null;
+      deliveryPerKmFee: Prisma.Decimal | number | null;
+      extraPickupFee: Prisma.Decimal | number | null;
+    },
+  ) {
+    const deliveryDistanceKm = this.roundDistance(
+      Math.max(...providerCoverage.map((coverage) => coverage.distanceKm), 0),
+    );
+    const additionalPickupCount = Math.max(providerCount - 1, 0);
+    const runnerBaseFee = this.roundMoney(Number(city.baseDeliveryFee ?? 3.5));
+    const runnerPerKmFee = this.roundMoney(
+      Number(city.deliveryPerKmFee ?? 0.9),
+    );
+    const runnerExtraPickupFee = this.roundMoney(
+      Number(city.extraPickupFee ?? 1.5),
+    );
+    const distanceFee = this.roundMoney(deliveryDistanceKm * runnerPerKmFee);
+    const extraPickupCharge = this.roundMoney(
+      additionalPickupCount * runnerExtraPickupFee,
+    );
+    const deliveryFee = this.roundMoney(
+      runnerBaseFee + distanceFee + extraPickupCharge,
+    );
+
+    return {
+      deliveryDistanceKm,
+      runnerBaseFee,
+      runnerPerKmFee,
+      runnerExtraPickupFee,
+      deliveryFee,
+    };
+  }
+
+  private async geocodeCheckoutAddress(
+    cityName: string,
+    dto: CheckoutCartDto,
+  ): Promise<GeocodedAddress> {
+    const geocodedAddress = await this.geocodingService.geocodeAddress({
+      streetAddress: dto.deliveryAddress,
+      postalCode: dto.postalCode,
+      cityName,
+    });
+
+    if (!geocodedAddress) {
+      throw new BadRequestException(
+        'Delivery address could not be geocoded for the selected city',
+      );
+    }
+
+    return geocodedAddress;
   }
 
   private buildOrderTrackingStatus(order: any) {
@@ -411,7 +524,11 @@ export class OrdersService {
     return result;
   }
 
-  async checkoutFromCart(clientId: string, idempotencyKey?: string) {
+  async checkoutFromCart(
+    clientId: string,
+    dto: CheckoutCartDto,
+    idempotencyKey?: string,
+  ) {
     if (!idempotencyKey?.trim()) {
       throw new BadRequestException('Idempotency-Key header is required');
     }
@@ -452,6 +569,17 @@ export class OrdersService {
         clientId,
       },
       include: {
+        city: {
+          select: {
+            id: true,
+            name: true,
+            active: true,
+            maxDeliveryRadiusKm: true,
+            baseDeliveryFee: true,
+            deliveryPerKmFee: true,
+            extraPickupFee: true,
+          },
+        },
         providers: {
           include: {
             items: true,
@@ -479,6 +607,24 @@ export class OrdersService {
       throw new BadRequestException('Active cart has no city assigned');
     }
 
+    if (!latestCart.city) {
+      throw new BadRequestException(
+        'Active cart city configuration is missing',
+      );
+    }
+
+    const checkoutCity = latestCart.city;
+
+    if (!checkoutCity.active) {
+      throw new BadRequestException('Active cart belongs to an inactive city');
+    }
+
+    if (dto.cityId !== latestCart.cityId) {
+      throw new BadRequestException(
+        'Checkout city does not match the active cart city',
+      );
+    }
+
     const providerOrders = latestCart.providers.filter(
       (provider) => provider.items.length > 0,
     );
@@ -492,6 +638,10 @@ export class OrdersService {
       0,
     );
     const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const geocodedAddress = await this.geocodeCheckoutAddress(
+      checkoutCity.name,
+      dto,
+    );
 
     try {
       return await this.prisma.$transaction(async (tx: any) => {
@@ -565,27 +715,121 @@ export class OrdersService {
           }
         }
 
+        const providerIds = providerOrders.map(
+          (provider) => provider.providerId,
+        );
+        const providerUsers = (await tx.user.findMany({
+          where: {
+            id: {
+              in: providerIds,
+            },
+          },
+          select: {
+            id: true,
+            latitude: true,
+            longitude: true,
+            providerServiceRadiusKm: true,
+          },
+        })) as Array<{
+          id: string;
+          latitude: number | null;
+          longitude: number | null;
+          providerServiceRadiusKm: number | null;
+        }>;
+        const providerUserMap = new Map(
+          providerUsers.map((provider: any) => [provider.id, provider]),
+        );
+
+        const providerCoverage = providerOrders.map((provider) => {
+          const providerUser = providerUserMap.get(provider.providerId);
+
+          if (
+            !providerUser ||
+            providerUser.latitude == null ||
+            providerUser.longitude == null
+          ) {
+            throw new ConflictException(
+              `Provider ${provider.providerId} does not have a configured delivery location`,
+            );
+          }
+
+          const distanceKm = this.roundDistance(
+            this.calculateDistanceKm(
+              geocodedAddress.latitude,
+              geocodedAddress.longitude,
+              Number(providerUser.latitude),
+              Number(providerUser.longitude),
+            ),
+          );
+          const coverageLimitKm = this.roundDistance(
+            this.resolveCoverageLimitKm(
+              dto.discoveryRadiusKm,
+              Number(providerUser.providerServiceRadiusKm ?? 10),
+              checkoutCity.maxDeliveryRadiusKm,
+            ),
+          );
+
+          if (distanceKm > coverageLimitKm) {
+            throw new BadRequestException(
+              `Provider ${provider.providerId} is outside the delivery coverage area`,
+            );
+          }
+
+          return {
+            providerId: provider.providerId,
+            distanceKm,
+            coverageLimitKm,
+          };
+        });
+        const providerCoverageMap = new Map(
+          providerCoverage.map((coverage) => [coverage.providerId, coverage]),
+        );
+        const deliveryPricing = this.buildDeliveryPricingSnapshot(
+          providerCoverage,
+          providerOrders.length,
+          checkoutCity,
+        );
+
         const order = await tx.order.create({
           data: {
             clientId,
             cityId: latestCart.cityId,
             totalPrice,
+            deliveryFee: deliveryPricing.deliveryFee,
+            deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
             status: DeliveryStatus.PENDING,
             checkoutIdempotencyKey: normalizedKey,
+            deliveryAddress: dto.deliveryAddress,
+            postalCode: dto.postalCode,
+            addressReference: dto.addressReference ?? null,
+            deliveryLat: geocodedAddress.latitude,
+            deliveryLng: geocodedAddress.longitude,
+            discoveryRadiusKm: dto.discoveryRadiusKm,
+            runnerBaseFee: deliveryPricing.runnerBaseFee,
+            runnerPerKmFee: deliveryPricing.runnerPerKmFee,
+            runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
             providerOrders: {
-              create: providerOrders.map((provider) => ({
-                providerId: provider.providerId,
-                status: ProviderOrderStatus.PENDING,
-                subtotalAmount: provider.subtotalAmount,
-                paymentStatus: 'PENDING',
-                items: {
-                  create: provider.items.map((item) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    priceAtPurchase: item.effectiveUnitPriceSnapshot,
-                  })),
-                },
-              })),
+              create: providerOrders.map((provider) => {
+                const coverage = providerCoverageMap.get(provider.providerId);
+
+                return {
+                  providerId: provider.providerId,
+                  status: ProviderOrderStatus.PENDING,
+                  subtotalAmount: provider.subtotalAmount,
+                  paymentStatus: 'PENDING',
+                  deliveryDistanceKm: coverage?.distanceKm,
+                  coverageLimitKm: coverage?.coverageLimitKm,
+                  items: {
+                    create: provider.items.map((item) => ({
+                      productId: item.productId,
+                      quantity: item.quantity,
+                      priceAtPurchase: item.effectiveUnitPriceSnapshot,
+                      unitBasePriceSnapshot: item.unitPriceSnapshot,
+                      discountPriceSnapshot: item.discountPriceSnapshot,
+                    })),
+                  },
+                };
+              }),
             },
           },
           include: {
@@ -808,6 +1052,8 @@ export class OrdersService {
         productId: product.id,
         quantity: item.quantity,
         priceAtPurchase: product.price,
+        unitBasePriceSnapshot: product.price,
+        discountPriceSnapshot: null,
       });
       providerGroups[providerId].subtotal += itemTotal;
     }
@@ -923,7 +1169,23 @@ export class OrdersService {
       where: { id },
       include: {
         providerOrders: {
-          include: { items: { include: { product: true } } },
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            items: { include: { product: true } },
+          },
+        },
+        deliveryOrder: {
+          select: {
+            id: true,
+            runnerId: true,
+            status: true,
+            paymentStatus: true,
+          },
         },
       },
     });

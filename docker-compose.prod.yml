@@ -2,8 +2,6 @@ services:
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,65 +19,57 @@ services:
     # Internally accessible via the mecerka_network on 5432
 
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE}
     restart: unless-stopped
-    env_file:
-      - .env
     depends_on:
       postgres:
         condition: service_healthy
     command: sh -c "npx prisma generate && npx prisma migrate deploy && node dist/src/main"
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_SECRET_CURRENT=${JWT_SECRET_CURRENT}
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      - FRONTEND_URL=${FRONTEND_URL}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
-      - DELIVERY_STRIPE_WEBHOOK_SECRET=${DELIVERY_STRIPE_WEBHOOK_SECRET}
-      - DONATIONS_STRIPE_WEBHOOK_SECRET=${DONATIONS_STRIPE_WEBHOOK_SECRET}
-      - MAIL_HOST=${MAIL_HOST}
-      - MAIL_PORT=${MAIL_PORT}
-      - MAIL_USER=${MAIL_USER}
-      - MAIL_PASS=${MAIL_PASS}
-      - MAIL_FROM=${MAIL_FROM}
-      - BACKEND_URL=${BACKEND_URL}
-      - PORT=3000
-      - NODE_ENV=production
-      - DEMO_MODE=${DEMO_MODE}
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET_CURRENT: ${JWT_SECRET_CURRENT}
+      FISCAL_PEPPER: ${FISCAL_PEPPER}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      WS_CORS_ORIGIN: ${WS_CORS_ORIGIN}
+      FRONTEND_URL: ${FRONTEND_URL}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      DELIVERY_STRIPE_WEBHOOK_SECRET: ${DELIVERY_STRIPE_WEBHOOK_SECRET}
+      DONATIONS_STRIPE_WEBHOOK_SECRET: ${DONATIONS_STRIPE_WEBHOOK_SECRET}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASS: ${MAIL_PASS}
+      MAIL_FROM: ${MAIL_FROM}
+      BACKEND_URL: ${BACKEND_URL}
+      PORT: 3000
+      NODE_ENV: production
+      DEMO_MODE: ${DEMO_MODE}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
     ports:
-      - "127.0.0.1:3000:3000" # Expose only to localhost for Nginx reverse proxy
+      - "127.0.0.1:${BACKEND_HOST_PORT}:3000"
     networks:
       - mecerka_network
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+    image: ${FRONTEND_IMAGE}
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-      - NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-      - PORT=3001
-      - HOSTNAME=0.0.0.0
+      INTERNAL_API_URL: http://backend:3000
+      API_BASE_URL: ${API_BASE_URL:-/api}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_REQUIRE_MFA: ${NEXT_PUBLIC_REQUIRE_MFA:-false}
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
     ports:
-      - "127.0.0.1:3001:3001" # Expose only to localhost for Nginx reverse proxy
+      - "127.0.0.1:${FRONTEND_HOST_PORT}:3001"
     networks:
       - mecerka_network
 
 volumes:
   postgres_data:
-    name: mecerka_postgres_volume
 
 networks:
   mecerka_network:
-    name: mecerka_network
     driver: bridge

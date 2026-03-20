@@ -28,33 +28,17 @@
           - button "Iniciar Sesión" [ref=e31] [cursor=pointer]:
             - text: Iniciar Sesión
             - img [ref=e32]
-        - generic [ref=e36]: o continuar con
-        - generic [ref=e38]:
-          - button "Google Google" [ref=e39] [cursor=pointer]:
-            - img "Google" [ref=e40]
-            - generic [ref=e41]: Google
-          - button "Apple Apple" [ref=e42] [cursor=pointer]:
-            - img "Apple" [ref=e43]
-            - generic [ref=e44]: Apple
-        - paragraph [ref=e45]:
+        - paragraph [ref=e34]:
           - text: ¿Nuevo en nuestro mercado?
-          - link "Crear una cuenta" [ref=e46] [cursor=pointer]:
-            - /url: /es/register?returnTo=%2Fdashboard
+          - link "Crear una cuenta" [ref=e35] [cursor=pointer]:
+            - /url: /es/register
+      - generic [ref=e36]: "Acceso disponible en esta versión: correo, contraseña y MFA."
+    - generic [ref=e40]:
+      - generic [ref=e43]: Featured Artisan
+      - heading "Elena Rossi" [level=3] [ref=e44]
+      - paragraph [ref=e45]: "\"Every piece of pottery tells a story of the earth it came from and the hands that shaped its destiny.\""
       - generic [ref=e47]:
-        - link "Sustainability" [ref=e48] [cursor=pointer]:
-          - /url: "#"
-        - link "Privacy" [ref=e49] [cursor=pointer]:
-          - /url: "#"
-        - link "Terms" [ref=e50] [cursor=pointer]:
-          - /url: "#"
-        - link "Journal" [ref=e51] [cursor=pointer]:
-          - /url: "#"
-    - generic [ref=e55]:
-      - generic [ref=e58]: Featured Artisan
-      - heading "Elena Rossi" [level=3] [ref=e59]
-      - paragraph [ref=e60]: "\"Every piece of pottery tells a story of the earth it came from and the hands that shaped its destiny.\""
-      - generic [ref=e62]:
-        - generic [ref=e63]: location_on
-        - generic [ref=e64]: Florence, Italy
+        - generic [ref=e48]: location_on
+        - generic [ref=e49]: Florence, Italy
   - region "Notifications alt+T"
-  - alert [ref=e65]
+  - alert [ref=e50]

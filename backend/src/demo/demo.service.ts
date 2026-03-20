@@ -34,6 +34,13 @@ type DemoProductSeed = {
   description: string;
 };
 
+type DemoDatasetStatus = {
+  users: number;
+  products: number;
+  orders: number;
+  deliveries: number;
+};
+
 @Injectable()
 export class DemoService implements OnApplicationBootstrap {
   private readonly logger = new Logger(DemoService.name);
@@ -175,17 +182,22 @@ export class DemoService implements OnApplicationBootstrap {
     }
 
     try {
-      if (await this.hasExistingDemoData()) {
+      const status = await this.getDemoDatasetStatus();
+      const admin = await this.ensureDemoAdmin();
+
+      if (this.isDemoDatasetComplete(status)) {
         return;
       }
 
-      const admin = await this.registerAndVerifyUser(
-        DemoService.DEMO_USERS.find((user) => user.kind === 'ADMIN')!,
-      );
+      if (this.hasAnyDemoData(status)) {
+        await this.cleanupDemoData(admin.id);
+      }
 
       await this.seedDemoData(admin.id);
 
-      this.logger.log(`demo.autoseed actor=${admin.id}`);
+      this.logger.log(
+        `demo.autoseed actor=${admin.id} users=${status.users} products=${status.products} orders=${status.orders} deliveries=${status.deliveries}`,
+      );
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'unknown demo auto-seed error';
@@ -205,15 +217,73 @@ export class DemoService implements OnApplicationBootstrap {
     }
   }
 
-  private async hasExistingDemoData() {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        email: { endsWith: DemoService.DEMO_EMAIL_DOMAIN },
-      },
+  private async ensureDemoAdmin() {
+    const adminSeed = DemoService.DEMO_USERS.find(
+      (user) => user.kind === 'ADMIN',
+    )!;
+    const existingAdmin = await this.prisma.user.findUnique({
+      where: { email: adminSeed.email },
       select: { id: true },
     });
 
-    return Boolean(user);
+    if (existingAdmin) {
+      return existingAdmin;
+    }
+
+    return this.registerAndVerifyUser(adminSeed);
+  }
+
+  private async getDemoDatasetStatus(): Promise<DemoDatasetStatus> {
+    const [users, products, orders, deliveries] = await Promise.all([
+      this.prisma.user.count({
+        where: {
+          email: { endsWith: DemoService.DEMO_EMAIL_DOMAIN },
+        },
+      }),
+      this.prisma.product.count({
+        where: {
+          imageUrl: {
+            startsWith: '/demo-products/',
+          },
+        },
+      }),
+      this.prisma.order.count({
+        where: {
+          client: {
+            email: { endsWith: DemoService.DEMO_EMAIL_DOMAIN },
+          },
+        },
+      }),
+      this.prisma.deliveryOrder.count({
+        where: {
+          order: {
+            client: {
+              email: { endsWith: DemoService.DEMO_EMAIL_DOMAIN },
+            },
+          },
+        },
+      }),
+    ]);
+
+    return { users, products, orders, deliveries };
+  }
+
+  private hasAnyDemoData(status: DemoDatasetStatus) {
+    return (
+      status.users > 0 ||
+      status.products > 0 ||
+      status.orders > 0 ||
+      status.deliveries > 0
+    );
+  }
+
+  private isDemoDatasetComplete(status: DemoDatasetStatus) {
+    return (
+      status.users >= DemoService.DEMO_USERS.length &&
+      status.products >= DemoService.DEMO_PRODUCTS.length &&
+      status.orders >= 3 &&
+      status.deliveries >= 2
+    );
   }
 
   private async seedDemoData(adminActorId: string) {
@@ -337,6 +407,22 @@ export class DemoService implements OnApplicationBootstrap {
         where: { id: user.id },
         data: {
           stripeAccountId: accountId,
+          ...(email === 'provider.demo@local.test'
+            ? {
+                address: 'Plaza de Zocodover, 1, Toledo',
+                latitude: 39.8569,
+                longitude: -4.0245,
+                providerServiceRadiusKm: 8,
+              }
+            : {}),
+          ...(email === 'provider2.demo@local.test'
+            ? {
+                address: 'Calle Comercio, 4, Toledo',
+                latitude: 39.8586,
+                longitude: -4.0226,
+                providerServiceRadiusKm: 8,
+              }
+            : {}),
         },
       });
     }
@@ -417,12 +503,26 @@ export class DemoService implements OnApplicationBootstrap {
     clientId: string,
     items: Array<{ productId: string; quantity: number }>,
     idempotencyKey: string,
+    cityId: string,
+    deliveryAddress: string,
+    postalCode: string,
+    addressReference?: string,
   ) {
     for (const item of items) {
       await this.cartService.addItem(clientId, item);
     }
 
-    return this.ordersService.checkoutFromCart(clientId, idempotencyKey);
+    return this.ordersService.checkoutFromCart(
+      clientId,
+      {
+        cityId,
+        deliveryAddress,
+        postalCode,
+        addressReference,
+        discoveryRadiusKm: 8,
+      },
+      idempotencyKey,
+    );
   }
 
   private async confirmDemoProviderOrderPayment(orderId: string) {
@@ -498,6 +598,10 @@ export class DemoService implements OnApplicationBootstrap {
     const productsByName = new Map<string, any>(
       products.map((product) => [product.name, product]),
     );
+    const cityId = products[0]?.cityId;
+    if (!cityId) {
+      throw new ConflictException('Demo products are missing a cityId');
+    }
     const user1 = await this.findUserByEmail('user.demo@local.test');
     const user2 = await this.findUserByEmail('user2.demo@local.test');
     const runner1 = await this.findUserByEmail('runner.demo@local.test');
@@ -516,6 +620,10 @@ export class DemoService implements OnApplicationBootstrap {
         },
       ],
       'demo-pending-order',
+      cityId,
+      'Calle Hombre de Palo, 7',
+      '45001',
+      'Portal azul',
     );
 
     const deliveringOrder = await this.createCheckoutOrder(
@@ -531,12 +639,15 @@ export class DemoService implements OnApplicationBootstrap {
         },
       ],
       'demo-delivering-order',
+      cityId,
+      'Calle Sixto Ramon Parro, 9',
+      '45001',
     );
     await this.confirmDemoProviderOrderPayment(deliveringOrder.id);
     const deliveringDelivery = await this.deliveryService.createDeliveryOrder(
       {
         orderId: deliveringOrder.id,
-        deliveryFee: 4.5,
+        deliveryFee: Number(deliveringOrder.deliveryFee ?? 0),
         currency: 'EUR',
       },
       user1.id,
@@ -584,12 +695,15 @@ export class DemoService implements OnApplicationBootstrap {
         },
       ],
       'demo-delivered-order',
+      cityId,
+      'Cuesta Carlos V, 3',
+      '45001',
     );
     await this.confirmDemoProviderOrderPayment(deliveredOrder.id);
     const deliveredDelivery = await this.deliveryService.createDeliveryOrder(
       {
         orderId: deliveredOrder.id,
-        deliveryFee: 4.9,
+        deliveryFee: Number(deliveredOrder.deliveryFee ?? 0),
         currency: 'EUR',
       },
       user2.id,
@@ -954,7 +1068,7 @@ export class DemoService implements OnApplicationBootstrap {
   async seed(adminActorId: string) {
     this.assertDemoEnabled();
     await this.baseSeedService.ensureBaseData();
-    if (await this.hasExistingDemoData()) {
+    if (this.hasAnyDemoData(await this.getDemoDatasetStatus())) {
       await this.cleanupDemoData(adminActorId);
     }
 

@@ -1,0 +1,1 @@
+export const GEOCODING_SERVICE = Symbol('GEOCODING_SERVICE');

@@ -1,0 +1,451 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - navigation [ref=e4]:
+        - link "Mecerka" [ref=e5] [cursor=pointer]:
+          - /url: /es
+          - img [ref=e6]
+          - generic [ref=e11]: Mecerka
+        - link "Catálogo" [ref=e13] [cursor=pointer]:
+          - /url: /es/products
+        - generic [ref=e14]:
+          - button "Switch Language" [ref=e15] [cursor=pointer]:
+            - img
+            - generic [ref=e16]: Switch Language
+          - link [ref=e17] [cursor=pointer]:
+            - /url: /es/cart
+            - button [ref=e18]:
+              - img
+          - link "Iniciar sesión" [ref=e19] [cursor=pointer]:
+            - /url: /es/login
+            - button "Iniciar sesión" [ref=e20]
+          - link "Crear cuenta" [ref=e21] [cursor=pointer]:
+            - /url: /es/register
+            - button "Crear cuenta" [ref=e22]
+    - main [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - heading "Catálogo de productos" [level=1] [ref=e26]
+          - paragraph [ref=e27]: Explora todos los productos disponibles en tu ciudad
+        - generic [ref=e28]:
+          - generic [ref=e29]:
+            - img [ref=e30]
+            - textbox "Busca por pieza, taller o técnica..." [ref=e33]
+          - generic [ref=e34]:
+            - generic [ref=e35]:
+              - img [ref=e36]
+              - text: "Filtrar por:"
+            - generic [ref=e37]:
+              - combobox [ref=e38] [cursor=pointer]:
+                - option "Cualquier ciudad" [selected]
+                - option "Madrid"
+                - option "Madrid Runtime"
+                - option "Madrid Runtime 2"
+                - option "Runtime City 1773927830"
+                - option "Runtime City 1773928979"
+                - option "Toledo"
+              - generic: ▼
+            - generic [ref=e39]:
+              - combobox [ref=e40] [cursor=pointer]:
+                - option "Cualquier técnica/categoría" [selected]
+                - option "Categoria Runtime 2"
+                - option "Ceramica Runtime"
+                - option "Despensa"
+                - option "Panadería"
+                - option "Runtime Category 1773927830"
+                - option "Runtime Category 1773928979"
+                - option "Verduras"
+              - generic: ▼
+        - generic [ref=e41]:
+          - generic [ref=e42]:
+            - link "Producto sin imagen Categoria Runtime 2" [ref=e43] [cursor=pointer]:
+              - /url: /es/products/66666666-6666-4666-8666-666666666666
+              - img "Producto sin imagen" [ref=e44]
+              - generic [ref=e46]: Categoria Runtime 2
+            - generic [ref=e48]:
+              - link "Runtime Bowl 2" [ref=e49] [cursor=pointer]:
+                - /url: /es/products/66666666-6666-4666-8666-666666666666
+                - heading "Runtime Bowl 2" [level=3] [ref=e50]
+              - paragraph [ref=e51]: Provider A2 product
+              - generic [ref=e52]:
+                - generic [ref=e53]:
+                  - img [ref=e54]
+                  - text: Hecho en Madrid Runtime 2
+                - generic [ref=e57]:
+                  - generic [ref=e58]:
+                    - generic [ref=e59]: 10,00 €
+                    - generic [ref=e60]: 8,00 €
+                  - button "Añadir" [ref=e61] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e62]:
+            - link "Producto sin imagen Categoria Runtime 2" [ref=e63] [cursor=pointer]:
+              - /url: /es/products/77777777-7777-4777-8777-777777777777
+              - img "Producto sin imagen" [ref=e64]
+              - generic [ref=e66]: Categoria Runtime 2
+            - generic [ref=e68]:
+              - link "Runtime Lamp 2" [ref=e69] [cursor=pointer]:
+                - /url: /es/products/77777777-7777-4777-8777-777777777777
+                - heading "Runtime Lamp 2" [level=3] [ref=e70]
+              - paragraph [ref=e71]: Provider B2 product
+              - generic [ref=e72]:
+                - generic [ref=e73]:
+                  - img [ref=e74]
+                  - text: Hecho en Madrid Runtime 2
+                - generic [ref=e77]:
+                  - generic [ref=e79]: 12,00 €
+                  - button "Añadir" [ref=e80] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e81]:
+            - link "Producto sin imagen Ceramica Runtime" [ref=e82] [cursor=pointer]:
+              - /url: /es/products/66666666-6666-6666-6666-666666666661
+              - img "Producto sin imagen" [ref=e83]
+              - generic [ref=e85]: Ceramica Runtime
+            - generic [ref=e87]:
+              - link "Runtime Bowl" [ref=e88] [cursor=pointer]:
+                - /url: /es/products/66666666-6666-6666-6666-666666666661
+                - heading "Runtime Bowl" [level=3] [ref=e89]
+              - paragraph [ref=e90]: Provider A product
+              - generic [ref=e91]:
+                - generic [ref=e92]:
+                  - img [ref=e93]
+                  - text: Hecho en Madrid Runtime
+                - generic [ref=e96]:
+                  - generic [ref=e97]:
+                    - generic [ref=e98]: 10,00 €
+                    - generic [ref=e99]: 8,00 €
+                  - button "Añadir" [ref=e100] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e101]:
+            - link "Producto sin imagen Ceramica Runtime" [ref=e102] [cursor=pointer]:
+              - /url: /es/products/77777777-7777-7777-7777-777777777771
+              - img "Producto sin imagen" [ref=e103]
+              - generic [ref=e105]: Ceramica Runtime
+            - generic [ref=e107]:
+              - link "Runtime Lamp" [ref=e108] [cursor=pointer]:
+                - /url: /es/products/77777777-7777-7777-7777-777777777771
+                - heading "Runtime Lamp" [level=3] [ref=e109]
+              - paragraph [ref=e110]: Provider B product
+              - generic [ref=e111]:
+                - generic [ref=e112]:
+                  - img [ref=e113]
+                  - text: Hecho en Madrid Runtime
+                - generic [ref=e116]:
+                  - generic [ref=e118]: 12,00 €
+                  - button "Añadir" [ref=e119] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e120]:
+            - link "Runtime Bread 1773927830 Runtime Category 1773927830" [ref=e121] [cursor=pointer]:
+              - /url: /es/products/282f68c2-14f4-4f0a-ac3a-035ae1064187
+              - img "Runtime Bread 1773927830" [ref=e122]
+              - generic [ref=e124]: Runtime Category 1773927830
+            - generic [ref=e126]:
+              - link "Runtime Bread 1773927830" [ref=e127] [cursor=pointer]:
+                - /url: /es/products/282f68c2-14f4-4f0a-ac3a-035ae1064187
+                - heading "Runtime Bread 1773927830" [level=3] [ref=e128]
+              - paragraph [ref=e129]: Runtime A
+              - generic [ref=e130]:
+                - generic [ref=e131]:
+                  - img [ref=e132]
+                  - text: Hecho en Runtime City 1773927830
+                - generic [ref=e135]:
+                  - generic [ref=e137]: 10,00 €
+                  - button "Añadir" [ref=e138] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e139]:
+            - link "Runtime Tomatoes 1773927830 Runtime Category 1773927830" [ref=e140] [cursor=pointer]:
+              - /url: /es/products/da9235fd-fd7a-4202-94ef-2bd11cf72361
+              - img "Runtime Tomatoes 1773927830" [ref=e141]
+              - generic [ref=e143]: Runtime Category 1773927830
+            - generic [ref=e145]:
+              - link "Runtime Tomatoes 1773927830" [ref=e146] [cursor=pointer]:
+                - /url: /es/products/da9235fd-fd7a-4202-94ef-2bd11cf72361
+                - heading "Runtime Tomatoes 1773927830" [level=3] [ref=e147]
+              - paragraph [ref=e148]: Runtime B
+              - generic [ref=e149]:
+                - generic [ref=e150]:
+                  - img [ref=e151]
+                  - text: Hecho en Runtime City 1773927830
+                - generic [ref=e154]:
+                  - generic [ref=e156]: 12,00 €
+                  - button "Añadir" [ref=e157] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e158]:
+            - link "Producto sin imagen Runtime Category 1773928979" [ref=e159] [cursor=pointer]:
+              - /url: /es/products/0954e065-4808-42e0-972c-c4f628edef8a
+              - img "Producto sin imagen" [ref=e160]
+              - generic [ref=e162]: Runtime Category 1773928979
+            - generic [ref=e164]:
+              - link "Runtime Product One" [ref=e165] [cursor=pointer]:
+                - /url: /es/products/0954e065-4808-42e0-972c-c4f628edef8a
+                - heading "Runtime Product One" [level=3] [ref=e166]
+              - paragraph [ref=e167]: Runtime product one
+              - generic [ref=e168]:
+                - generic [ref=e169]:
+                  - img [ref=e170]
+                  - text: Hecho en Runtime City 1773928979
+                - generic [ref=e173]:
+                  - generic [ref=e175]: 12,00 €
+                  - button "Añadir" [ref=e176] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e177]:
+            - link "Producto sin imagen Runtime Category 1773928979" [ref=e178] [cursor=pointer]:
+              - /url: /es/products/a0d1b6f4-3351-473b-a8f2-45002bcb7b19
+              - img "Producto sin imagen" [ref=e179]
+              - generic [ref=e181]: Runtime Category 1773928979
+            - generic [ref=e183]:
+              - link "Runtime Product Two" [ref=e184] [cursor=pointer]:
+                - /url: /es/products/a0d1b6f4-3351-473b-a8f2-45002bcb7b19
+                - heading "Runtime Product Two" [level=3] [ref=e185]
+              - paragraph [ref=e186]: Runtime product two
+              - generic [ref=e187]:
+                - generic [ref=e188]:
+                  - img [ref=e189]
+                  - text: Hecho en Runtime City 1773928979
+                - generic [ref=e192]:
+                  - generic [ref=e194]: 9,00 €
+                  - button "Añadir" [ref=e195] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e196]:
+            - link "Producto sin imagen Categoria Runtime 2" [ref=e197] [cursor=pointer]:
+              - /url: /es/products/30000000-0000-4000-8000-000000000001
+              - img "Producto sin imagen" [ref=e198]
+              - generic [ref=e200]: Categoria Runtime 2
+            - generic [ref=e202]:
+              - link "Runtime Madrid Product One" [ref=e203] [cursor=pointer]:
+                - /url: /es/products/30000000-0000-4000-8000-000000000001
+                - heading "Runtime Madrid Product One" [level=3] [ref=e204]
+              - paragraph [ref=e205]: Runtime product one
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - img [ref=e208]
+                  - text: Hecho en Madrid
+                - generic [ref=e211]:
+                  - generic [ref=e213]: 12,00 €
+                  - button "Añadir" [ref=e214] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e215]:
+            - link "Producto sin imagen Categoria Runtime 2" [ref=e216] [cursor=pointer]:
+              - /url: /es/products/30000000-0000-4000-8000-000000000002
+              - img "Producto sin imagen" [ref=e217]
+              - generic [ref=e219]: Categoria Runtime 2
+            - generic [ref=e221]:
+              - link "Runtime Madrid Product Two" [ref=e222] [cursor=pointer]:
+                - /url: /es/products/30000000-0000-4000-8000-000000000002
+                - heading "Runtime Madrid Product Two" [level=3] [ref=e223]
+              - paragraph [ref=e224]: Runtime product two
+              - generic [ref=e225]:
+                - generic [ref=e226]:
+                  - img [ref=e227]
+                  - text: Hecho en Madrid
+                - generic [ref=e230]:
+                  - generic [ref=e232]: 9,00 €
+                  - button "Añadir" [ref=e233] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e234]:
+            - link "Producto sin imagen Categoria Runtime 2" [ref=e235] [cursor=pointer]:
+              - /url: /es/products/30000000-0000-4000-8000-000000000003
+              - img "Producto sin imagen" [ref=e236]
+              - generic [ref=e238]: Categoria Runtime 2
+            - generic [ref=e240]:
+              - link "Runtime Madrid Product Far" [ref=e241] [cursor=pointer]:
+                - /url: /es/products/30000000-0000-4000-8000-000000000003
+                - heading "Runtime Madrid Product Far" [level=3] [ref=e242]
+              - paragraph [ref=e243]: Runtime product far
+              - generic [ref=e244]:
+                - generic [ref=e245]:
+                  - img [ref=e246]
+                  - text: Hecho en Madrid
+                - generic [ref=e249]:
+                  - generic [ref=e251]: 15,00 €
+                  - button "Añadir" [ref=e252] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e253]:
+            - link "Producto sin imagen Runtime Category 1773928979" [ref=e254] [cursor=pointer]:
+              - /url: /es/products/8fdc1f49-0b5a-4bf1-b533-58199685e88e
+              - img "Producto sin imagen" [ref=e255]
+              - generic [ref=e257]: Runtime Category 1773928979
+            - generic [ref=e259]:
+              - link "Discount Product A 1773960037" [ref=e260] [cursor=pointer]:
+                - /url: /es/products/8fdc1f49-0b5a-4bf1-b533-58199685e88e
+                - heading "Discount Product A 1773960037" [level=3] [ref=e261]
+              - paragraph [ref=e262]: Producto con descuento privado por proveedor
+              - generic [ref=e263]:
+                - generic [ref=e264]:
+                  - img [ref=e265]
+                  - text: Hecho en Madrid
+                - generic [ref=e268]:
+                  - generic [ref=e270]: 14,00 €
+                  - button "Añadir" [ref=e271] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e272]:
+            - link "Producto sin imagen Runtime Category 1773928979" [ref=e273] [cursor=pointer]:
+              - /url: /es/products/62407167-89c1-4ad1-81ea-dab4127d6a3c
+              - img "Producto sin imagen" [ref=e274]
+              - generic [ref=e276]: Runtime Category 1773928979
+            - generic [ref=e278]:
+              - link "Discount Product B 1773960037" [ref=e279] [cursor=pointer]:
+                - /url: /es/products/62407167-89c1-4ad1-81ea-dab4127d6a3c
+                - heading "Discount Product B 1773960037" [level=3] [ref=e280]
+              - paragraph [ref=e281]: Producto sin descuento privado
+              - generic [ref=e282]:
+                - generic [ref=e283]:
+                  - img [ref=e284]
+                  - text: Hecho en Madrid
+                - generic [ref=e287]:
+                  - generic [ref=e289]: 9,00 €
+                  - button "Añadir" [ref=e290] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e291]:
+            - link "Empanada gallega Panadería" [ref=e292] [cursor=pointer]:
+              - /url: /es/products/2bb74733-1f2f-4124-ae13-5e4e9c30ffe3
+              - img "Empanada gallega" [ref=e293]
+              - generic [ref=e295]: Panadería
+            - generic [ref=e297]:
+              - link "Empanada gallega" [ref=e298] [cursor=pointer]:
+                - /url: /es/products/2bb74733-1f2f-4124-ae13-5e4e9c30ffe3
+                - heading "Empanada gallega" [level=3] [ref=e299]
+              - paragraph [ref=e300]: Empanada lista para probar el flujo de compra.
+              - generic [ref=e301]:
+                - generic [ref=e302]:
+                  - img [ref=e303]
+                  - text: Hecho en Toledo
+                - generic [ref=e306]:
+                  - generic [ref=e308]: 6,90 €
+                  - button "Añadir" [ref=e309] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e310]:
+            - link "Pan artesano Panadería" [ref=e311] [cursor=pointer]:
+              - /url: /es/products/79f3f4ca-a4b8-451e-9151-ba450a883066
+              - img "Pan artesano" [ref=e312]
+              - generic [ref=e314]: Panadería
+            - generic [ref=e316]:
+              - link "Pan artesano" [ref=e317] [cursor=pointer]:
+                - /url: /es/products/79f3f4ca-a4b8-451e-9151-ba450a883066
+                - heading "Pan artesano" [level=3] [ref=e318]
+              - paragraph [ref=e319]: Hogaza artesanal para pedidos de demo.
+              - generic [ref=e320]:
+                - generic [ref=e321]:
+                  - img [ref=e322]
+                  - text: Hecho en Toledo
+                - generic [ref=e325]:
+                  - generic [ref=e327]: 2,50 €
+                  - button "Añadir" [ref=e328] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e329]:
+            - link "Aceite de oliva Despensa" [ref=e330] [cursor=pointer]:
+              - /url: /es/products/aafc2f18-ad32-4d20-9385-95266f412137
+              - img "Aceite de oliva" [ref=e331]
+              - generic [ref=e333]: Despensa
+            - generic [ref=e335]:
+              - link "Aceite de oliva" [ref=e336] [cursor=pointer]:
+                - /url: /es/products/aafc2f18-ad32-4d20-9385-95266f412137
+                - heading "Aceite de oliva" [level=3] [ref=e337]
+              - paragraph [ref=e338]: Aceite de oliva virgen extra para pedidos demo.
+              - generic [ref=e339]:
+                - generic [ref=e340]:
+                  - img [ref=e341]
+                  - text: Hecho en Toledo
+                - generic [ref=e344]:
+                  - generic [ref=e346]: 9,50 €
+                  - button "Añadir" [ref=e347] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e348]:
+            - link "Queso manchego Despensa" [ref=e349] [cursor=pointer]:
+              - /url: /es/products/a61d73ec-c9e8-4f7e-8452-34ea769633d8
+              - img "Queso manchego" [ref=e350]
+              - generic [ref=e352]: Despensa
+            - generic [ref=e354]:
+              - link "Queso manchego" [ref=e355] [cursor=pointer]:
+                - /url: /es/products/a61d73ec-c9e8-4f7e-8452-34ea769633d8
+                - heading "Queso manchego" [level=3] [ref=e356]
+              - paragraph [ref=e357]: Queso manchego curado para la demo.
+              - generic [ref=e358]:
+                - generic [ref=e359]:
+                  - img [ref=e360]
+                  - text: Hecho en Toledo
+                - generic [ref=e363]:
+                  - generic [ref=e365]: 8,75 €
+                  - button "Añadir" [ref=e366] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e367]:
+            - link "Huevos camperos Despensa" [ref=e368] [cursor=pointer]:
+              - /url: /es/products/eafc0eb1-d956-46ce-bb75-d7724c39f8b1
+              - img "Huevos camperos" [ref=e369]
+              - generic [ref=e371]: Despensa
+            - generic [ref=e373]:
+              - link "Huevos camperos" [ref=e374] [cursor=pointer]:
+                - /url: /es/products/eafc0eb1-d956-46ce-bb75-d7724c39f8b1
+                - heading "Huevos camperos" [level=3] [ref=e375]
+              - paragraph [ref=e376]: Docena de huevos camperos de muestra.
+              - generic [ref=e377]:
+                - generic [ref=e378]:
+                  - img [ref=e379]
+                  - text: Hecho en Toledo
+                - generic [ref=e382]:
+                  - generic [ref=e384]: 4,40 €
+                  - button "Añadir" [ref=e385] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+          - generic [ref=e386]:
+            - link "Tomates ecológicos Verduras" [ref=e387] [cursor=pointer]:
+              - /url: /es/products/cb2d0119-1328-4093-b54d-d0a97ab621e2
+              - img "Tomates ecológicos" [ref=e388]
+              - generic [ref=e390]: Verduras
+            - generic [ref=e392]:
+              - link "Tomates ecológicos" [ref=e393] [cursor=pointer]:
+                - /url: /es/products/cb2d0119-1328-4093-b54d-d0a97ab621e2
+                - heading "Tomates ecológicos" [level=3] [ref=e394]
+              - paragraph [ref=e395]: Tomates frescos para pedidos de demo.
+              - generic [ref=e396]:
+                - generic [ref=e397]:
+                  - img [ref=e398]
+                  - text: Hecho en Toledo
+                - generic [ref=e401]:
+                  - generic [ref=e403]: 3,20 €
+                  - button "Añadir" [ref=e404] [cursor=pointer]:
+                    - img
+                    - text: Añadir
+    - contentinfo [ref=e405]:
+      - generic [ref=e406]:
+        - generic [ref=e407]:
+          - generic [ref=e408]:
+            - link "Mecerka" [ref=e409] [cursor=pointer]:
+              - /url: /es
+              - img [ref=e410]
+              - generic [ref=e415]: Mecerka
+            - paragraph [ref=e416]:
+              - text: El mercado vivo de tu ciudad.
+              - text: Donde la artesanía local, los talleres de barrio y la confianza de siempre encuentran su lugar en la red.
+            - paragraph [ref=e417]: La superficie pública actual del MVP se centra en catálogo, registro, acceso y compra local. La documentación legal pública y el centro de soporte ampliado no están publicados en esta versión.
+          - generic [ref=e418]:
+            - heading "Plataforma" [level=3] [ref=e419]
+            - list [ref=e420]:
+              - listitem [ref=e421]:
+                - link "Catálogo" [ref=e422] [cursor=pointer]:
+                  - /url: /es/products
+              - listitem [ref=e423]:
+                - link "Iniciar sesión" [ref=e424] [cursor=pointer]:
+                  - /url: /es/login
+              - listitem [ref=e425]:
+                - link "Registrarse" [ref=e426] [cursor=pointer]:
+                  - /url: /es/register
+        - paragraph [ref=e428]: 2026 Mecerka. Todos los derechos reservados.
+  - region "Notifications alt+T"
+  - alert [ref=e429]

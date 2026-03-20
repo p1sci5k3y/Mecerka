@@ -38,7 +38,7 @@ describe('Order Lifecycle (e2e)', () => {
     await closeTestApp(app);
   });
 
-  it('completes the legacy order lifecycle across client, provider, and runner', async () => {
+  it('completes the legacy single-provider order lifecycle and marks the endpoint as deprecated', async () => {
     await truncateDatabase(prisma);
 
     const { user: client, password: clientPassword } = await createTestUser(
@@ -104,6 +104,10 @@ describe('Order Lifecycle (e2e)', () => {
       });
 
     expect(createResponse.status).toBe(201);
+    expect(createResponse.headers.deprecation).toBe('true');
+    expect(createResponse.headers.warning).toContain(
+      'Legacy single-provider order creation endpoint',
+    );
     expect(createResponse.body.id).toBeDefined();
     expect(createResponse.body.status).toBe(DeliveryStatus.PENDING);
     createdOrderId = createResponse.body.id;

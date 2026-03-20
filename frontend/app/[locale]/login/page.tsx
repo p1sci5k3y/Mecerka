@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react"
 import { useRouter, Link } from "@/lib/navigation"
 import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
+import { setAuthSessionHint } from "@/lib/auth-session"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react"
@@ -87,6 +88,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await api.post('/auth/mfa/verify', { token })
+      setAuthSessionHint()
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
       router.replace(returnTo ?? getPrimaryRouteForRoles(pendingRoles))
     } catch (error: any) {
@@ -216,23 +218,6 @@ export default function LoginPage() {
 
           {step === 1 && (
             <>
-              <div className="flex items-center gap-4 py-8">
-                <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div>
-                <span className="text-xs text-slate-400 uppercase tracking-tighter">{t('orContinueWith')}</span>
-                <div className="h-px bg-slate-200 dark:bg-slate-800 flex-1"></div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <button type="button" className="flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors">
-                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuB2E0Yr4ov3sNptO8UviwDYcHJHiIrFmPbG-1r5o1fA2GIvadZIQB5PvvJY9CGOfEsQ_JUyQ4A0jf-2bx4B0RfSJH59ypks2e6lJXzQR4LKeJSttcaSodODvgXCpnyJ6SHUuX09AUrUlFnckQkuGUy0rEdtmguxfRA7kcXVWMfbMmZcC-i8VACnH4IEZsHTnYP4O8vMw7wjHNOp0O0yyNVAsVB316ewL17RDDy-WtD1ajGZXThzkUAb3TlkjXV-z5Xz7cufs04tKW8" alt="Google" className="w-5 h-5" />
-                  <span className="text-sm font-medium">Google</span>
-                </button>
-                <button type="button" className="flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-800 py-3 rounded-lg hover:bg-white dark:hover:bg-slate-800 transition-colors">
-                  <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxRCC68Vav1jmjFbubjb8KlpTBpqwfdOHhDSiDPEgvAvour5UNi8g5-BDU2DvErVTx44Id-Cpzpb20umcVh4UH4pRU_tuKieLVjJ5UvZwef5lEZDA-4tEtx1g-nwDCnT80lYCX30__r8rgvUcobgthFoV8haaXXfKpohWO6EOL_X8kELfEtRBbuAVmlpZxc1jWwIfkoFtOIA2HmV_sR3ui47EVyBraCSUl6eNNnzArj5xGgQA-q5djrDSnaCfGTb_l8wluti2NIPc" alt="Apple" className="w-5 h-5" />
-                  <span className="text-sm font-medium">Apple</span>
-                </button>
-              </div>
-
               <p className="mt-12 text-center text-sm text-slate-500">
                 {t('newToMarketplace')}{" "}
                 <Link href={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : "/register"} className="text-[#e07b61] font-semibold hover:underline underline-offset-4">{t('createAccount')}</Link>
@@ -241,12 +226,8 @@ export default function LoginPage() {
           )}
         </div>
 
-        {/* Footer Links (hidden on small mobile to save space) */}
-        <div className="hidden sm:flex flex-wrap justify-center lg:justify-start gap-6 text-[10px] uppercase tracking-[0.2em] text-slate-400 mt-8">
-          <Link href="#" className="hover:text-[#e07b61] transition-colors">Sustainability</Link>
-          <Link href="#" className="hover:text-[#e07b61] transition-colors">Privacy</Link>
-          <Link href="#" className="hover:text-[#e07b61] transition-colors">Terms</Link>
-          <Link href="#" className="hover:text-[#e07b61] transition-colors">Journal</Link>
+        <div className="hidden sm:block text-[11px] leading-relaxed text-slate-400 mt-8">
+          Acceso disponible en esta versión: correo, contraseña y MFA.
         </div>
       </div>
 

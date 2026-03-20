@@ -102,12 +102,27 @@ if [ -z "$DATABASE_URL" ]; then
   generated_keys="$generated_keys DATABASE_URL"
 fi
 
-replace_or_append "DEMO_MODE" "false" "$ENV_FILE"
+DEMO_MODE=$(read_value "DEMO_MODE" "$ENV_FILE")
+if [ -z "$DEMO_MODE" ]; then
+  DEMO_MODE=false
+  replace_or_append "DEMO_MODE" "$DEMO_MODE" "$ENV_FILE"
+  generated_keys="$generated_keys DEMO_MODE"
+fi
+
+if [ "$DEMO_MODE" = "true" ]; then
+  DEMO_PASSWORD=$(read_value "DEMO_PASSWORD" "$ENV_FILE")
+  if [ -z "$DEMO_PASSWORD" ]; then
+    DEMO_PASSWORD=$(openssl rand -base64 24 | tr -d '\n')
+    replace_or_append "DEMO_PASSWORD" "$DEMO_PASSWORD" "$ENV_FILE"
+    generated_keys="$generated_keys DEMO_PASSWORD"
+    log "generated a demo password because DEMO_MODE=true"
+  fi
+fi
 
 if [ -n "$generated_keys" ]; then
   log "generated missing values for:$generated_keys"
 else
   log "all required local secrets were already present"
 fi
-log "DEMO_MODE defaults to false. Set it to true manually only for intentional demo workflows."
+log "DEMO_MODE defaults to false when missing. Use scripts/bootstrap-demo-env.sh for a reproducible local demo setup."
 log ".env is ready"

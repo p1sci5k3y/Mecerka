@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import type { Role } from "@/lib/types"
 import { getPrimaryRouteForUser } from "@/lib/role-navigation"
+import { getPublicRuntimeConfig } from "@/lib/runtime-config"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -34,11 +35,19 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return
     }
 
-    const requireMfa = process.env.NEXT_PUBLIC_REQUIRE_MFA !== 'false';
-    if (!isLoading && isAuthenticated && user && !user.mfaEnabled && requireMfa) {
-      // Allow access to setup page if MFA not enabled
-      if (pathname !== '/mfa/setup') {
-        router.replace("/mfa/setup")
+    if (!isLoading && isAuthenticated && user) {
+      let active = true
+      void getPublicRuntimeConfig().then((config) => {
+        if (!active) return
+        if (!user.mfaEnabled && config.requireMfa) {
+          // Allow access to setup page if MFA not enabled
+          if (pathname !== '/mfa/setup') {
+            router.replace("/mfa/setup")
+          }
+        }
+      })
+      return () => {
+        active = false
       }
     }
   }, [isLoading, isAuthenticated, user, allowedRoles, router, pathname])

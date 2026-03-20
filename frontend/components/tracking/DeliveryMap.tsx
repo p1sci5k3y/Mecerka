@@ -7,6 +7,7 @@ import L from 'leaflet';
 import io, { Socket } from 'socket.io-client';
 import { ordersService } from '@/lib/services/orders-service';
 import { Play, Square, MapPin } from 'lucide-react';
+import { getTrackingBaseUrl } from '@/lib/runtime-config';
 
 // Fix for default markers in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -119,7 +120,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
         initMapData();
 
         // Connect WebSocket
-        const newSocket = io(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/tracking`, {
+        const newSocket = io(`${getTrackingBaseUrl()}/tracking`, {
             path: '/socket.io',
             transports: ['websocket'],
             withCredentials: true,

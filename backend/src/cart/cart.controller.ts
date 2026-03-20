@@ -19,6 +19,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import type { RequestWithUser } from '../auth/interfaces/auth.interfaces';
 import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { CheckoutCartDto } from './dto/checkout-cart.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { OrdersService } from '../orders/orders.service';
 
@@ -65,8 +66,13 @@ export class CartController {
   @Roles(Role.CLIENT)
   checkout(
     @Request() req: RequestWithUser,
+    @Body() dto: CheckoutCartDto,
     @Headers('Idempotency-Key') idempotencyKey?: string,
   ) {
-    return this.ordersService.checkoutFromCart(req.user.userId, idempotencyKey);
+    return this.ordersService.checkoutFromCart(
+      req.user.userId,
+      dto,
+      idempotencyKey,
+    );
   }
 }

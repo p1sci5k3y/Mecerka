@@ -6,6 +6,7 @@ import {
   UseGuards,
   Request,
   Body,
+  Header,
 } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,12 +22,29 @@ export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
   @Post('intent/:orderId')
+  @Header('Deprecation', 'true')
+  @Header(
+    'Warning',
+    '299 - "Legacy single-provider payment intent endpoint. Use provider-order payment sessions instead."',
+  )
   @Roles(Role.CLIENT)
   async createIntent(
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Request() req: RequestWithUser,
   ) {
     return this.paymentsService.createTripartitePaymentIntent(
+      orderId,
+      req.user.userId,
+    );
+  }
+
+  @Post('orders/:orderId/provider-sessions')
+  @Roles(Role.CLIENT)
+  async prepareOrderProviderPayments(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.paymentsService.prepareOrderProviderPayments(
       orderId,
       req.user.userId,
     );
@@ -45,6 +63,11 @@ export class PaymentsController {
   }
 
   @Post('cash/:orderId')
+  @Header('Deprecation', 'true')
+  @Header(
+    'Warning',
+    '299 - "Legacy cash payment endpoint. Use provider-order payment sessions instead."',
+  )
   @Roles(Role.CLIENT)
   async processCash(
     @Param('orderId', ParseUUIDPipe) orderId: string,
