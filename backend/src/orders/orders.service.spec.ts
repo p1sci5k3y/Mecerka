@@ -136,7 +136,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           { id: 'po-2', status: ProviderOrderStatus.REJECTED_BY_STORE }, // Ignore this one
         ],
       });
-      orderRepositoryMock.update.mockResolvedValue({
+      prismaMock.order.update.mockResolvedValue({
         id: 'ord-123',
         status: DeliveryStatus.IN_TRANSIT,
       });
@@ -144,8 +144,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       const result = await service.markInTransit('ord-123', 'runner-123');
 
       expect(result.status).toBe(DeliveryStatus.IN_TRANSIT);
-      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord-123', {
-        status: DeliveryStatus.IN_TRANSIT,
+      expect(prismaMock.order.update).toHaveBeenCalledWith({
+        where: { id: 'ord-123' },
+        data: { status: DeliveryStatus.IN_TRANSIT },
       });
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
