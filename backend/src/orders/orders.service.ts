@@ -564,346 +564,25 @@ export class OrdersService {
       return this.toReservationAwareOrder(existingOrder);
     }
 
-    const latestCart = await this.prisma.cartGroup.findFirst({
-      where: {
-        clientId,
-      },
-      include: {
-        city: {
-          select: {
-            id: true,
-            name: true,
-            active: true,
-            maxDeliveryRadiusKm: true,
-            baseDeliveryFee: true,
-            deliveryPerKmFee: true,
-            extraPickupFee: true,
-          },
-        },
-        providers: {
-          include: {
-            items: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    if (!latestCart) {
-      throw new BadRequestException('Active cart is empty');
-    }
-
-    if (latestCart.status !== 'ACTIVE') {
-      throw new BadRequestException('Cart is not active');
-    }
-
-    if (latestCart.providers.length === 0) {
-      throw new BadRequestException('Active cart is empty');
-    }
-
-    if (!latestCart.cityId) {
-      throw new BadRequestException('Active cart has no city assigned');
-    }
-
-    if (!latestCart.city) {
-      throw new BadRequestException(
-        'Active cart city configuration is missing',
-      );
-    }
-
-    const checkoutCity = latestCart.city;
-
-    if (!checkoutCity.active) {
-      throw new BadRequestException('Active cart belongs to an inactive city');
-    }
-
-    if (dto.cityId !== latestCart.cityId) {
-      throw new BadRequestException(
-        'Checkout city does not match the active cart city',
-      );
-    }
-
-    const providerOrders = latestCart.providers.filter(
-      (provider) => provider.items.length > 0,
-    );
-
-    if (providerOrders.length === 0) {
-      throw new BadRequestException('Active cart has no items to checkout');
-    }
-
-    const totalPrice = providerOrders.reduce(
-      (sum, provider) => sum + Number(provider.subtotalAmount),
-      0,
-    );
-    const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const geocodedAddress = await this.geocodeCheckoutAddress(
-      checkoutCity.name,
-      dto,
-    );
-
     try {
-      return await this.prisma.$transaction(async (tx: any) => {
-        const requestedItems = providerOrders.flatMap(
-          (provider) => provider.items,
-        );
-        const productIds = [
-          ...new Set(requestedItems.map((item) => item.productId)),
-        ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-
-        if (productIds.length === 0) {
-          throw new BadRequestException('Active cart has no items to checkout');
-        }
-
-        // Keep checkout and payment confirmation on the same deterministic lock order.
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
-            productIds.map((id) => Prisma.sql`${id}::uuid`),
-          )}) FOR UPDATE`,
-        );
-
-        const products = await tx.product.findMany({
-          where: {
-            id: {
-              in: productIds,
-            },
-          },
-          select: {
-            id: true,
-            stock: true,
-          },
-        });
-        const reservations = await tx.stockReservation.groupBy({
-          by: ['productId'],
-          where: {
-            productId: {
-              in: productIds,
-            },
-            status: 'ACTIVE',
-            expiresAt: {
-              gt: new Date(),
-            },
-          },
-          _sum: {
-            quantity: true,
-          },
-        });
-
-        const productStock = new Map(
-          products.map((product: any) => [product.id, Number(product.stock)]),
-        );
-        const reservedStock = new Map(
-          reservations.map((reservation: any) => [
-            reservation.productId,
-            reservation._sum.quantity ?? 0,
-          ]),
-        );
-
-        for (const item of requestedItems) {
-          const currentStock = Number(
-            productStock.get(item.productId) ?? Number.NaN,
-          );
-          if (Number.isNaN(currentStock)) {
-            throw new ConflictException('STOCK_UNAVAILABLE');
-          }
-          const availableStock =
-            currentStock - Number(reservedStock.get(item.productId) ?? 0);
-
-          if (availableStock < item.quantity) {
-            throw new ConflictException('STOCK_UNAVAILABLE');
-          }
-        }
-
-        const providerIds = providerOrders.map(
-          (provider) => provider.providerId,
-        );
-        const providerUsers = (await tx.user.findMany({
-          where: {
-            id: {
-              in: providerIds,
-            },
-          },
-          select: {
-            id: true,
-            latitude: true,
-            longitude: true,
-            providerServiceRadiusKm: true,
-          },
-        })) as Array<{
-          id: string;
-          latitude: number | null;
-          longitude: number | null;
-          providerServiceRadiusKm: number | null;
-        }>;
-        const providerUserMap = new Map(
-          providerUsers.map((provider: any) => [provider.id, provider]),
-        );
-
-        const providerCoverage = providerOrders.map((provider) => {
-          const providerUser = providerUserMap.get(provider.providerId);
-
-          if (
-            !providerUser ||
-            providerUser.latitude == null ||
-            providerUser.longitude == null
-          ) {
-            throw new ConflictException(
-              `Provider ${provider.providerId} does not have a configured delivery location`,
-            );
-          }
-
-          const distanceKm = this.roundDistance(
-            this.calculateDistanceKm(
-              geocodedAddress.latitude,
-              geocodedAddress.longitude,
-              Number(providerUser.latitude),
-              Number(providerUser.longitude),
-            ),
-          );
-          const coverageLimitKm = this.roundDistance(
-            this.resolveCoverageLimitKm(
-              dto.discoveryRadiusKm,
-              Number(providerUser.providerServiceRadiusKm ?? 10),
-              checkoutCity.maxDeliveryRadiusKm,
-            ),
-          );
-
-          if (distanceKm > coverageLimitKm) {
-            throw new BadRequestException(
-              `Provider ${provider.providerId} is outside the delivery coverage area`,
-            );
-          }
-
-          return {
-            providerId: provider.providerId,
-            distanceKm,
-            coverageLimitKm,
-          };
-        });
-        const providerCoverageMap = new Map(
-          providerCoverage.map((coverage) => [coverage.providerId, coverage]),
-        );
-        const deliveryPricing = this.buildDeliveryPricingSnapshot(
-          providerCoverage,
-          providerOrders.length,
-          checkoutCity,
-        );
-
-        const order = await tx.order.create({
-          data: {
-            clientId,
-            cityId: latestCart.cityId,
-            totalPrice,
-            deliveryFee: deliveryPricing.deliveryFee,
-            deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
-            status: DeliveryStatus.PENDING,
-            checkoutIdempotencyKey: normalizedKey,
-            deliveryAddress: dto.deliveryAddress,
-            postalCode: dto.postalCode,
-            addressReference: dto.addressReference ?? null,
-            deliveryLat: geocodedAddress.latitude,
-            deliveryLng: geocodedAddress.longitude,
-            discoveryRadiusKm: dto.discoveryRadiusKm,
-            runnerBaseFee: deliveryPricing.runnerBaseFee,
-            runnerPerKmFee: deliveryPricing.runnerPerKmFee,
-            runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
-            providerOrders: {
-              create: providerOrders.map((provider) => {
-                const coverage = providerCoverageMap.get(provider.providerId);
-
-                return {
-                  providerId: provider.providerId,
-                  status: ProviderOrderStatus.PENDING,
-                  subtotalAmount: provider.subtotalAmount,
-                  paymentStatus: 'PENDING',
-                  deliveryDistanceKm: coverage?.distanceKm,
-                  coverageLimitKm: coverage?.coverageLimitKm,
-                  items: {
-                    create: provider.items.map((item) => ({
-                      productId: item.productId,
-                      quantity: item.quantity,
-                      priceAtPurchase: item.effectiveUnitPriceSnapshot,
-                      unitBasePriceSnapshot: item.unitPriceSnapshot,
-                      discountPriceSnapshot: item.discountPriceSnapshot,
-                    })),
-                  },
-                };
-              }),
-            },
-          },
-          include: {
-            providerOrders: {
-              include: {
-                items: true,
-              },
-            },
-          },
-        });
-
-        await tx.orderSummaryDocument.create({
-          data: {
-            orderId: order.id,
-            displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
-            totalAmount: totalPrice,
-            currency: 'EUR',
-          },
-        });
-
-        await tx.stockReservation.createMany({
-          data: order.providerOrders.flatMap((providerOrder: any) =>
-            providerOrder.items.map((item: any) => ({
-              providerOrderId: providerOrder.id,
-              productId: item.productId,
-              quantity: item.quantity,
-              status: 'ACTIVE',
-              expiresAt: reservationExpiresAt,
-            })),
-          ),
-        });
-
-        await tx.cartGroup.update({
-          where: { id: latestCart.id },
-          data: {
-            status: 'CHECKED_OUT',
-            version: {
-              increment: 1,
-            },
-          },
-        });
-
-        const orderWithReservations = await tx.order.findUniqueOrThrow({
-          where: { id: order.id },
-          include: {
-            summaryDocument: true,
-            providerOrders: {
-              include: {
-                items: true,
-                reservations: {
-                  where: { status: 'ACTIVE' },
-                  select: {
-                    expiresAt: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        const reservationAwareOrder = this.toReservationAwareOrder(
-          orderWithReservations,
-        );
-
-        this.logStructuredEvent(
-          'order.created',
-          {
-            orderId: reservationAwareOrder.id,
-          },
-          'Aggregated order created from cart checkout',
-        );
-
-        return reservationAwareOrder;
-      });
+      const { cart, providerOrders, checkoutCity, totalPrice } =
+        await this.validateCartForCheckout(clientId, dto);
+      const addresses = await this.resolveDeliveryAddresses(
+        providerOrders,
+        dto,
+        checkoutCity,
+      );
+      const order = await this.createOrderWithSuborders(
+        clientId,
+        dto,
+        cart,
+        providerOrders,
+        addresses,
+        totalPrice,
+        normalizedKey,
+      );
+      await this.reserveStockForOrder(order);
+      return this.initiatePaymentSession(order, clientId);
     } catch (error: any) {
       if (error?.code === 'P2002') {
         const duplicatedOrder = await (this.prisma.order as any).findUnique({
@@ -939,6 +618,407 @@ export class OrdersService {
 
       throw error;
     }
+  }
+
+  private async validateCartForCheckout(
+    clientId: string,
+    dto: CheckoutCartDto,
+  ): Promise<{
+    cart: any;
+    checkoutCity: any;
+    providerOrders: any[];
+    totalPrice: number;
+  }> {
+    const cart = await this.prisma.cartGroup.findFirst({
+      where: {
+        clientId,
+      },
+      include: {
+        city: {
+          select: {
+            id: true,
+            name: true,
+            active: true,
+            maxDeliveryRadiusKm: true,
+            baseDeliveryFee: true,
+            deliveryPerKmFee: true,
+            extraPickupFee: true,
+          },
+        },
+        providers: {
+          include: {
+            items: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    if (!cart) {
+      throw new BadRequestException('Active cart is empty');
+    }
+
+    if (cart.status !== 'ACTIVE') {
+      throw new BadRequestException('Cart is not active');
+    }
+
+    if (cart.providers.length === 0) {
+      throw new BadRequestException('Active cart is empty');
+    }
+
+    if (!cart.cityId) {
+      throw new BadRequestException('Active cart has no city assigned');
+    }
+
+    if (!cart.city) {
+      throw new BadRequestException(
+        'Active cart city configuration is missing',
+      );
+    }
+
+    const checkoutCity = cart.city;
+
+    if (!checkoutCity.active) {
+      throw new BadRequestException('Active cart belongs to an inactive city');
+    }
+
+    if (dto.cityId !== cart.cityId) {
+      throw new BadRequestException(
+        'Checkout city does not match the active cart city',
+      );
+    }
+
+    const providerOrders = cart.providers.filter(
+      (provider: any) => provider.items.length > 0,
+    );
+
+    if (providerOrders.length === 0) {
+      throw new BadRequestException('Active cart has no items to checkout');
+    }
+
+    const totalPrice = providerOrders.reduce(
+      (sum: number, provider: any) => sum + Number(provider.subtotalAmount),
+      0,
+    );
+
+    return { cart, checkoutCity, providerOrders, totalPrice };
+  }
+
+  private async resolveDeliveryAddresses(
+    providerOrders: any[],
+    dto: CheckoutCartDto,
+    checkoutCity: any,
+  ): Promise<{
+    geocodedAddress: GeocodedAddress;
+    providerCoverageMap: Map<
+      string,
+      { providerId: string; distanceKm: number; coverageLimitKm: number }
+    >;
+    deliveryPricing: ReturnType<
+      typeof OrdersService.prototype.buildDeliveryPricingSnapshot
+    >;
+  }> {
+    const geocodedAddress = await this.geocodeCheckoutAddress(
+      checkoutCity.name,
+      dto,
+    );
+
+    const providerIds = providerOrders.map((provider) => provider.providerId);
+    const providerUsers = (await this.prisma.user.findMany({
+      where: {
+        id: {
+          in: providerIds,
+        },
+      },
+      select: {
+        id: true,
+        latitude: true,
+        longitude: true,
+        providerServiceRadiusKm: true,
+      },
+    })) as Array<{
+      id: string;
+      latitude: number | null;
+      longitude: number | null;
+      providerServiceRadiusKm: number | null;
+    }>;
+    const providerUserMap = new Map(
+      providerUsers.map((provider: any) => [provider.id, provider]),
+    );
+
+    const providerCoverage = providerOrders.map((provider) => {
+      const providerUser = providerUserMap.get(provider.providerId);
+
+      if (
+        !providerUser ||
+        providerUser.latitude == null ||
+        providerUser.longitude == null
+      ) {
+        throw new ConflictException(
+          `Provider ${provider.providerId} does not have a configured delivery location`,
+        );
+      }
+
+      const distanceKm = this.roundDistance(
+        this.calculateDistanceKm(
+          geocodedAddress.latitude,
+          geocodedAddress.longitude,
+          Number(providerUser.latitude),
+          Number(providerUser.longitude),
+        ),
+      );
+      const coverageLimitKm = this.roundDistance(
+        this.resolveCoverageLimitKm(
+          dto.discoveryRadiusKm,
+          Number(providerUser.providerServiceRadiusKm ?? 10),
+          checkoutCity.maxDeliveryRadiusKm,
+        ),
+      );
+
+      if (distanceKm > coverageLimitKm) {
+        throw new BadRequestException(
+          `Provider ${provider.providerId} is outside the delivery coverage area`,
+        );
+      }
+
+      return {
+        providerId: provider.providerId,
+        distanceKm,
+        coverageLimitKm,
+      };
+    });
+    const providerCoverageMap = new Map(
+      providerCoverage.map((coverage) => [coverage.providerId, coverage]),
+    );
+    const deliveryPricing = this.buildDeliveryPricingSnapshot(
+      providerCoverage,
+      providerOrders.length,
+      checkoutCity,
+    );
+
+    return { geocodedAddress, providerCoverageMap, deliveryPricing };
+  }
+
+  private async createOrderWithSuborders(
+    clientId: string,
+    dto: CheckoutCartDto,
+    cart: any,
+    providerOrders: any[],
+    addresses: {
+      geocodedAddress: GeocodedAddress;
+      providerCoverageMap: Map<
+        string,
+        { providerId: string; distanceKm: number; coverageLimitKm: number }
+      >;
+      deliveryPricing: ReturnType<
+        typeof OrdersService.prototype.buildDeliveryPricingSnapshot
+      >;
+    },
+    totalPrice: number,
+    normalizedKey: string,
+  ): Promise<any> {
+    const { geocodedAddress, providerCoverageMap, deliveryPricing } = addresses;
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const requestedItems = providerOrders.flatMap(
+        (provider) => provider.items,
+      );
+      const productIds = [
+        ...new Set(requestedItems.map((item) => item.productId)),
+      ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+      if (productIds.length === 0) {
+        throw new BadRequestException('Active cart has no items to checkout');
+      }
+
+      // Keep checkout and payment confirmation on the same deterministic lock order.
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
+          productIds.map((id) => Prisma.sql`${id}::uuid`),
+        )}) FOR UPDATE`,
+      );
+
+      const products = await tx.product.findMany({
+        where: {
+          id: {
+            in: productIds,
+          },
+        },
+        select: {
+          id: true,
+          stock: true,
+        },
+      });
+      const reservations = await tx.stockReservation.groupBy({
+        by: ['productId'],
+        where: {
+          productId: {
+            in: productIds,
+          },
+          status: 'ACTIVE',
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+        _sum: {
+          quantity: true,
+        },
+      });
+
+      const productStock = new Map(
+        products.map((product: any) => [product.id, Number(product.stock)]),
+      );
+      const reservedStock = new Map(
+        reservations.map((reservation: any) => [
+          reservation.productId,
+          reservation._sum.quantity ?? 0,
+        ]),
+      );
+
+      for (const item of requestedItems) {
+        const currentStock = Number(
+          productStock.get(item.productId) ?? Number.NaN,
+        );
+        if (Number.isNaN(currentStock)) {
+          throw new ConflictException('STOCK_UNAVAILABLE');
+        }
+        const availableStock =
+          currentStock - Number(reservedStock.get(item.productId) ?? 0);
+
+        if (availableStock < item.quantity) {
+          throw new ConflictException('STOCK_UNAVAILABLE');
+        }
+      }
+
+      const order = await tx.order.create({
+        data: {
+          clientId,
+          cityId: cart.cityId,
+          totalPrice,
+          deliveryFee: deliveryPricing.deliveryFee,
+          deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
+          status: DeliveryStatus.PENDING,
+          checkoutIdempotencyKey: normalizedKey,
+          deliveryAddress: dto.deliveryAddress,
+          postalCode: dto.postalCode,
+          addressReference: dto.addressReference ?? null,
+          deliveryLat: geocodedAddress.latitude,
+          deliveryLng: geocodedAddress.longitude,
+          discoveryRadiusKm: dto.discoveryRadiusKm,
+          runnerBaseFee: deliveryPricing.runnerBaseFee,
+          runnerPerKmFee: deliveryPricing.runnerPerKmFee,
+          runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
+          providerOrders: {
+            create: providerOrders.map((provider) => {
+              const coverage = providerCoverageMap.get(provider.providerId);
+
+              return {
+                providerId: provider.providerId,
+                status: ProviderOrderStatus.PENDING,
+                subtotalAmount: provider.subtotalAmount,
+                paymentStatus: 'PENDING',
+                deliveryDistanceKm: coverage?.distanceKm,
+                coverageLimitKm: coverage?.coverageLimitKm,
+                items: {
+                  create: provider.items.map((item: any) => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    priceAtPurchase: item.effectiveUnitPriceSnapshot,
+                    unitBasePriceSnapshot: item.unitPriceSnapshot,
+                    discountPriceSnapshot: item.discountPriceSnapshot,
+                  })),
+                },
+              };
+            }),
+          },
+        },
+        include: {
+          providerOrders: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      });
+
+      await tx.orderSummaryDocument.create({
+        data: {
+          orderId: order.id,
+          displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
+          totalAmount: totalPrice,
+          currency: 'EUR',
+        },
+      });
+
+      await tx.cartGroup.update({
+        where: { id: cart.id },
+        data: {
+          status: 'CHECKED_OUT',
+          version: {
+            increment: 1,
+          },
+        },
+      });
+
+      return order;
+    });
+  }
+
+  private async reserveStockForOrder(order: any): Promise<void> {
+    const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.prisma.stockReservation.createMany({
+      data: order.providerOrders.flatMap((providerOrder: any) =>
+        providerOrder.items.map((item: any) => ({
+          providerOrderId: providerOrder.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          status: 'ACTIVE',
+          expiresAt: reservationExpiresAt,
+        })),
+      ),
+    });
+  }
+
+  private async initiatePaymentSession(
+    order: any,
+    _clientId: string,
+  ): Promise<any> {
+    const orderWithReservations = await (
+      this.prisma.order as any
+    ).findUniqueOrThrow({
+      where: { id: order.id },
+      include: {
+        summaryDocument: true,
+        providerOrders: {
+          include: {
+            items: true,
+            reservations: {
+              where: { status: 'ACTIVE' },
+              select: {
+                expiresAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const reservationAwareOrder = this.toReservationAwareOrder(
+      orderWithReservations,
+    );
+
+    this.logStructuredEvent(
+      'order.created',
+      {
+        orderId: reservationAwareOrder.id,
+      },
+      'Aggregated order created from cart checkout',
+    );
+
+    return reservationAwareOrder;
   }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
