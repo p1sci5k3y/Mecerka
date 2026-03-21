@@ -12,6 +12,7 @@ import {
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { IOrderRepository } from './repositories/order.repository.interface';
 import {
   Role,
   DeliveryStatus,
@@ -44,6 +45,8 @@ export class OrdersService {
     private readonly eventEmitter: EventEmitter2,
     @Inject(GEOCODING_SERVICE)
     private readonly geocodingService: GeocodingPort,
+    @Inject(IOrderRepository)
+    private readonly orderRepository: IOrderRepository,
     @Optional() private readonly riskService?: RiskService,
   ) {}
 
@@ -1493,7 +1496,7 @@ export class OrdersService {
       );
     }
 
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.orderRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
     if (!canTransitionOrder(order.status, DeliveryStatus.ASSIGNED)) {
       throw new BadRequestException('Order cannot transition to ASSIGNED');
@@ -1617,9 +1620,8 @@ export class OrdersService {
       );
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: { status: DeliveryStatus.IN_TRANSIT },
+    const updated = await this.orderRepository.update(id, {
+      status: DeliveryStatus.IN_TRANSIT,
     });
 
     this.eventEmitter.emit('order.stateChanged', {

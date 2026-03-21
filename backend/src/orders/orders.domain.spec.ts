@@ -15,6 +15,8 @@ import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { assertTestEnvironment } from '../../test/test-env';
+import { IOrderRepository } from './repositories/order.repository.interface';
+import { PrismaOrderRepository } from './repositories/prisma-order.repository';
 
 jest.setTimeout(20000);
 
@@ -41,6 +43,8 @@ describe('OrdersService - Provider Payment Domain', () => {
           provide: ConfigService,
           useValue: { get: jest.fn().mockReturnValue('dummy') },
         },
+        PrismaOrderRepository,
+        { provide: IOrderRepository, useClass: PrismaOrderRepository },
       ],
     }).compile();
 
