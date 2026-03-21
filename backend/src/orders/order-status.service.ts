@@ -22,6 +22,11 @@ import {
 } from './utils/state-machine';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RiskService } from '../risk/risk.service';
+import {
+  OrderCancelledEvent,
+  OrderDeliveredEvent,
+  OrderInTransitEvent,
+} from '../domain/events/order-events';
 
 @Injectable()
 export class OrderStatusService {
@@ -311,10 +316,7 @@ export class OrderStatusService {
     });
     this.logStructuredEvent(
       'order.state_transition',
-      {
-        orderId: id,
-        runnerId,
-      },
+      { orderId: id, runnerId },
       'Order assigned to runner',
     );
 
@@ -348,16 +350,15 @@ export class OrderStatusService {
       );
     }
 
-    this.eventEmitter.emit('order.stateChanged', {
+    const deliveredEvent: OrderDeliveredEvent = {
+      type: 'order.delivered',
       orderId: id,
-      status: DeliveryStatus.DELIVERED,
-    });
+      occurredAt: new Date(),
+    };
+    this.eventEmitter.emit('order.stateChanged', deliveredEvent);
     this.logStructuredEvent(
       'order.state_transition',
-      {
-        orderId: id,
-        runnerId,
-      },
+      { orderId: id, runnerId },
       'Order marked as delivered',
     );
 
@@ -409,18 +410,16 @@ export class OrderStatusService {
       data: { status: DeliveryStatus.IN_TRANSIT },
     });
 
-    this.eventEmitter.emit('order.stateChanged', {
+    const inTransitEvent: OrderInTransitEvent = {
+      type: 'order.in_transit',
       orderId: id,
-      newStatus: updated.status,
-      actorRole: Role.RUNNER,
-      timestamp: new Date().toISOString(),
-    });
+      driverId: runnerId,
+      occurredAt: new Date(),
+    };
+    this.eventEmitter.emit('order.stateChanged', inTransitEvent);
     this.logStructuredEvent(
       'order.state_transition',
-      {
-        orderId: id,
-        runnerId,
-      },
+      { orderId: id, runnerId },
       'Order marked as in transit',
     );
 
@@ -509,17 +508,15 @@ export class OrderStatusService {
       });
     });
 
-    this.eventEmitter.emit('order.stateChanged', {
+    const cancelledEvent: OrderCancelledEvent = {
+      type: 'order.cancelled',
       orderId: id,
-      newStatus: updated.status,
-      actorRole: isAdmin ? Role.ADMIN : Role.CLIENT,
-      timestamp: new Date().toISOString(),
-    });
+      occurredAt: new Date(),
+    };
+    this.eventEmitter.emit('order.stateChanged', cancelledEvent);
     this.logStructuredEvent(
       'order.state_transition',
-      {
-        orderId: id,
-      },
+      { orderId: id },
       'Order cancelled',
     );
 

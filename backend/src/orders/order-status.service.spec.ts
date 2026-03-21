@@ -541,8 +541,8 @@ describe('OrderStatusService – State Machine', () => {
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
         expect.objectContaining({
+          type: 'order.delivered',
           orderId: 'ord-1',
-          status: DeliveryStatus.DELIVERED,
         }),
       );
     });
