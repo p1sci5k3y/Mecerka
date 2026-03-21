@@ -591,52 +591,9 @@ export class OrdersService {
       },
     });
 
-    if (!latestCart) {
-      throw new BadRequestException('Active cart is empty');
-    }
+    const { checkoutCity, providerOrders, totalPrice } =
+      this.validateCartForCheckout(latestCart, dto);
 
-    if (latestCart.status !== 'ACTIVE') {
-      throw new BadRequestException('Cart is not active');
-    }
-
-    if (latestCart.providers.length === 0) {
-      throw new BadRequestException('Active cart is empty');
-    }
-
-    if (!latestCart.cityId) {
-      throw new BadRequestException('Active cart has no city assigned');
-    }
-
-    if (!latestCart.city) {
-      throw new BadRequestException(
-        'Active cart city configuration is missing',
-      );
-    }
-
-    const checkoutCity = latestCart.city;
-
-    if (!checkoutCity.active) {
-      throw new BadRequestException('Active cart belongs to an inactive city');
-    }
-
-    if (dto.cityId !== latestCart.cityId) {
-      throw new BadRequestException(
-        'Checkout city does not match the active cart city',
-      );
-    }
-
-    const providerOrders = latestCart.providers.filter(
-      (provider) => provider.items.length > 0,
-    );
-
-    if (providerOrders.length === 0) {
-      throw new BadRequestException('Active cart has no items to checkout');
-    }
-
-    const totalPrice = providerOrders.reduce(
-      (sum, provider) => sum + Number(provider.subtotalAmount),
-      0,
-    );
     const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
     const geocodedAddress = await this.geocodeCheckoutAddress(
       checkoutCity.name,
@@ -715,162 +672,34 @@ export class OrdersService {
           }
         }
 
-        const providerIds = providerOrders.map(
-          (provider) => provider.providerId,
-        );
-        const providerUsers = (await tx.user.findMany({
-          where: {
-            id: {
-              in: providerIds,
-            },
-          },
-          select: {
-            id: true,
-            latitude: true,
-            longitude: true,
-            providerServiceRadiusKm: true,
-          },
-        })) as Array<{
-          id: string;
-          latitude: number | null;
-          longitude: number | null;
-          providerServiceRadiusKm: number | null;
-        }>;
-        const providerUserMap = new Map(
-          providerUsers.map((provider: any) => [provider.id, provider]),
-        );
-
-        const providerCoverage = providerOrders.map((provider) => {
-          const providerUser = providerUserMap.get(provider.providerId);
-
-          if (
-            !providerUser ||
-            providerUser.latitude == null ||
-            providerUser.longitude == null
-          ) {
-            throw new ConflictException(
-              `Provider ${provider.providerId} does not have a configured delivery location`,
-            );
-          }
-
-          const distanceKm = this.roundDistance(
-            this.calculateDistanceKm(
-              geocodedAddress.latitude,
-              geocodedAddress.longitude,
-              Number(providerUser.latitude),
-              Number(providerUser.longitude),
-            ),
-          );
-          const coverageLimitKm = this.roundDistance(
-            this.resolveCoverageLimitKm(
-              dto.discoveryRadiusKm,
-              Number(providerUser.providerServiceRadiusKm ?? 10),
-              checkoutCity.maxDeliveryRadiusKm,
-            ),
+        const { providerCoverageMap, deliveryPricing } =
+          await this.resolveDeliveryAddresses(
+            providerOrders,
+            geocodedAddress,
+            dto,
+            checkoutCity,
+            tx,
           );
 
-          if (distanceKm > coverageLimitKm) {
-            throw new BadRequestException(
-              `Provider ${provider.providerId} is outside the delivery coverage area`,
-            );
-          }
-
-          return {
-            providerId: provider.providerId,
-            distanceKm,
-            coverageLimitKm,
-          };
-        });
-        const providerCoverageMap = new Map(
-          providerCoverage.map((coverage) => [coverage.providerId, coverage]),
-        );
-        const deliveryPricing = this.buildDeliveryPricingSnapshot(
-          providerCoverage,
-          providerOrders.length,
-          checkoutCity,
+        const order = await this.createOrderWithSuborders(
+          tx,
+          latestCart,
+          geocodedAddress,
+          providerCoverageMap,
+          deliveryPricing,
+          providerOrders,
+          clientId,
+          totalPrice,
+          normalizedKey,
+          dto,
         );
 
-        const order = await tx.order.create({
-          data: {
-            clientId,
-            cityId: latestCart.cityId,
-            totalPrice,
-            deliveryFee: deliveryPricing.deliveryFee,
-            deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
-            status: DeliveryStatus.PENDING,
-            checkoutIdempotencyKey: normalizedKey,
-            deliveryAddress: dto.deliveryAddress,
-            postalCode: dto.postalCode,
-            addressReference: dto.addressReference ?? null,
-            deliveryLat: geocodedAddress.latitude,
-            deliveryLng: geocodedAddress.longitude,
-            discoveryRadiusKm: dto.discoveryRadiusKm,
-            runnerBaseFee: deliveryPricing.runnerBaseFee,
-            runnerPerKmFee: deliveryPricing.runnerPerKmFee,
-            runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
-            providerOrders: {
-              create: providerOrders.map((provider) => {
-                const coverage = providerCoverageMap.get(provider.providerId);
-
-                return {
-                  providerId: provider.providerId,
-                  status: ProviderOrderStatus.PENDING,
-                  subtotalAmount: provider.subtotalAmount,
-                  paymentStatus: 'PENDING',
-                  deliveryDistanceKm: coverage?.distanceKm,
-                  coverageLimitKm: coverage?.coverageLimitKm,
-                  items: {
-                    create: provider.items.map((item) => ({
-                      productId: item.productId,
-                      quantity: item.quantity,
-                      priceAtPurchase: item.effectiveUnitPriceSnapshot,
-                      unitBasePriceSnapshot: item.unitPriceSnapshot,
-                      discountPriceSnapshot: item.discountPriceSnapshot,
-                    })),
-                  },
-                };
-              }),
-            },
-          },
-          include: {
-            providerOrders: {
-              include: {
-                items: true,
-              },
-            },
-          },
-        });
-
-        await tx.orderSummaryDocument.create({
-          data: {
-            orderId: order.id,
-            displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
-            totalAmount: totalPrice,
-            currency: 'EUR',
-          },
-        });
-
-        await tx.stockReservation.createMany({
-          data: order.providerOrders.flatMap((providerOrder: any) =>
-            providerOrder.items.map((item: any) => ({
-              providerOrderId: providerOrder.id,
-              productId: item.productId,
-              quantity: item.quantity,
-              status: 'ACTIVE',
-              expiresAt: reservationExpiresAt,
-            })),
-          ),
-        });
-
-        await tx.cartGroup.update({
-          where: { id: latestCart.id },
-          data: {
-            status: 'CHECKED_OUT',
-            version: {
-              increment: 1,
-            },
-          },
-        });
+        await this.reserveStockForOrder(
+          tx,
+          order,
+          latestCart,
+          reservationExpiresAt,
+        );
 
         const orderWithReservations = await tx.order.findUniqueOrThrow({
           where: { id: order.id },
@@ -939,6 +768,269 @@ export class OrdersService {
 
       throw error;
     }
+  }
+
+  private validateCartForCheckout(
+    cart: any,
+    dto: CheckoutCartDto,
+  ): { checkoutCity: any; providerOrders: any[]; totalPrice: number } {
+    if (!cart) {
+      throw new BadRequestException('Active cart is empty');
+    }
+
+    if (cart.status !== 'ACTIVE') {
+      throw new BadRequestException('Cart is not active');
+    }
+
+    if (cart.providers.length === 0) {
+      throw new BadRequestException('Active cart is empty');
+    }
+
+    if (!cart.cityId) {
+      throw new BadRequestException('Active cart has no city assigned');
+    }
+
+    if (!cart.city) {
+      throw new BadRequestException(
+        'Active cart city configuration is missing',
+      );
+    }
+
+    const checkoutCity = cart.city;
+
+    if (!checkoutCity.active) {
+      throw new BadRequestException('Active cart belongs to an inactive city');
+    }
+
+    if (dto.cityId !== cart.cityId) {
+      throw new BadRequestException(
+        'Checkout city does not match the active cart city',
+      );
+    }
+
+    const providerOrders = cart.providers.filter(
+      (provider: any) => provider.items.length > 0,
+    );
+
+    if (providerOrders.length === 0) {
+      throw new BadRequestException('Active cart has no items to checkout');
+    }
+
+    const totalPrice = providerOrders.reduce(
+      (sum: number, provider: any) => sum + Number(provider.subtotalAmount),
+      0,
+    );
+
+    return { checkoutCity, providerOrders, totalPrice };
+  }
+
+  private async resolveDeliveryAddresses(
+    providerOrders: any[],
+    geocodedAddress: GeocodedAddress,
+    dto: CheckoutCartDto,
+    checkoutCity: any,
+    tx: any,
+  ): Promise<{
+    providerCoverage: Array<{
+      providerId: string;
+      distanceKm: number;
+      coverageLimitKm: number;
+    }>;
+    providerCoverageMap: Map<
+      string,
+      { providerId: string; distanceKm: number; coverageLimitKm: number }
+    >;
+    deliveryPricing: ReturnType<
+      typeof OrdersService.prototype.buildDeliveryPricingSnapshot
+    >;
+  }> {
+    const providerIds = providerOrders.map((provider) => provider.providerId);
+    const providerUsers = (await tx.user.findMany({
+      where: {
+        id: {
+          in: providerIds,
+        },
+      },
+      select: {
+        id: true,
+        latitude: true,
+        longitude: true,
+        providerServiceRadiusKm: true,
+      },
+    })) as Array<{
+      id: string;
+      latitude: number | null;
+      longitude: number | null;
+      providerServiceRadiusKm: number | null;
+    }>;
+    const providerUserMap = new Map(
+      providerUsers.map((provider: any) => [provider.id, provider]),
+    );
+
+    const providerCoverage = providerOrders.map((provider) => {
+      const providerUser = providerUserMap.get(provider.providerId);
+
+      if (
+        !providerUser ||
+        providerUser.latitude == null ||
+        providerUser.longitude == null
+      ) {
+        throw new ConflictException(
+          `Provider ${provider.providerId} does not have a configured delivery location`,
+        );
+      }
+
+      const distanceKm = this.roundDistance(
+        this.calculateDistanceKm(
+          geocodedAddress.latitude,
+          geocodedAddress.longitude,
+          Number(providerUser.latitude),
+          Number(providerUser.longitude),
+        ),
+      );
+      const coverageLimitKm = this.roundDistance(
+        this.resolveCoverageLimitKm(
+          dto.discoveryRadiusKm,
+          Number(providerUser.providerServiceRadiusKm ?? 10),
+          checkoutCity.maxDeliveryRadiusKm,
+        ),
+      );
+
+      if (distanceKm > coverageLimitKm) {
+        throw new BadRequestException(
+          `Provider ${provider.providerId} is outside the delivery coverage area`,
+        );
+      }
+
+      return {
+        providerId: provider.providerId,
+        distanceKm,
+        coverageLimitKm,
+      };
+    });
+    const providerCoverageMap = new Map(
+      providerCoverage.map((coverage) => [coverage.providerId, coverage]),
+    );
+    const deliveryPricing = this.buildDeliveryPricingSnapshot(
+      providerCoverage,
+      providerOrders.length,
+      checkoutCity,
+    );
+
+    return { providerCoverage, providerCoverageMap, deliveryPricing };
+  }
+
+  private async createOrderWithSuborders(
+    tx: any,
+    latestCart: any,
+    geocodedAddress: GeocodedAddress,
+    providerCoverageMap: Map<
+      string,
+      { distanceKm: number; coverageLimitKm: number }
+    >,
+    deliveryPricing: {
+      deliveryFee: number;
+      deliveryDistanceKm: number;
+      runnerBaseFee: number;
+      runnerPerKmFee: number;
+      runnerExtraPickupFee: number;
+    },
+    providerOrders: any[],
+    clientId: string,
+    totalPrice: number,
+    normalizedKey: string,
+    dto: CheckoutCartDto,
+  ): Promise<any> {
+    const order = await tx.order.create({
+      data: {
+        clientId,
+        cityId: latestCart.cityId,
+        totalPrice,
+        deliveryFee: deliveryPricing.deliveryFee,
+        deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
+        status: DeliveryStatus.PENDING,
+        checkoutIdempotencyKey: normalizedKey,
+        deliveryAddress: dto.deliveryAddress,
+        postalCode: dto.postalCode,
+        addressReference: dto.addressReference ?? null,
+        deliveryLat: geocodedAddress.latitude,
+        deliveryLng: geocodedAddress.longitude,
+        discoveryRadiusKm: dto.discoveryRadiusKm,
+        runnerBaseFee: deliveryPricing.runnerBaseFee,
+        runnerPerKmFee: deliveryPricing.runnerPerKmFee,
+        runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
+        providerOrders: {
+          create: providerOrders.map((provider) => {
+            const coverage = providerCoverageMap.get(provider.providerId);
+
+            return {
+              providerId: provider.providerId,
+              status: ProviderOrderStatus.PENDING,
+              subtotalAmount: provider.subtotalAmount,
+              paymentStatus: 'PENDING',
+              deliveryDistanceKm: coverage?.distanceKm,
+              coverageLimitKm: coverage?.coverageLimitKm,
+              items: {
+                create: provider.items.map((item: any) => ({
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  priceAtPurchase: item.effectiveUnitPriceSnapshot,
+                  unitBasePriceSnapshot: item.unitPriceSnapshot,
+                  discountPriceSnapshot: item.discountPriceSnapshot,
+                })),
+              },
+            };
+          }),
+        },
+      },
+      include: {
+        providerOrders: {
+          include: {
+            items: true,
+          },
+        },
+      },
+    });
+
+    await tx.orderSummaryDocument.create({
+      data: {
+        orderId: order.id,
+        displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
+        totalAmount: totalPrice,
+        currency: 'EUR',
+      },
+    });
+
+    return order;
+  }
+
+  private async reserveStockForOrder(
+    tx: any,
+    order: any,
+    latestCart: any,
+    reservationExpiresAt: Date,
+  ): Promise<void> {
+    await tx.stockReservation.createMany({
+      data: order.providerOrders.flatMap((providerOrder: any) =>
+        providerOrder.items.map((item: any) => ({
+          providerOrderId: providerOrder.id,
+          productId: item.productId,
+          quantity: item.quantity,
+          status: 'ACTIVE',
+          expiresAt: reservationExpiresAt,
+        })),
+      ),
+    });
+
+    await tx.cartGroup.update({
+      where: { id: latestCart.id },
+      data: {
+        status: 'CHECKED_OUT',
+        version: {
+          increment: 1,
+        },
+      },
+    });
   }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
