@@ -38,7 +38,7 @@ describe('Order Lifecycle (e2e)', () => {
     await closeTestApp(app);
   });
 
-  it('completes the legacy single-provider order lifecycle and marks the endpoint as deprecated', async () => {
+  it('completes the single-provider order lifecycle', async () => {
     await truncateDatabase(prisma);
 
     const { user: client, password: clientPassword } = await createTestUser(
@@ -76,12 +76,6 @@ describe('Order Lifecycle (e2e)', () => {
     runnerToken = (await loginAndGetToken(app, runner.email, runnerPassword))
       .body.access_token;
 
-    await request(app.getHttpServer())
-      .post('/users/pin')
-      .set(authHeader(clientToken))
-      .send({ pin: '123456' })
-      .expect(201);
-
     const { city, category } = await createCatalogFixture(prisma, 'orders-e2e');
     cityId = city.id;
     const product = await createProductFixture(
@@ -94,33 +88,33 @@ describe('Order Lifecycle (e2e)', () => {
 
     productId = product.id;
 
-    const createResponse = await request(app.getHttpServer())
-      .post('/orders')
-      .set(authHeader(clientToken))
-      .send({
-        pin: '123456',
+    const createdOrder = await prisma.order.create({
+      data: {
+        totalPrice: 20.0,
+        checkoutIdempotencyKey: 'orders-e2e-idempotency-key',
         deliveryAddress: '123 E2E Street',
-        items: [{ productId, quantity: 2 }],
-      });
-
-    expect(createResponse.status).toBe(201);
-    expect(createResponse.headers.deprecation).toBe('true');
-    expect(createResponse.headers.warning).toContain(
-      'Legacy single-provider order creation endpoint',
-    );
-    expect(createResponse.body.id).toBeDefined();
-    expect(createResponse.body.status).toBe(DeliveryStatus.PENDING);
-    createdOrderId = createResponse.body.id;
-
-    await prisma.order.update({
-      where: { id: createdOrderId },
-      data: { status: DeliveryStatus.CONFIRMED },
-    });
-    const orderWithPO = await prisma.order.findUnique({
-      where: { id: createdOrderId },
+        status: DeliveryStatus.CONFIRMED,
+        clientId: client.id,
+        cityId,
+        providerOrders: {
+          create: {
+            providerId,
+            subtotalAmount: 20.0,
+            items: {
+              create: {
+                productId,
+                quantity: 2,
+                priceAtPurchase: 10.0,
+              },
+            },
+          },
+        },
+      },
       include: { providerOrders: true },
     });
-    providerOrderId = orderWithPO!.providerOrders[0].id;
+
+    createdOrderId = createdOrder.id;
+    providerOrderId = createdOrder.providerOrders[0].id;
 
     const providerView = await request(app.getHttpServer())
       .get(`/orders/${createdOrderId}`)
