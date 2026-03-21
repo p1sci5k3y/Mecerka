@@ -12,6 +12,7 @@ import {
 import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PaymentsService } from '../payments/payments.service';
+import { StripeWebhookService } from '../payments/stripe-webhook.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { assertTestEnvironment } from '../../test/test-env';
@@ -29,6 +30,7 @@ describe('OrdersService - Provider Payment Domain', () => {
       providers: [
         OrdersService,
         PaymentsService,
+        StripeWebhookService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
