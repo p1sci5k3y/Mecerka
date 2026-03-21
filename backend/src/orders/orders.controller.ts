@@ -1,14 +1,17 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Body,
   UseGuards,
   Request,
   Param,
   ParseUUIDPipe,
+  Header,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -20,6 +23,20 @@ import type { RequestWithUser } from '../auth/interfaces/auth.interfaces';
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
+
+  @Post()
+  @Header('Deprecation', 'true')
+  @Header(
+    'Warning',
+    '299 - "Legacy single-provider order creation endpoint. Use /cart/items plus /cart/checkout for official marketplace checkout."',
+  )
+  @Roles(Role.CLIENT)
+  create(
+    @Body() createOrderDto: CreateOrderDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.ordersService.create(createOrderDto, req.user.userId);
+  }
 
   @Get('available')
   @Roles(Role.RUNNER)
