@@ -31,6 +31,7 @@ import type {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RiskService } from '../risk/risk.service';
 import { OrderItemsService } from './order-items.service';
+import { Money } from '../domain/value-objects';
 
 @Injectable()
 export class OrdersService {
@@ -103,10 +104,6 @@ export class OrdersService {
     return Number(value.toFixed(2));
   }
 
-  private roundMoney(value: number) {
-    return Number(value.toFixed(2));
-  }
-
   private calculateDistanceKm(
     lat1: number,
     lon1: number,
@@ -160,20 +157,21 @@ export class OrdersService {
       Math.max(...providerCoverage.map((coverage) => coverage.distanceKm), 0),
     );
     const additionalPickupCount = Math.max(providerCount - 1, 0);
-    const runnerBaseFee = this.roundMoney(Number(city.baseDeliveryFee ?? 3.5));
-    const runnerPerKmFee = this.roundMoney(
+    const runnerBaseFee = Money.of(Number(city.baseDeliveryFee ?? 3.5)).amount;
+    const runnerPerKmFee = Money.of(
       Number(city.deliveryPerKmFee ?? 0.9),
-    );
-    const runnerExtraPickupFee = this.roundMoney(
+    ).amount;
+    const runnerExtraPickupFee = Money.of(
       Number(city.extraPickupFee ?? 1.5),
-    );
-    const distanceFee = this.roundMoney(deliveryDistanceKm * runnerPerKmFee);
-    const extraPickupCharge = this.roundMoney(
-      additionalPickupCount * runnerExtraPickupFee,
-    );
-    const deliveryFee = this.roundMoney(
-      runnerBaseFee + distanceFee + extraPickupCharge,
-    );
+    ).amount;
+    const distanceFee =
+      Money.of(runnerPerKmFee).multiply(deliveryDistanceKm).amount;
+    const extraPickupCharge = Money.of(runnerExtraPickupFee).multiply(
+      additionalPickupCount,
+    ).amount;
+    const deliveryFee = Money.of(runnerBaseFee)
+      .add(Money.of(distanceFee))
+      .add(Money.of(extraPickupCharge)).amount;
 
     return {
       deliveryDistanceKm,
@@ -671,9 +669,10 @@ export class OrdersService {
     }
 
     const totalPrice = providerOrders.reduce(
-      (sum: number, provider: any) => sum + Number(provider.subtotalAmount),
-      0,
-    );
+      (acc: Money, provider: any) =>
+        acc.add(Money.of(Number(provider.subtotalAmount))),
+      Money.of(0),
+    ).amount;
 
     return { cart, checkoutCity, providerOrders, totalPrice };
   }
@@ -1087,14 +1086,14 @@ export class OrdersService {
     // 7. Group by Provider payload using aggregated items
     const providerGroups: Record<string, { items: any[]; subtotal: number }> =
       {};
-    let orderTotalPrice = 0;
+    let orderTotalMoney = Money.of(0);
 
     for (const item of aggregatedItems) {
       const product = products.find((p) => p.id === item.productId)!;
       const providerId = product.providerId;
-      const itemTotal = Number(product.price) * item.quantity;
+      const itemMoney = Money.of(Number(product.price)).multiply(item.quantity);
 
-      orderTotalPrice += itemTotal;
+      orderTotalMoney = orderTotalMoney.add(itemMoney);
 
       if (!providerGroups[providerId]) {
         providerGroups[providerId] = { items: [], subtotal: 0 };
@@ -1107,8 +1106,12 @@ export class OrdersService {
         unitBasePriceSnapshot: product.price,
         discountPriceSnapshot: null,
       });
-      providerGroups[providerId].subtotal += itemTotal;
+      providerGroups[providerId].subtotal = Money.of(
+        providerGroups[providerId].subtotal,
+      ).add(itemMoney).amount;
     }
+
+    const orderTotalPrice = orderTotalMoney.amount;
 
     if (Object.keys(providerGroups).length !== 1) {
       throw new BadRequestException(
@@ -1120,7 +1123,9 @@ export class OrdersService {
     const baseCityFee = 3.5; // Note: Fetch from config/DB map
     const multiStopPenalty = 1.5;
     const providerCount = Object.keys(providerGroups).length;
-    const deliveryFee = baseCityFee + (providerCount - 1) * multiStopPenalty;
+    const deliveryFee = Money.of(baseCityFee).add(
+      Money.of(multiStopPenalty).multiply(providerCount - 1),
+    ).amount;
 
     // 6. Create Order and ProviderOrders (NO STOCK LOCK YET)
     const order = await this.prisma.order.create({
@@ -1427,7 +1432,9 @@ export class OrdersService {
           });
         }
         const stat = productStats.get(item.productId)!;
-        stat.revenue += Number(item.priceAtPurchase) * item.quantity;
+        stat.revenue = Money.of(stat.revenue).add(
+          Money.of(Number(item.priceAtPurchase)).multiply(item.quantity),
+        ).amount;
         stat.quantity += item.quantity;
       });
     });
