@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { OrderQueryService } from './order-query.service';
 import { OrderItemsService } from './order-items.service';
 import { OrderStatusService } from './order-status.service';
 import { OrdersController } from './orders.controller';
@@ -14,6 +15,7 @@ import { PrismaOrderRepository } from './repositories/prisma-order.repository';
   controllers: [OrdersController],
   providers: [
     OrdersService,
+    OrderQueryService,
     OrderItemsService,
     OrderStatusService,
     { provide: IOrderRepository, useClass: PrismaOrderRepository },

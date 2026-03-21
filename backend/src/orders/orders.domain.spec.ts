@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { OrderQueryService } from './order-query.service';
 import { OrderItemsService } from './order-items.service';
 import { OrderStatusService } from './order-status.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -51,6 +52,18 @@ describe('OrdersService - Provider Payment Domain', () => {
         },
         PrismaOrderRepository,
         { provide: IOrderRepository, useClass: PrismaOrderRepository },
+        {
+          provide: OrderQueryService,
+          useValue: {
+            getOrderTracking: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            getAvailableOrders: jest.fn(),
+            getProviderTopProducts: jest.fn(),
+            getProviderStats: jest.fn(),
+            getProviderSalesChart: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
