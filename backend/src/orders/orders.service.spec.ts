@@ -29,6 +29,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     prismaMock = {
       order: {
         findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
@@ -43,6 +44,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       },
       stockReservation: {
         findMany: jest.fn(),
+        createMany: jest.fn(),
       },
       product: {
         findMany: jest.fn(),
@@ -376,6 +378,14 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         ],
       });
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
           $executeRaw: jest.fn(),
@@ -386,16 +396,6 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
-          },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
-              },
-            ]),
           },
           order: {
             create: jest.fn().mockRejectedValue({ code: 'P2002' }),
@@ -541,13 +541,27 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         ],
       });
-      const transactionReservationCreateMany = jest
-        .fn()
-        .mockResolvedValue({ count: 2 });
       const transactionSummaryCreate = jest.fn().mockResolvedValue({
         id: 'summary-1',
       });
 
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+        {
+          id: 'provider-2',
+          latitude: 40.418,
+          longitude: -3.705,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
+      prismaMock.order.findUniqueOrThrow.mockImplementation(
+        transactionFindUniqueOrThrow,
+      );
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
           $executeRaw: jest.fn(),
@@ -557,29 +571,11 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               { id: 'product-2', stock: 5 },
             ]),
           },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
-              },
-              {
-                id: 'provider-2',
-                latitude: 40.418,
-                longitude: -3.705,
-                providerServiceRadiusKm: 8,
-              },
-            ]),
-          },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
-            createMany: transactionReservationCreateMany,
           },
           order: {
             create: transactionOrderCreate,
-            findUniqueOrThrow: transactionFindUniqueOrThrow,
           },
           orderSummaryDocument: {
             create: transactionSummaryCreate,
@@ -752,6 +748,40 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         ],
       });
 
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        id: 'ord-single',
+        deliveryFee: 3.53,
+        deliveryDistanceKm: 0.03,
+        runnerBaseFee: 3.5,
+        runnerPerKmFee: 0.9,
+        runnerExtraPickupFee: 1.5,
+        providerOrders: [
+          {
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.03,
+            coverageLimitKm: 6,
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [
+              {
+                productId: 'product-1',
+                quantity: 1,
+                priceAtPurchase: 25,
+              },
+            ],
+          },
+        ],
+      });
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
           $executeRaw: jest.fn(),
@@ -760,50 +790,11 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               .fn()
               .mockResolvedValue([{ id: 'product-1', stock: 5 }]),
           },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
-              },
-            ]),
-          },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
-            createMany: jest.fn().mockResolvedValue({ count: 1 }),
           },
           order: {
             create: transactionOrderCreate,
-            findUniqueOrThrow: jest.fn().mockResolvedValue({
-              id: 'ord-single',
-              deliveryFee: 3.53,
-              deliveryDistanceKm: 0.03,
-              runnerBaseFee: 3.5,
-              runnerPerKmFee: 0.9,
-              runnerExtraPickupFee: 1.5,
-              providerOrders: [
-                {
-                  id: 'po-1',
-                  providerId: 'provider-1',
-                  subtotalAmount: 25,
-                  paymentStatus: 'PENDING',
-                  deliveryDistanceKm: 0.03,
-                  coverageLimitKm: 6,
-                  reservations: [
-                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
-                  ],
-                  items: [
-                    {
-                      productId: 'product-1',
-                      quantity: 1,
-                      priceAtPurchase: 25,
-                    },
-                  ],
-                },
-              ],
-            }),
           },
           orderSummaryDocument: {
             create: jest.fn().mockResolvedValue({ id: 'summary-1' }),
@@ -866,6 +857,54 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         ],
       });
 
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+        {
+          id: 'provider-2',
+          latitude: 40.4205,
+          longitude: -3.711,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        id: 'ord-pricing',
+        deliveryFee: 3.8,
+        deliveryDistanceKm: 0.55,
+        runnerBaseFee: 2,
+        runnerPerKmFee: 1,
+        runnerExtraPickupFee: 1.25,
+        providerOrders: [
+          {
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 10,
+            paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.03,
+            coverageLimitKm: 6,
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [
+              { productId: 'product-1', quantity: 1, priceAtPurchase: 10 },
+            ],
+          },
+          {
+            id: 'po-2',
+            providerId: 'provider-2',
+            subtotalAmount: 12,
+            paymentStatus: 'PENDING',
+            deliveryDistanceKm: 0.55,
+            coverageLimitKm: 6,
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+            items: [
+              { productId: 'product-2', quantity: 1, priceAtPurchase: 12 },
+            ],
+          },
+        ],
+      });
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
           $executeRaw: jest.fn(),
@@ -875,74 +914,11 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               { id: 'product-2', stock: 5 },
             ]),
           },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
-              },
-              {
-                id: 'provider-2',
-                latitude: 40.4205,
-                longitude: -3.711,
-                providerServiceRadiusKm: 8,
-              },
-            ]),
-          },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
-            createMany: jest.fn().mockResolvedValue({ count: 2 }),
           },
           order: {
             create: jest.fn().mockResolvedValue({
-              id: 'ord-pricing',
-              deliveryFee: 3.8,
-              deliveryDistanceKm: 0.55,
-              runnerBaseFee: 2,
-              runnerPerKmFee: 1,
-              runnerExtraPickupFee: 1.25,
-              providerOrders: [
-                {
-                  id: 'po-1',
-                  providerId: 'provider-1',
-                  subtotalAmount: 10,
-                  paymentStatus: 'PENDING',
-                  deliveryDistanceKm: 0.03,
-                  coverageLimitKm: 6,
-                  reservations: [
-                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
-                  ],
-                  items: [
-                    {
-                      productId: 'product-1',
-                      quantity: 1,
-                      priceAtPurchase: 10,
-                    },
-                  ],
-                },
-                {
-                  id: 'po-2',
-                  providerId: 'provider-2',
-                  subtotalAmount: 12,
-                  paymentStatus: 'PENDING',
-                  deliveryDistanceKm: 0.55,
-                  coverageLimitKm: 6,
-                  reservations: [
-                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
-                  ],
-                  items: [
-                    {
-                      productId: 'product-2',
-                      quantity: 1,
-                      priceAtPurchase: 12,
-                    },
-                  ],
-                },
-              ],
-            }),
-            findUniqueOrThrow: jest.fn().mockResolvedValue({
               id: 'ord-pricing',
               deliveryFee: 3.8,
               deliveryDistanceKm: 0.55,
@@ -1041,6 +1017,14 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         ],
       });
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
           $executeRaw: jest.fn(),
@@ -1054,16 +1038,6 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               {
                 productId: 'product-1',
                 _sum: { quantity: 1 },
-              },
-            ]),
-          },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
               },
             ]),
           },
@@ -1115,6 +1089,35 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         ],
       });
 
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.417,
+          longitude: -3.704,
+          providerServiceRadiusKm: 8,
+        },
+      ]);
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        id: 'ord-new',
+        clientId: 'client-1',
+        summaryDocument: {
+          id: 'summary-1',
+          orderId: 'ord-new',
+          displayNumber: 'SUM-ORD-NEW',
+          totalAmount: 30,
+          currency: 'EUR',
+        },
+        providerOrders: [
+          {
+            id: 'po-1',
+            items: [
+              { productId: 'product-b', quantity: 1, priceAtPurchase: 10 },
+              { productId: 'product-a', quantity: 1, priceAtPurchase: 20 },
+            ],
+            reservations: [{ expiresAt: new Date('2026-03-15T12:15:00.000Z') }],
+          },
+        ],
+      });
       const executeRaw = jest.fn();
       prismaMock.$transaction.mockImplementation(async (callback: any) =>
         callback({
@@ -1125,19 +1128,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
               { id: 'product-b', stock: 5 },
             ]),
           },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.417,
-                longitude: -3.704,
-                providerServiceRadiusKm: 8,
-              },
-            ]),
-          },
           stockReservation: {
             groupBy: jest.fn().mockResolvedValue([]),
-            createMany: jest.fn().mockResolvedValue({ count: 2 }),
           },
           order: {
             create: jest.fn().mockResolvedValue({
@@ -1156,37 +1148,6 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
                       quantity: 1,
                       priceAtPurchase: 20,
                     },
-                  ],
-                },
-              ],
-            }),
-            findUniqueOrThrow: jest.fn().mockResolvedValue({
-              id: 'ord-new',
-              clientId: 'client-1',
-              summaryDocument: {
-                id: 'summary-1',
-                orderId: 'ord-new',
-                displayNumber: 'SUM-ORD-NEW',
-                totalAmount: 30,
-                currency: 'EUR',
-              },
-              providerOrders: [
-                {
-                  id: 'po-1',
-                  items: [
-                    {
-                      productId: 'product-b',
-                      quantity: 1,
-                      priceAtPurchase: 10,
-                    },
-                    {
-                      productId: 'product-a',
-                      quantity: 1,
-                      priceAtPurchase: 20,
-                    },
-                  ],
-                  reservations: [
-                    { expiresAt: new Date('2026-03-15T12:15:00.000Z') },
                   ],
                 },
               ],
@@ -1278,29 +1239,14 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         ],
       });
-      prismaMock.$transaction.mockImplementation(async (callback: any) =>
-        callback({
-          $executeRaw: jest.fn(),
-          product: {
-            findMany: jest
-              .fn()
-              .mockResolvedValue([{ id: 'product-1', stock: 5 }]),
-          },
-          stockReservation: {
-            groupBy: jest.fn().mockResolvedValue([]),
-          },
-          user: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                id: 'provider-1',
-                latitude: 40.5001,
-                longitude: -3.8,
-                providerServiceRadiusKm: 6,
-              },
-            ]),
-          },
-        }),
-      );
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: 'provider-1',
+          latitude: 40.5001,
+          longitude: -3.8,
+          providerServiceRadiusKm: 6,
+        },
+      ]);
 
       await expect(
         service.checkoutFromCart(

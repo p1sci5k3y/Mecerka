@@ -564,175 +564,25 @@ export class OrdersService {
       return this.toReservationAwareOrder(existingOrder);
     }
 
-    const latestCart = await this.prisma.cartGroup.findFirst({
-      where: {
-        clientId,
-      },
-      include: {
-        city: {
-          select: {
-            id: true,
-            name: true,
-            active: true,
-            maxDeliveryRadiusKm: true,
-            baseDeliveryFee: true,
-            deliveryPerKmFee: true,
-            extraPickupFee: true,
-          },
-        },
-        providers: {
-          include: {
-            items: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    const { checkoutCity, providerOrders, totalPrice } =
-      this.validateCartForCheckout(latestCart, dto);
-
-    const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-    const geocodedAddress = await this.geocodeCheckoutAddress(
-      checkoutCity.name,
-      dto,
-    );
-
     try {
-      return await this.prisma.$transaction(async (tx: any) => {
-        const requestedItems = providerOrders.flatMap(
-          (provider) => provider.items,
-        );
-        const productIds = [
-          ...new Set(requestedItems.map((item) => item.productId)),
-        ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-
-        if (productIds.length === 0) {
-          throw new BadRequestException('Active cart has no items to checkout');
-        }
-
-        // Keep checkout and payment confirmation on the same deterministic lock order.
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
-            productIds.map((id) => Prisma.sql`${id}::uuid`),
-          )}) FOR UPDATE`,
-        );
-
-        const products = await tx.product.findMany({
-          where: {
-            id: {
-              in: productIds,
-            },
-          },
-          select: {
-            id: true,
-            stock: true,
-          },
-        });
-        const reservations = await tx.stockReservation.groupBy({
-          by: ['productId'],
-          where: {
-            productId: {
-              in: productIds,
-            },
-            status: 'ACTIVE',
-            expiresAt: {
-              gt: new Date(),
-            },
-          },
-          _sum: {
-            quantity: true,
-          },
-        });
-
-        const productStock = new Map(
-          products.map((product: any) => [product.id, Number(product.stock)]),
-        );
-        const reservedStock = new Map(
-          reservations.map((reservation: any) => [
-            reservation.productId,
-            reservation._sum.quantity ?? 0,
-          ]),
-        );
-
-        for (const item of requestedItems) {
-          const currentStock = Number(
-            productStock.get(item.productId) ?? Number.NaN,
-          );
-          if (Number.isNaN(currentStock)) {
-            throw new ConflictException('STOCK_UNAVAILABLE');
-          }
-          const availableStock =
-            currentStock - Number(reservedStock.get(item.productId) ?? 0);
-
-          if (availableStock < item.quantity) {
-            throw new ConflictException('STOCK_UNAVAILABLE');
-          }
-        }
-
-        const { providerCoverageMap, deliveryPricing } =
-          await this.resolveDeliveryAddresses(
-            providerOrders,
-            geocodedAddress,
-            dto,
-            checkoutCity,
-            tx,
-          );
-
-        const order = await this.createOrderWithSuborders(
-          tx,
-          latestCart,
-          geocodedAddress,
-          providerCoverageMap,
-          deliveryPricing,
-          providerOrders,
-          clientId,
-          totalPrice,
-          normalizedKey,
-          dto,
-        );
-
-        await this.reserveStockForOrder(
-          tx,
-          order,
-          latestCart,
-          reservationExpiresAt,
-        );
-
-        const orderWithReservations = await tx.order.findUniqueOrThrow({
-          where: { id: order.id },
-          include: {
-            summaryDocument: true,
-            providerOrders: {
-              include: {
-                items: true,
-                reservations: {
-                  where: { status: 'ACTIVE' },
-                  select: {
-                    expiresAt: true,
-                  },
-                },
-              },
-            },
-          },
-        });
-
-        const reservationAwareOrder = this.toReservationAwareOrder(
-          orderWithReservations,
-        );
-
-        this.logStructuredEvent(
-          'order.created',
-          {
-            orderId: reservationAwareOrder.id,
-          },
-          'Aggregated order created from cart checkout',
-        );
-
-        return reservationAwareOrder;
-      });
+      const { cart, providerOrders, checkoutCity, totalPrice } =
+        await this.validateCartForCheckout(clientId, dto);
+      const addresses = await this.resolveDeliveryAddresses(
+        providerOrders,
+        dto,
+        checkoutCity,
+      );
+      const order = await this.createOrderWithSuborders(
+        clientId,
+        dto,
+        cart,
+        providerOrders,
+        addresses,
+        totalPrice,
+        normalizedKey,
+      );
+      await this.reserveStockForOrder(order);
+      return this.initiatePaymentSession(order, clientId);
     } catch (error: any) {
       if (error?.code === 'P2002') {
         const duplicatedOrder = await (this.prisma.order as any).findUnique({
@@ -770,10 +620,42 @@ export class OrdersService {
     }
   }
 
-  private validateCartForCheckout(
-    cart: any,
+  private async validateCartForCheckout(
+    clientId: string,
     dto: CheckoutCartDto,
-  ): { checkoutCity: any; providerOrders: any[]; totalPrice: number } {
+  ): Promise<{
+    cart: any;
+    checkoutCity: any;
+    providerOrders: any[];
+    totalPrice: number;
+  }> {
+    const cart = await this.prisma.cartGroup.findFirst({
+      where: {
+        clientId,
+      },
+      include: {
+        city: {
+          select: {
+            id: true,
+            name: true,
+            active: true,
+            maxDeliveryRadiusKm: true,
+            baseDeliveryFee: true,
+            deliveryPerKmFee: true,
+            extraPickupFee: true,
+          },
+        },
+        providers: {
+          include: {
+            items: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
     if (!cart) {
       throw new BadRequestException('Active cart is empty');
     }
@@ -821,21 +703,15 @@ export class OrdersService {
       0,
     );
 
-    return { checkoutCity, providerOrders, totalPrice };
+    return { cart, checkoutCity, providerOrders, totalPrice };
   }
 
   private async resolveDeliveryAddresses(
     providerOrders: any[],
-    geocodedAddress: GeocodedAddress,
     dto: CheckoutCartDto,
     checkoutCity: any,
-    tx: any,
   ): Promise<{
-    providerCoverage: Array<{
-      providerId: string;
-      distanceKm: number;
-      coverageLimitKm: number;
-    }>;
+    geocodedAddress: GeocodedAddress;
     providerCoverageMap: Map<
       string,
       { providerId: string; distanceKm: number; coverageLimitKm: number }
@@ -844,8 +720,13 @@ export class OrdersService {
       typeof OrdersService.prototype.buildDeliveryPricingSnapshot
     >;
   }> {
+    const geocodedAddress = await this.geocodeCheckoutAddress(
+      checkoutCity.name,
+      dto,
+    );
+
     const providerIds = providerOrders.map((provider) => provider.providerId);
-    const providerUsers = (await tx.user.findMany({
+    const providerUsers = (await this.prisma.user.findMany({
       where: {
         id: {
           in: providerIds,
@@ -917,100 +798,178 @@ export class OrdersService {
       checkoutCity,
     );
 
-    return { providerCoverage, providerCoverageMap, deliveryPricing };
+    return { geocodedAddress, providerCoverageMap, deliveryPricing };
   }
 
   private async createOrderWithSuborders(
-    tx: any,
-    latestCart: any,
-    geocodedAddress: GeocodedAddress,
-    providerCoverageMap: Map<
-      string,
-      { distanceKm: number; coverageLimitKm: number }
-    >,
-    deliveryPricing: {
-      deliveryFee: number;
-      deliveryDistanceKm: number;
-      runnerBaseFee: number;
-      runnerPerKmFee: number;
-      runnerExtraPickupFee: number;
-    },
-    providerOrders: any[],
     clientId: string,
+    dto: CheckoutCartDto,
+    cart: any,
+    providerOrders: any[],
+    addresses: {
+      geocodedAddress: GeocodedAddress;
+      providerCoverageMap: Map<
+        string,
+        { providerId: string; distanceKm: number; coverageLimitKm: number }
+      >;
+      deliveryPricing: ReturnType<
+        typeof OrdersService.prototype.buildDeliveryPricingSnapshot
+      >;
+    },
     totalPrice: number,
     normalizedKey: string,
-    dto: CheckoutCartDto,
   ): Promise<any> {
-    const order = await tx.order.create({
-      data: {
-        clientId,
-        cityId: latestCart.cityId,
-        totalPrice,
-        deliveryFee: deliveryPricing.deliveryFee,
-        deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
-        status: DeliveryStatus.PENDING,
-        checkoutIdempotencyKey: normalizedKey,
-        deliveryAddress: dto.deliveryAddress,
-        postalCode: dto.postalCode,
-        addressReference: dto.addressReference ?? null,
-        deliveryLat: geocodedAddress.latitude,
-        deliveryLng: geocodedAddress.longitude,
-        discoveryRadiusKm: dto.discoveryRadiusKm,
-        runnerBaseFee: deliveryPricing.runnerBaseFee,
-        runnerPerKmFee: deliveryPricing.runnerPerKmFee,
-        runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
-        providerOrders: {
-          create: providerOrders.map((provider) => {
-            const coverage = providerCoverageMap.get(provider.providerId);
+    const { geocodedAddress, providerCoverageMap, deliveryPricing } = addresses;
 
-            return {
-              providerId: provider.providerId,
-              status: ProviderOrderStatus.PENDING,
-              subtotalAmount: provider.subtotalAmount,
-              paymentStatus: 'PENDING',
-              deliveryDistanceKm: coverage?.distanceKm,
-              coverageLimitKm: coverage?.coverageLimitKm,
-              items: {
-                create: provider.items.map((item: any) => ({
-                  productId: item.productId,
-                  quantity: item.quantity,
-                  priceAtPurchase: item.effectiveUnitPriceSnapshot,
-                  unitBasePriceSnapshot: item.unitPriceSnapshot,
-                  discountPriceSnapshot: item.discountPriceSnapshot,
-                })),
-              },
-            };
-          }),
-        },
-      },
-      include: {
-        providerOrders: {
-          include: {
-            items: true,
+    return this.prisma.$transaction(async (tx: any) => {
+      const requestedItems = providerOrders.flatMap(
+        (provider) => provider.items,
+      );
+      const productIds = [
+        ...new Set(requestedItems.map((item) => item.productId)),
+      ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+      if (productIds.length === 0) {
+        throw new BadRequestException('Active cart has no items to checkout');
+      }
+
+      // Keep checkout and payment confirmation on the same deterministic lock order.
+      await tx.$executeRaw(
+        Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
+          productIds.map((id) => Prisma.sql`${id}::uuid`),
+        )}) FOR UPDATE`,
+      );
+
+      const products = await tx.product.findMany({
+        where: {
+          id: {
+            in: productIds,
           },
         },
-      },
-    });
+        select: {
+          id: true,
+          stock: true,
+        },
+      });
+      const reservations = await tx.stockReservation.groupBy({
+        by: ['productId'],
+        where: {
+          productId: {
+            in: productIds,
+          },
+          status: 'ACTIVE',
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+        _sum: {
+          quantity: true,
+        },
+      });
 
-    await tx.orderSummaryDocument.create({
-      data: {
-        orderId: order.id,
-        displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
-        totalAmount: totalPrice,
-        currency: 'EUR',
-      },
-    });
+      const productStock = new Map(
+        products.map((product: any) => [product.id, Number(product.stock)]),
+      );
+      const reservedStock = new Map(
+        reservations.map((reservation: any) => [
+          reservation.productId,
+          reservation._sum.quantity ?? 0,
+        ]),
+      );
 
-    return order;
+      for (const item of requestedItems) {
+        const currentStock = Number(
+          productStock.get(item.productId) ?? Number.NaN,
+        );
+        if (Number.isNaN(currentStock)) {
+          throw new ConflictException('STOCK_UNAVAILABLE');
+        }
+        const availableStock =
+          currentStock - Number(reservedStock.get(item.productId) ?? 0);
+
+        if (availableStock < item.quantity) {
+          throw new ConflictException('STOCK_UNAVAILABLE');
+        }
+      }
+
+      const order = await tx.order.create({
+        data: {
+          clientId,
+          cityId: cart.cityId,
+          totalPrice,
+          deliveryFee: deliveryPricing.deliveryFee,
+          deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
+          status: DeliveryStatus.PENDING,
+          checkoutIdempotencyKey: normalizedKey,
+          deliveryAddress: dto.deliveryAddress,
+          postalCode: dto.postalCode,
+          addressReference: dto.addressReference ?? null,
+          deliveryLat: geocodedAddress.latitude,
+          deliveryLng: geocodedAddress.longitude,
+          discoveryRadiusKm: dto.discoveryRadiusKm,
+          runnerBaseFee: deliveryPricing.runnerBaseFee,
+          runnerPerKmFee: deliveryPricing.runnerPerKmFee,
+          runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
+          providerOrders: {
+            create: providerOrders.map((provider) => {
+              const coverage = providerCoverageMap.get(provider.providerId);
+
+              return {
+                providerId: provider.providerId,
+                status: ProviderOrderStatus.PENDING,
+                subtotalAmount: provider.subtotalAmount,
+                paymentStatus: 'PENDING',
+                deliveryDistanceKm: coverage?.distanceKm,
+                coverageLimitKm: coverage?.coverageLimitKm,
+                items: {
+                  create: provider.items.map((item: any) => ({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    priceAtPurchase: item.effectiveUnitPriceSnapshot,
+                    unitBasePriceSnapshot: item.unitPriceSnapshot,
+                    discountPriceSnapshot: item.discountPriceSnapshot,
+                  })),
+                },
+              };
+            }),
+          },
+        },
+        include: {
+          providerOrders: {
+            include: {
+              items: true,
+            },
+          },
+        },
+      });
+
+      await tx.orderSummaryDocument.create({
+        data: {
+          orderId: order.id,
+          displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
+          totalAmount: totalPrice,
+          currency: 'EUR',
+        },
+      });
+
+      await tx.cartGroup.update({
+        where: { id: cart.id },
+        data: {
+          status: 'CHECKED_OUT',
+          version: {
+            increment: 1,
+          },
+        },
+      });
+
+      return order;
+    });
   }
 
-  private async reserveStockForOrder(
-    tx: any,
-    order: any,
-    latestCart: any,
-    reservationExpiresAt: Date,
-  ): Promise<void> {
-    await tx.stockReservation.createMany({
+  private async reserveStockForOrder(order: any): Promise<void> {
+    const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.prisma.stockReservation.createMany({
       data: order.providerOrders.flatMap((providerOrder: any) =>
         providerOrder.items.map((item: any) => ({
           providerOrderId: providerOrder.id,
@@ -1021,16 +980,45 @@ export class OrdersService {
         })),
       ),
     });
+  }
 
-    await tx.cartGroup.update({
-      where: { id: latestCart.id },
-      data: {
-        status: 'CHECKED_OUT',
-        version: {
-          increment: 1,
+  private async initiatePaymentSession(
+    order: any,
+    _clientId: string,
+  ): Promise<any> {
+    const orderWithReservations = await (
+      this.prisma.order as any
+    ).findUniqueOrThrow({
+      where: { id: order.id },
+      include: {
+        summaryDocument: true,
+        providerOrders: {
+          include: {
+            items: true,
+            reservations: {
+              where: { status: 'ACTIVE' },
+              select: {
+                expiresAt: true,
+              },
+            },
+          },
         },
       },
     });
+
+    const reservationAwareOrder = this.toReservationAwareOrder(
+      orderWithReservations,
+    );
+
+    this.logStructuredEvent(
+      'order.created',
+      {
+        orderId: reservationAwareOrder.id,
+      },
+      'Aggregated order created from cart checkout',
+    );
+
+    return reservationAwareOrder;
   }
 
   async create(createOrderDto: CreateOrderDto, clientId: string) {
