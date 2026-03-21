@@ -13,6 +13,7 @@ import { OrderStatusService } from './order-status.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { IOrderRepository } from './repositories/order.repository.interface';
 import {
   Role,
   DeliveryStatus,
@@ -30,6 +31,7 @@ import type {
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RiskService } from '../risk/risk.service';
 import { OrderItemsService } from './order-items.service';
+import { canTransitionOrder } from './utils/state-machine';
 
 @Injectable()
 export class OrdersService {
@@ -42,6 +44,8 @@ export class OrdersService {
     private readonly geocodingService: GeocodingPort,
     private readonly orderItemsService: OrderItemsService,
     private readonly orderStatusService: OrderStatusService,
+    @Inject(IOrderRepository)
+    private readonly orderRepository: IOrderRepository,
     @Optional() private readonly riskService?: RiskService,
   ) {}
 
@@ -1368,7 +1372,65 @@ export class OrdersService {
   }
 
   async acceptOrder(id: string, runnerId: string) {
-    return this.orderStatusService.acceptOrder(id, runnerId);
+    const runner = await this.prisma.user.findUnique({
+      where: { id: runnerId },
+      select: {
+        stripeAccountId: true,
+        runnerProfile: { select: { isActive: true } },
+      },
+    });
+
+    if (!runner?.runnerProfile?.isActive) {
+      throw new ForbiddenException(
+        'Tu perfil de runner no esta activo para aceptar pedidos.',
+      );
+    }
+
+    if (!runner.stripeAccountId) {
+      throw new ForbiddenException(
+        'Debes completar tu registro financiero en Stripe antes de aceptar pedidos.',
+      );
+    }
+
+    const order = await this.orderRepository.findById(id);
+    if (!order) throw new NotFoundException('Order not found');
+    if (!canTransitionOrder(order.status, DeliveryStatus.ASSIGNED)) {
+      throw new BadRequestException('Order cannot transition to ASSIGNED');
+    }
+
+    const result = await this.prisma.order.updateMany({
+      where: {
+        id,
+        status: DeliveryStatus.READY_FOR_ASSIGNMENT,
+        runnerId: null,
+        clientId: { not: runnerId },
+      },
+      data: {
+        runnerId,
+        status: DeliveryStatus.ASSIGNED,
+      },
+    });
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Order is already accepted, cannot be assigned, or you are trying to deliver your own order',
+      );
+    }
+
+    this.eventEmitter.emit('order.stateChanged', {
+      orderId: id,
+      status: DeliveryStatus.ASSIGNED,
+    });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+        runnerId,
+      },
+      'Order assigned to runner',
+    );
+
+    return this.prisma.order.findUnique({ where: { id } });
   }
 
   async completeOrder(id: string, runnerId: string) {
@@ -1376,7 +1438,65 @@ export class OrdersService {
   }
 
   async markInTransit(id: string, runnerId: string) {
-    return this.orderStatusService.markInTransit(id, runnerId);
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { providerOrders: true },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.runnerId !== runnerId) {
+      throw new ForbiddenException(
+        'You are not the assigned runner for this order',
+      );
+    }
+
+    if (
+      !canTransitionOrder(order.status, DeliveryStatus.IN_TRANSIT) ||
+      order.status !== DeliveryStatus.ASSIGNED
+    ) {
+      throw new ConflictException(
+        'Order must be in ASSIGNED state to mark as IN_TRANSIT',
+      );
+    }
+
+    const activeProviderOrders = order.providerOrders.filter(
+      (po) =>
+        po.status !== ProviderOrderStatus.REJECTED_BY_STORE &&
+        po.status !== ProviderOrderStatus.CANCELLED,
+    );
+    const allPickedUp =
+      activeProviderOrders.length > 0 &&
+      activeProviderOrders.every(
+        (po) => po.status === ProviderOrderStatus.PICKED_UP,
+      );
+
+    if (!allPickedUp) {
+      throw new ConflictException(
+        'All active provider orders must be PICKED_UP before marking IN_TRANSIT',
+      );
+    }
+
+    const updated = await this.orderRepository.update(id, {
+      status: DeliveryStatus.IN_TRANSIT,
+    });
+
+    this.eventEmitter.emit('order.stateChanged', {
+      orderId: id,
+      newStatus: updated.status,
+      actorRole: Role.RUNNER,
+      timestamp: new Date().toISOString(),
+    });
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId: id,
+        runnerId,
+      },
+      'Order marked as in transit',
+    );
+
+    return updated;
   }
 
   async cancelOrder(id: string, userId: string, roles: Role[]) {

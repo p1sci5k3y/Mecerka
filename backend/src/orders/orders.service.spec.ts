@@ -5,6 +5,7 @@ import { OrderStatusService } from './order-status.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
+import { IOrderRepository } from './repositories/order.repository.interface';
 import {
   DeliveryStatus,
   PaymentSessionStatus,
@@ -19,6 +20,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let prismaMock: any;
   let eventEmitterMock: any;
   let geocodingServiceMock: any;
+  let orderRepositoryMock: any;
   const validCheckoutDto = {
     cityId: 'city-1',
     deliveryAddress: 'Calle Mayor 1',
@@ -76,6 +78,10 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         formattedAddress: 'Calle Mayor 1, 28013 Madrid, Spain',
       }),
     };
+    orderRepositoryMock = {
+      findById: jest.fn(),
+      update: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -92,6 +98,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
             getProviderTopProducts: jest.fn(),
           },
         },
+        { provide: IOrderRepository, useValue: orderRepositoryMock },
       ],
     }).compile();
 
@@ -129,7 +136,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           { id: 'po-2', status: ProviderOrderStatus.REJECTED_BY_STORE }, // Ignore this one
         ],
       });
-      prismaMock.order.update.mockResolvedValue({
+      orderRepositoryMock.update.mockResolvedValue({
         id: 'ord-123',
         status: DeliveryStatus.IN_TRANSIT,
       });
@@ -137,9 +144,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       const result = await service.markInTransit('ord-123', 'runner-123');
 
       expect(result.status).toBe(DeliveryStatus.IN_TRANSIT);
-      expect(prismaMock.order.update).toHaveBeenCalledWith({
-        where: { id: 'ord-123' },
-        data: { status: DeliveryStatus.IN_TRANSIT },
+      expect(orderRepositoryMock.update).toHaveBeenCalledWith('ord-123', {
+        status: DeliveryStatus.IN_TRANSIT,
       });
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
