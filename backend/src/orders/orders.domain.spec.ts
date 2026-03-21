@@ -12,6 +12,7 @@ import {
 import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrderItemsService } from './order-items.service';
+import { OrderStatusService } from './order-status.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
@@ -30,6 +31,7 @@ describe('OrdersService - Provider Payment Domain', () => {
       providers: [
         OrdersService,
         OrderItemsService,
+        OrderStatusService,
         PaymentsService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
