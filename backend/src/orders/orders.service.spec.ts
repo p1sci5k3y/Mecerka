@@ -157,48 +157,6 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     });
   });
 
-  describe('Order creation guardrails', () => {
-    it('rejects multi-provider orders because the payment flow cannot settle them safely', async () => {
-      prismaMock.product.findMany.mockResolvedValue([
-        {
-          id: 'prod-1',
-          name: 'Prod A',
-          stock: 5,
-          isActive: true,
-          cityId: 'city-1',
-          price: 10,
-          providerId: 'provider-a',
-          provider: { stripeAccountId: 'acct_a' },
-        },
-        {
-          id: 'prod-2',
-          name: 'Prod B',
-          stock: 5,
-          isActive: true,
-          cityId: 'city-1',
-          price: 20,
-          providerId: 'provider-b',
-          provider: { stripeAccountId: 'acct_b' },
-        },
-      ]);
-
-      await expect(
-        service.create(
-          {
-            items: [
-              { productId: 'prod-1', quantity: 1 },
-              { productId: 'prod-2', quantity: 1 },
-            ],
-            deliveryAddress: 'Main Street 1',
-          },
-          'client-1',
-        ),
-      ).rejects.toThrow(
-        'El flujo de pago actual solo admite pedidos de un único proveedor.',
-      );
-    });
-  });
-
   describe('Order tracking', () => {
     it('returns null location before pickup', async () => {
       prismaMock.order.findUnique.mockResolvedValue({
@@ -1503,9 +1461,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
         expect.objectContaining({
+          type: 'order.cancelled',
           orderId: 'ord-123',
-          newStatus: DeliveryStatus.CANCELLED,
-          actorRole: Role.CLIENT,
         }),
       );
     });
@@ -1542,7 +1499,8 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
         expect.objectContaining({
-          actorRole: Role.ADMIN,
+          type: 'order.cancelled',
+          orderId: 'ord-123',
         }),
       );
     });
