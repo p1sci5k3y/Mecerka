@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
+import { OrderItemsService } from './order-items.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
@@ -28,6 +29,7 @@ describe('OrdersService - Provider Payment Domain', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        OrderItemsService,
         PaymentsService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
