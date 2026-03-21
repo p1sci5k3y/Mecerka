@@ -23,30 +23,19 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import * as argon2 from 'argon2';
-
-type PaymentConfirmationPayload = {
-  amount?: number | null;
-  amountReceived?: number | null;
-  currency?: string | null;
-  accountId?: string | null;
-  metadata?: Record<string, string | undefined> | null;
-};
+import {
+  StripeWebhookService,
+  PaymentConfirmationPayload,
+} from './stripe-webhook.service';
 
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private static readonly WEBHOOK_STATUS_RECEIVED = 'RECEIVED';
-  private static readonly WEBHOOK_STATUS_PROCESSED = 'PROCESSED';
-  private static readonly WEBHOOK_STATUS_IGNORED = 'IGNORED';
-  private static readonly WEBHOOK_STATUS_FAILED = 'FAILED';
   private static readonly DEFAULT_PROVIDER_ORDER_CURRENCY = 'eur';
   private static readonly DEMO_PROVIDER_PAYMENT_UNAVAILABLE_MESSAGE =
     'Este entorno demo no puede preparar pagos Stripe reales por comercio. El pedido y sus subpedidos siguen siendo válidos, pero el cobro requiere credenciales Stripe operativas.';
   private static readonly STALE_WEBHOOK_RECEIVED_MS = 5 * 60 * 1000;
-  private static readonly FINAL_WEBHOOK_STATUSES = new Set<string>([
-    PaymentsService.WEBHOOK_STATUS_PROCESSED,
-    PaymentsService.WEBHOOK_STATUS_IGNORED,
-  ]);
 
   private readonly stripe: Stripe;
 
@@ -54,6 +43,7 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
+    private readonly stripeWebhookService: StripeWebhookService,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
@@ -70,61 +60,7 @@ export class PaymentsService {
   }
 
   async isProcessed(eventId: string): Promise<boolean> {
-    const event = await (this.prisma as any).paymentWebhookEvent.findUnique({
-      where: { id: eventId },
-      select: { status: true },
-    });
-    return event
-      ? PaymentsService.FINAL_WEBHOOK_STATUSES.has(event.status ?? '')
-      : false;
-  }
-
-  private async claimWebhookEvent(
-    eventId: string,
-    provider: string,
-    eventType: string,
-  ) {
-    try {
-      await (this.prisma as any).paymentWebhookEvent.create({
-        data: {
-          id: eventId,
-          provider,
-          eventType,
-          status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
-        },
-      });
-      return true;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
-        const staleBefore = new Date(
-          Date.now() - PaymentsService.STALE_WEBHOOK_RECEIVED_MS,
-        );
-        const reclaimed = await (
-          this.prisma as any
-        ).paymentWebhookEvent.updateMany({
-          where: {
-            id: eventId,
-            OR: [
-              { status: PaymentsService.WEBHOOK_STATUS_FAILED },
-              {
-                status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
-                receivedAt: { lt: staleBefore },
-              },
-            ],
-          },
-          data: {
-            provider,
-            eventType,
-            status: PaymentsService.WEBHOOK_STATUS_RECEIVED,
-            receivedAt: new Date(),
-            processedAt: null,
-          },
-        });
-
-        return reclaimed.count === 1 ? true : false;
-      }
-      throw error;
-    }
+    return this.stripeWebhookService.isProcessed(eventId);
   }
 
   private buildAggregateProviderPaymentStatus(providerOrders: any[]) {
@@ -283,20 +219,6 @@ export class PaymentsService {
     };
   }
 
-  private async markWebhookEventStatus(
-    eventId: string,
-    status: string,
-    processedAt?: Date,
-  ) {
-    await (this.prisma as any).paymentWebhookEvent.update({
-      where: { id: eventId },
-      data: {
-        status,
-        ...(processedAt ? { processedAt } : {}),
-      },
-    });
-  }
-
   async upsertPaymentAccount(
     ownerType: PaymentAccountOwnerType,
     ownerId: string,
@@ -385,10 +307,6 @@ export class PaymentsService {
     return null;
   }
 
-  private normalizeCurrency(value?: string | null) {
-    return value?.trim().toLowerCase() ?? null;
-  }
-
   private buildProviderPaymentMetadata(
     orderId: string,
     providerOrderId: string,
@@ -436,75 +354,6 @@ export class PaymentsService {
       PaymentAccountProvider.STRIPE,
       user.stripeAccountId,
     );
-  }
-
-  private validateConfirmedProviderPayment(
-    providerOrder: any,
-    paymentSession: any,
-    expectedStripeAccountId: string,
-    confirmation?: PaymentConfirmationPayload,
-  ) {
-    if (!confirmation) {
-      throw new ConflictException(
-        'Payment confirmation payload is required for provider payment verification',
-      );
-    }
-
-    const expectedAmount = Math.round(
-      Number(providerOrder.subtotalAmount) * 100,
-    );
-    const paidAmount =
-      confirmation.amountReceived ?? confirmation.amount ?? Number.NaN;
-
-    if (!Number.isFinite(paidAmount) || paidAmount !== expectedAmount) {
-      throw new ConflictException(
-        'Payment amount does not match the expected provider order subtotal',
-      );
-    }
-
-    const paidCurrency = this.normalizeCurrency(confirmation.currency);
-    if (paidCurrency !== PaymentsService.DEFAULT_PROVIDER_ORDER_CURRENCY) {
-      throw new ConflictException(
-        'Payment currency does not match the expected provider order currency',
-      );
-    }
-
-    if (!confirmation.accountId) {
-      throw new ConflictException(
-        'Payment account is missing from the confirmed provider payment',
-      );
-    }
-
-    if (confirmation.accountId !== expectedStripeAccountId) {
-      throw new ConflictException(
-        'Payment account does not match the provider connected account',
-      );
-    }
-
-    const metadata = confirmation.metadata ?? {};
-    if (
-      !metadata.orderId ||
-      !metadata.providerOrderId ||
-      !metadata.providerPaymentSessionId
-    ) {
-      throw new ConflictException(
-        'Payment metadata is incomplete for provider payment verification',
-      );
-    }
-
-    if (metadata.orderId !== providerOrder.order.id) {
-      throw new ConflictException('Payment metadata orderId mismatch');
-    }
-
-    if (metadata.providerOrderId !== providerOrder.id) {
-      throw new ConflictException('Payment metadata providerOrderId mismatch');
-    }
-
-    if (metadata.providerPaymentSessionId !== paymentSession.id) {
-      throw new ConflictException(
-        'Payment metadata providerPaymentSessionId mismatch',
-      );
-    }
   }
 
   async prepareProviderOrderPayment(providerOrderId: string, clientId: string) {
@@ -1273,293 +1122,12 @@ export class PaymentsService {
     eventType: string,
     confirmation?: PaymentConfirmationPayload,
   ) {
-    const claimed = await this.claimWebhookEvent(eventId, 'STRIPE', eventType);
-    if (!claimed) {
-      return { message: 'Webhook already processed' };
-    }
-
-    try {
-      const result = await this.prisma.$transaction(async (tx: any) => {
-        const now = new Date();
-
-        const paymentSession = await tx.providerPaymentSession.findUnique({
-          where: { externalSessionId },
-          include: {
-            providerOrder: {
-              include: { items: true },
-            },
-          },
-        });
-
-        if (!paymentSession) {
-          throw new NotFoundException('Payment session not found');
-        }
-
-        if (
-          paymentSession.status === PaymentSessionStatus.EXPIRED ||
-          paymentSession.status === PaymentSessionStatus.FAILED
-        ) {
-          throw new ConflictException(
-            'Inactive payment session cannot be confirmed',
-          );
-        }
-
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
-        );
-
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "StockReservation" WHERE "providerOrderId" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
-        );
-
-        const providerOrder = await tx.providerOrder.findUnique({
-          where: { id: paymentSession.providerOrderId },
-          include: {
-            order: {
-              select: {
-                id: true,
-                status: true,
-              },
-            },
-            reservations: {
-              where: { status: 'ACTIVE' },
-              select: {
-                id: true,
-                productId: true,
-                quantity: true,
-                expiresAt: true,
-              },
-            },
-            items: true,
-          },
-        });
-
-        if (!providerOrder) {
-          throw new NotFoundException('ProviderOrder not found');
-        }
-
-        if (
-          providerOrder.paymentRef &&
-          providerOrder.paymentRef !== externalSessionId
-        ) {
-          throw new ConflictException(
-            'Superseded payment session cannot be confirmed',
-          );
-        }
-
-        if (paymentSession.status === PaymentSessionStatus.COMPLETED) {
-          return {
-            message: 'Provider payment session already completed',
-            status: providerOrder.status,
-          };
-        }
-
-        if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
-          return {
-            message: 'ProviderOrder already paid',
-            status: providerOrder.status,
-          };
-        }
-
-        if (providerOrder.reservations.length === 0) {
-          throw new ConflictException(
-            'ProviderOrder has no active reservations to consume',
-          );
-        }
-
-        const hasExpiredReservations = providerOrder.reservations.some(
-          (reservation: { expiresAt?: Date | null }) =>
-            reservation.expiresAt instanceof Date &&
-            reservation.expiresAt.getTime() <= now.getTime(),
-        );
-        if (hasExpiredReservations) {
-          this.logger.warn(
-            `Stripe webhook ${eventId} confirmed expired reservation for providerOrder ${providerOrder.id} and session ${externalSessionId}`,
-          );
-        }
-
-        const paymentAccount =
-          await this.resolveActiveStripePaymentAccountWithinClient(
-            tx,
-            PaymentAccountOwnerType.PROVIDER,
-            providerOrder.providerId,
-          );
-
-        if (!paymentAccount?.externalAccountId) {
-          throw new ConflictException(
-            'Provider payment account is not active for this provider order',
-          );
-        }
-
-        this.validateConfirmedProviderPayment(
-          providerOrder,
-          paymentSession,
-          paymentAccount.externalAccountId,
-          confirmation,
-        );
-
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "Order" WHERE "id" = ${providerOrder.order.id}::uuid FOR UPDATE`,
-        );
-
-        const productIds = [
-          ...new Set(
-            providerOrder.reservations.map(
-              (reservation: any) => reservation.productId,
-            ),
-          ),
-        ].sort();
-
-        await tx.$executeRaw(
-          Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
-            productIds.map((id) => Prisma.sql`${id}::uuid`),
-          )}) FOR UPDATE`,
-        );
-
-        const reservationIds = providerOrder.reservations.map(
-          (reservation: any) => reservation.id,
-        );
-
-        const consumedReservations = await tx.stockReservation.updateMany({
-          where: {
-            id: {
-              in: reservationIds,
-            },
-            providerOrderId: providerOrder.id,
-            status: 'ACTIVE',
-          },
-          data: {
-            status: 'CONSUMED',
-          },
-        });
-
-        if (consumedReservations.count !== reservationIds.length) {
-          throw new ConflictException(
-            'Reservations changed during payment confirmation',
-          );
-        }
-
-        for (const reservation of providerOrder.reservations) {
-          const updated = await tx.product.updateMany({
-            where: {
-              id: reservation.productId,
-              stock: { gte: reservation.quantity },
-            },
-            data: {
-              stock: { decrement: reservation.quantity },
-            },
-          });
-
-          if (updated.count !== 1) {
-            throw new ConflictException(
-              'Concurrent stock update detected during payment confirmation',
-            );
-          }
-        }
-
-        await tx.providerPaymentSession.update({
-          where: { id: paymentSession.id },
-          data: {
-            status: PaymentSessionStatus.COMPLETED,
-          },
-        });
-
-        await tx.providerOrder.update({
-          where: { id: providerOrder.id },
-          data: {
-            paymentStatus: ProviderPaymentStatus.PAID,
-            status: ProviderOrderStatus.PAID,
-            paidAt: now,
-          },
-        });
-
-        const refreshedOrder = await tx.order.findUnique({
-          where: { id: providerOrder.order.id },
-          select: {
-            id: true,
-            status: true,
-            providerOrders: {
-              select: {
-                id: true,
-                paymentStatus: true,
-              },
-            },
-          },
-        });
-
-        if (!refreshedOrder) {
-          throw new NotFoundException('Order not found');
-        }
-
-        const allProviderOrdersPaid = refreshedOrder.providerOrders.every(
-          (sibling: any) =>
-            sibling.paymentStatus === ProviderPaymentStatus.PAID,
-        );
-
-        let updatedOrderStatus = refreshedOrder.status;
-        if (
-          allProviderOrdersPaid &&
-          refreshedOrder.status === DeliveryStatus.PENDING
-        ) {
-          updatedOrderStatus = DeliveryStatus.CONFIRMED;
-          await tx.order.update({
-            where: { id: refreshedOrder.id },
-            data: {
-              status: DeliveryStatus.CONFIRMED,
-              confirmedAt: now,
-            },
-          });
-        }
-
-        return {
-          success: true,
-          orderId: refreshedOrder.id,
-          providerOrderId: providerOrder.id,
-          status: updatedOrderStatus,
-          paymentStatus: ProviderPaymentStatus.PAID,
-          paymentRef: externalSessionId,
-          _events: {
-            stateChanged: {
-              orderId: refreshedOrder.id,
-              status: updatedOrderStatus,
-              paymentRef: externalSessionId,
-            },
-            partialCancelled: null,
-          },
-        };
-      });
-
-      if (result?._events) {
-        this.eventEmitter.emit(
-          'order.stateChanged',
-          result._events.stateChanged,
-        );
-        if (result._events.partialCancelled) {
-          this.eventEmitter.emit(
-            'order.partialCancelled',
-            result._events.partialCancelled,
-          );
-        }
-        delete (result as any)._events;
-      }
-
-      await this.markWebhookEventStatus(
-        eventId,
-        result?.message
-          ? PaymentsService.WEBHOOK_STATUS_IGNORED
-          : PaymentsService.WEBHOOK_STATUS_PROCESSED,
-        new Date(),
-      );
-
-      return result;
-    } catch (error) {
-      await this.markWebhookEventStatus(
-        eventId,
-        PaymentsService.WEBHOOK_STATUS_FAILED,
-        new Date(),
-      );
-      throw error;
-    }
+    return this.stripeWebhookService.confirmProviderOrderPayment(
+      externalSessionId,
+      eventId,
+      eventType,
+      confirmation,
+    );
   }
 
   /**
@@ -1568,37 +1136,10 @@ export class PaymentsService {
    * This wrapper is restricted to single-provider orders only.
    */
   async confirmPayment(orderId: string, paymentRef: string, eventId: string) {
-    if (await this.isProcessed(eventId)) {
-      return { message: 'Webhook already processed' };
-    }
-
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        providerOrders: {
-          select: { id: true },
-        },
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    if (order.providerOrders.length !== 1) {
-      throw new ConflictException(
-        'Legacy payment confirmation wrapper only supports single-provider orders',
-      );
-    }
-
-    this.logger.warn(
-      `Deprecated confirmPayment(orderId=..., paymentRef=...) wrapper invoked for order ${orderId}`,
-    );
-
-    void paymentRef;
-    throw new ConflictException(
-      'Legacy payment confirmation wrapper is disabled. Use verified provider webhook confirmation instead.',
+    return this.stripeWebhookService.confirmPayment(
+      orderId,
+      paymentRef,
+      eventId,
     );
   }
 
