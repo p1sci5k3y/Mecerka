@@ -25,8 +25,23 @@ async function bootstrap() {
   const { httpAdapter } = app.get(HttpAdapterHost);
   app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapter as any));
 
-  // Content Security Policy is enabled with default safe directives to mitigate XSS
+  // Content Security Policy is enabled with explicit directives to mitigate XSS
   app.use(helmet());
+  app.use(
+    helmet.contentSecurityPolicy({
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    }),
+  );
   // Restrict browser feature access via Permissions-Policy header
   app.use((_req: any, res: any, next: any) => {
     res.setHeader(
