@@ -22,6 +22,16 @@ export function validateEnvironment(config: EnvRecord) {
     );
   }
 
+  const jwtSecret = readString(config, 'JWT_SECRET');
+  if (!jwtSecret) {
+    throw new Error('JWT_SECRET is required');
+  }
+
+  const databaseUrl = readString(config, 'DATABASE_URL');
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required');
+  }
+
   config.FISCAL_PEPPER = fiscalPepper;
   return config;
 }

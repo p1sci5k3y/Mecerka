@@ -36,7 +36,7 @@ export class AuthController {
     response.cookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
       httpOnly: true,
       path: '/',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: ACCESS_TOKEN_COOKIE_MAX_AGE_MS,
     });
@@ -68,7 +68,7 @@ export class AuthController {
     response.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
       httpOnly: true,
       path: '/',
-      sameSite: 'lax',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
     return this.authService.logout(req.user.userId);

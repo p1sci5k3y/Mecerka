@@ -27,6 +27,14 @@ async function bootstrap() {
 
   // Content Security Policy is enabled with default safe directives to mitigate XSS
   app.use(helmet());
+  // Restrict browser feature access via Permissions-Policy header
+  app.use((_req: any, res: any, next: any) => {
+    res.setHeader(
+      'Permissions-Policy',
+      'camera=(), microphone=(), geolocation=()',
+    );
+    next();
+  });
 
   const isDev = process.env.NODE_ENV !== 'production';
   const frontendUrl = process.env.FRONTEND_URL;
