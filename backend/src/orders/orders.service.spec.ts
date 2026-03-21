@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
+import { OrderQueryService } from './order-query.service';
 import { OrderItemsService } from './order-items.service';
 import { OrderStatusService } from './order-status.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -99,6 +100,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         },
         { provide: IOrderRepository, useValue: orderRepositoryMock },
+        OrderQueryService,
       ],
     }).compile();
 
