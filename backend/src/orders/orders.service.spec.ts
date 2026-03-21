@@ -15,6 +15,7 @@ import {
   Role,
 } from '@prisma/client';
 import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { CheckoutService } from './checkout.service';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let service: OrdersService;
@@ -100,6 +101,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           },
         },
         { provide: IOrderRepository, useValue: orderRepositoryMock },
+        CheckoutService,
         OrderQueryService,
       ],
     }).compile();
