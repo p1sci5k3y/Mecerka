@@ -6,11 +6,18 @@ import { OrdersController } from './orders.controller';
 import { GeocodingModule } from '../geocoding/geocoding.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RiskModule } from '../risk/risk.module';
+import { IOrderRepository } from './repositories/order.repository.interface';
+import { PrismaOrderRepository } from './repositories/prisma-order.repository';
 
 @Module({
   imports: [PrismaModule, RiskModule, GeocodingModule],
   controllers: [OrdersController],
-  providers: [OrdersService, OrderItemsService, OrderStatusService],
+  providers: [
+    OrdersService,
+    OrderItemsService,
+    OrderStatusService,
+    { provide: IOrderRepository, useClass: PrismaOrderRepository },
+  ],
   exports: [OrdersService, OrderStatusService],
 })
 export class OrdersModule {}
