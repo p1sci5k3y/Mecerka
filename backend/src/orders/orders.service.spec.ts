@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdersService } from './orders.service';
 import { OrderItemsService } from './order-items.service';
+import { OrderStatusService } from './order-status.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
@@ -79,6 +80,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrdersService,
+        OrderStatusService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: GEOCODING_SERVICE, useValue: geocodingServiceMock },
