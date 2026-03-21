@@ -32,6 +32,32 @@ export function validateEnvironment(config: EnvRecord) {
     throw new Error('DATABASE_URL is required');
   }
 
+  const stripeSecretKey = readString(config, 'STRIPE_SECRET_KEY');
+  if (!stripeSecretKey) {
+    throw new Error('STRIPE_SECRET_KEY is required');
+  }
+
+  const stripeWebhookSecret = readString(config, 'STRIPE_WEBHOOK_SECRET');
+  if (!stripeWebhookSecret) {
+    throw new Error('STRIPE_WEBHOOK_SECRET is required');
+  }
+
+  const frontendUrl = readString(config, 'FRONTEND_URL');
+  if (!frontendUrl) {
+    throw new Error('FRONTEND_URL is required');
+  }
+
+  const nodeEnv = readString(config, 'NODE_ENV') || 'development';
+  const validNodeEnvs = ['development', 'production', 'test'];
+  if (!validNodeEnvs.includes(nodeEnv)) {
+    throw new Error(`NODE_ENV must be one of: ${validNodeEnvs.join(', ')}`);
+  }
+
+  if (!config.TOTP_ISSUER) {
+    config.TOTP_ISSUER = 'Mecerka';
+  }
+
   config.FISCAL_PEPPER = fiscalPepper;
+  config.NODE_ENV = nodeEnv;
   return config;
 }
