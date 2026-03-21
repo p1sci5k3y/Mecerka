@@ -101,6 +101,14 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "statements": 44,
+        "branches": 38,
+        "functions": 47,
+        "lines": 44
+      }
+    },
     "testEnvironment": "node"
   },
   "prisma": {
