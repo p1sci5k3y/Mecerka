@@ -250,4 +250,269 @@ describe('RiskService', () => {
       cutoff: new Date('2099-01-01T00:00:00.000Z'),
     });
   });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    const now = new Date('2099-01-10T00:00:00.000Z');
+
+    it('sanitizeMetadata returns undefined for empty metadata', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-1',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.CLIENT,
+        actorId: 'actor-1',
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        score: 10,
+        // no metadata
+      });
+
+      expect(prismaMock.riskEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ metadata: undefined }),
+        }),
+      );
+    });
+
+    it('sanitizeMetadata returns undefined when all keys are disallowed', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-1',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.CLIENT,
+        actorId: 'actor-1',
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        score: 10,
+        metadata: {
+          email: 'user@example.com',
+          addressLine: 'Calle X',
+          token: 'secret',
+        } as any,
+      });
+
+      expect(prismaMock.riskEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ metadata: undefined }),
+        }),
+      );
+    });
+
+    it('recordRiskEvent without dedupKey creates event directly', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-nodedupkey',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      const result = await service.recordRiskEvent({
+        actorType: RiskActorType.RUNNER,
+        actorId: 'runner-1',
+        category: RiskCategory.RUNNER_GPS_ANOMALY,
+        score: 20,
+        // no dedupKey
+      });
+
+      expect(result.created).toBe(true);
+      expect(prismaMock.riskEvent.findUniqueOrThrow).not.toHaveBeenCalled();
+    });
+
+    it('recordRiskEvent rethrows non-P2002 errors', async () => {
+      prismaMock.riskEvent.create.mockRejectedValue(new Error('DB down'));
+
+      await expect(
+        service.recordRiskEvent({
+          actorType: RiskActorType.CLIENT,
+          actorId: 'actor-1',
+          category: RiskCategory.CLIENT_REFUND_ABUSE,
+          score: 10,
+          dedupKey: 'some-key',
+        }),
+      ).rejects.toThrow('DB down');
+    });
+
+    it('computeRiskLevel returns CRITICAL for score >= threshold', async () => {
+      prismaMock.riskEvent.findMany.mockResolvedValue([
+        {
+          category: RiskCategory.CLIENT_REFUND_ABUSE,
+          score: 100,
+          createdAt: now,
+        },
+      ]);
+      prismaMock.riskScoreSnapshot.upsert.mockResolvedValue({
+        score: 100,
+        level: RiskLevel.CRITICAL,
+      });
+
+      const result = await service.recalculateRiskScore(
+        RiskActorType.CLIENT,
+        'actor-crit',
+        now,
+      );
+
+      expect(result.snapshot.level).toBe(RiskLevel.CRITICAL);
+    });
+
+    it('computeRiskLevel returns HIGH for score >= HIGH threshold', async () => {
+      // HIGH threshold is typically 70
+      prismaMock.riskEvent.findMany.mockResolvedValue([
+        {
+          category: RiskCategory.EXCESSIVE_INCIDENTS,
+          score: 70,
+          createdAt: now,
+        },
+      ]);
+      prismaMock.riskScoreSnapshot.upsert.mockResolvedValue({
+        score: 70,
+        level: RiskLevel.HIGH,
+      });
+
+      const result = await service.recalculateRiskScore(
+        RiskActorType.CLIENT,
+        'actor-high',
+        now,
+      );
+
+      expect(result.snapshot).toBeDefined();
+    });
+
+    it('computeRiskLevel returns LOW for score 0', async () => {
+      prismaMock.riskEvent.findMany.mockResolvedValue([]);
+      prismaMock.riskScoreSnapshot.upsert.mockResolvedValue({
+        score: 0,
+        level: RiskLevel.LOW,
+      });
+
+      const result = await service.recalculateRiskScore(
+        RiskActorType.CLIENT,
+        'actor-low',
+        now,
+      );
+
+      expect(result.snapshot.level).toBe(RiskLevel.LOW);
+    });
+
+    it('getActorRiskScore returns snapshot and breakdown', async () => {
+      prismaMock.riskScoreSnapshot.findUnique.mockResolvedValue({
+        score: 25,
+        level: RiskLevel.MEDIUM,
+      });
+      prismaMock.riskEvent.findMany.mockResolvedValue([
+        {
+          category: RiskCategory.EXCESSIVE_INCIDENTS,
+          score: 25,
+          createdAt: now,
+        },
+      ]);
+
+      const result = await service.getActorRiskScore(
+        RiskActorType.CLIENT,
+        'actor-1',
+        now,
+      );
+
+      expect(result.snapshot).toBeDefined();
+      expect(result.breakdown).toBeDefined();
+    });
+
+    it('getActorRiskScore returns null snapshot when actor has no snapshot', async () => {
+      prismaMock.riskScoreSnapshot.findUnique.mockResolvedValue(null);
+      prismaMock.riskEvent.findMany.mockResolvedValue([]);
+
+      const result = await service.getActorRiskScore(
+        RiskActorType.CLIENT,
+        'actor-new',
+        now,
+      );
+
+      expect(result.snapshot).toBeNull();
+      expect(result.breakdown).toEqual([]);
+    });
+
+    it('listHighRiskActors uses default HIGH level when minimumLevel not specified', async () => {
+      prismaMock.riskScoreSnapshot.findMany.mockResolvedValue([]);
+
+      await service.listHighRiskActors({});
+
+      expect(prismaMock.riskScoreSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            level: {
+              in: expect.arrayContaining([RiskLevel.HIGH, RiskLevel.CRITICAL]),
+            },
+          },
+        }),
+      );
+    });
+
+    it('listHighRiskActors uses CRITICAL when minimumLevel is CRITICAL', async () => {
+      prismaMock.riskScoreSnapshot.findMany.mockResolvedValue([]);
+
+      await service.listHighRiskActors({ minimumLevel: RiskLevel.CRITICAL });
+
+      expect(prismaMock.riskScoreSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { level: { in: [RiskLevel.CRITICAL] } },
+        }),
+      );
+    });
+
+    it('listActorRiskEvents filters by category and since when provided', async () => {
+      prismaMock.riskEvent.findMany.mockResolvedValue([]);
+      const since = new Date('2099-01-01T00:00:00.000Z');
+
+      await service.listActorRiskEvents(RiskActorType.CLIENT, 'actor-1', {
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        since,
+        limit: 5,
+      });
+
+      expect(prismaMock.riskEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            category: RiskCategory.CLIENT_REFUND_ABUSE,
+            createdAt: { gte: since },
+          }),
+        }),
+      );
+    });
+
+    it('listActorRiskEvents without filters still calls findMany', async () => {
+      prismaMock.riskEvent.findMany.mockResolvedValue([]);
+
+      await service.listActorRiskEvents(RiskActorType.RUNNER, 'runner-1');
+
+      expect(prismaMock.riskEvent.findMany).toHaveBeenCalled();
+    });
+
+    it('sanitizeMetadataValue handles non-finite numbers → undefined', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-nan',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.CLIENT,
+        actorId: 'actor-1',
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        score: 10,
+        metadata: {
+          eventType: 'test',
+          count: Number.NaN, // non-finite number → undefined
+        } as any,
+      });
+
+      const call = prismaMock.riskEvent.create.mock.calls[0][0];
+      const meta = call.data.metadata as Record<string, unknown>;
+      // NaN values are filtered out — count key should not appear or be undefined
+      expect(meta?.count).toBeUndefined();
+    });
+  });
 });
