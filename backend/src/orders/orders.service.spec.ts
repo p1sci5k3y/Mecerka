@@ -14,7 +14,12 @@ import {
   ProviderPaymentStatus,
   Role,
 } from '@prisma/client';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CheckoutService } from './checkout.service';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
@@ -1539,6 +1544,489 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       );
 
       expect(orderRepositoryMock.findById).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    describe('prepareProviderOrderPayment', () => {
+      it('throws NotFoundException when provider order does not exist', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue(null),
+            },
+          }),
+        );
+
+        await expect(
+          service.prepareProviderOrderPayment('missing-po'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws ConflictException when provider order status is not payment-eligible', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                status: ProviderOrderStatus.CANCELLED,
+                paymentStatus: ProviderPaymentStatus.PENDING,
+                reservations: [],
+                paymentSessions: [],
+              }),
+            },
+          }),
+        );
+
+        await expect(
+          service.prepareProviderOrderPayment('po-1'),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it('throws ConflictException when provider order is already paid', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                status: ProviderOrderStatus.PENDING,
+                paymentStatus: ProviderPaymentStatus.PAID,
+                reservations: [],
+                paymentSessions: [],
+              }),
+            },
+          }),
+        );
+
+        await expect(
+          service.prepareProviderOrderPayment('po-1'),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it('throws ConflictException when no active stock reservation exists', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                status: ProviderOrderStatus.PENDING,
+                paymentStatus: ProviderPaymentStatus.PENDING,
+                reservations: [], // no active reservations
+                paymentSessions: [],
+              }),
+            },
+          }),
+        );
+
+        await expect(
+          service.prepareProviderOrderPayment('po-1'),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it('selects earliest expiresAt when multiple reservations exist', async () => {
+        const earlier = new Date('2026-03-15T11:00:00.000Z');
+        const later = new Date('2026-03-15T12:00:00.000Z');
+        const transactionCreate = jest.fn().mockResolvedValue({ id: 'sess-1' });
+        const transactionUpdateSession = jest
+          .fn()
+          .mockResolvedValue({ id: 'sess-1', paymentUrl: '/url' });
+        const transactionUpdateProviderOrder = jest.fn().mockResolvedValue({});
+
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                status: ProviderOrderStatus.PENDING,
+                paymentStatus: ProviderPaymentStatus.PENDING,
+                paymentReadyAt: null,
+                reservations: [{ expiresAt: later }, { expiresAt: earlier }],
+                paymentSessions: [],
+              }),
+              update: transactionUpdateProviderOrder,
+            },
+            providerPaymentSession: {
+              create: transactionCreate,
+              update: transactionUpdateSession,
+            },
+          }),
+        );
+
+        await service.prepareProviderOrderPayment('po-1');
+
+        expect(transactionCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ expiresAt: earlier }),
+          }),
+        );
+      });
+
+      it('preserves existing paymentReadyAt when not null in existing session path', async () => {
+        const existingReadyAt = new Date('2026-03-14T10:00:00.000Z');
+        const transactionUpdateProviderOrder = jest.fn().mockResolvedValue({});
+        const existingSession = { id: 'sess-existing' };
+
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                status: ProviderOrderStatus.PAYMENT_PENDING,
+                paymentStatus: ProviderPaymentStatus.PENDING,
+                paymentReadyAt: existingReadyAt,
+                reservations: [
+                  { expiresAt: new Date('2026-03-15T12:00:00.000Z') },
+                ],
+                paymentSessions: [existingSession],
+              }),
+              update: transactionUpdateProviderOrder,
+            },
+          }),
+        );
+
+        const result = await service.prepareProviderOrderPayment('po-1');
+
+        expect(transactionUpdateProviderOrder).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              paymentReadyAt: existingReadyAt,
+              status: ProviderOrderStatus.PAYMENT_PENDING, // not PENDING, so preserved
+            }),
+          }),
+        );
+        expect(result).toBe(existingSession);
+      });
+    });
+
+    describe('expireReservations', () => {
+      it('returns zero counts when no reservations are expired', async () => {
+        (prismaMock as any).stockReservation = {
+          findMany: jest.fn().mockResolvedValue([]),
+        };
+
+        const result = await service.expireReservations(new Date());
+
+        expect(result).toEqual({
+          expiredReservations: 0,
+          expiredProviderOrders: 0,
+        });
+        expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('expires reservations and eligible provider orders in a transaction', async () => {
+        (prismaMock as any).stockReservation = {
+          findMany: jest.fn().mockResolvedValue([
+            { id: 'res-1', providerOrderId: 'po-1' },
+            { id: 'res-2', providerOrderId: 'po-1' },
+          ]),
+        };
+
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            stockReservation: {
+              updateMany: jest.fn().mockResolvedValue({ count: 2 }),
+            },
+            providerOrder: {
+              updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+            },
+          }),
+        );
+
+        const result = await service.expireReservations(new Date());
+
+        expect(result).toEqual({
+          expiredReservations: 2,
+          expiredProviderOrders: 1,
+        });
+      });
+
+      it('deduplicates providerOrderIds before updating provider orders', async () => {
+        (prismaMock as any).stockReservation = {
+          findMany: jest.fn().mockResolvedValue([
+            { id: 'res-1', providerOrderId: 'po-1' },
+            { id: 'res-2', providerOrderId: 'po-1' }, // same po
+            { id: 'res-3', providerOrderId: 'po-2' },
+          ]),
+        };
+
+        const providerOrderUpdateMany = jest
+          .fn()
+          .mockResolvedValue({ count: 2 });
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            stockReservation: {
+              updateMany: jest.fn().mockResolvedValue({ count: 3 }),
+            },
+            providerOrder: {
+              updateMany: providerOrderUpdateMany,
+            },
+          }),
+        );
+
+        await service.expireReservations(new Date());
+
+        expect(providerOrderUpdateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id: { in: expect.arrayContaining(['po-1', 'po-2']) },
+            }),
+          }),
+        );
+        // Ensure deduplication: only 2 unique IDs
+        const callArgs = providerOrderUpdateMany.mock.calls[0][0];
+        expect(callArgs.where.id.in).toHaveLength(2);
+      });
+    });
+
+    describe('create (legacy manual flow)', () => {
+      it('throws NotFoundException when user is not found (PIN flow)', async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'prod-1', quantity: 1 }],
+              deliveryAddress: 'Calle Mayor 1',
+              pin: '1234',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws BadRequestException when user has no PIN configured', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'client-1',
+          pin: null,
+        });
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'prod-1', quantity: 1 }],
+              deliveryAddress: 'Calle Mayor 1',
+              pin: '1234',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws NotFoundException when a product does not exist', async () => {
+        prismaMock.product.findMany.mockResolvedValue([]); // no products found
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'missing-prod', quantity: 1 }],
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws BadRequestException when a product is inactive', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Inactive Product',
+            isActive: false,
+            stock: 5,
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: 'acct_123' },
+          },
+        ]);
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'prod-1', quantity: 1 }],
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when provider has no stripe account', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Good Product',
+            isActive: true,
+            stock: 5,
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: null }, // no stripe
+          },
+        ]);
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'prod-1', quantity: 1 }],
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when products span multiple cities', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Product 1',
+            isActive: true,
+            stock: 5,
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: 'acct_1' },
+          },
+          {
+            id: 'prod-2',
+            name: 'Product 2',
+            isActive: true,
+            stock: 5,
+            cityId: 'city-2', // different city
+            price: 15,
+            providerId: 'prov-2',
+            provider: { stripeAccountId: 'acct_2' },
+          },
+        ]);
+
+        await expect(
+          service.create(
+            {
+              items: [
+                { productId: 'prod-1', quantity: 1 },
+                { productId: 'prod-2', quantity: 1 },
+              ],
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when stock is insufficient', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Low Stock Product',
+            isActive: true,
+            stock: 1, // only 1 in stock
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: 'acct_1' },
+          },
+        ]);
+
+        await expect(
+          service.create(
+            {
+              items: [{ productId: 'prod-1', quantity: 5 }], // requesting 5
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when products span multiple providers', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Product 1',
+            isActive: true,
+            stock: 5,
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: 'acct_1' },
+          },
+          {
+            id: 'prod-2',
+            name: 'Product 2',
+            isActive: true,
+            stock: 5,
+            cityId: 'city-1',
+            price: 15,
+            providerId: 'prov-2', // different provider
+            provider: { stripeAccountId: 'acct_2' },
+          },
+        ]);
+
+        await expect(
+          service.create(
+            {
+              items: [
+                { productId: 'prod-1', quantity: 1 },
+                { productId: 'prod-2', quantity: 1 },
+              ],
+              deliveryAddress: 'Calle Mayor 1',
+            } as any,
+            'client-1',
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('aggregates duplicate productIds and creates the order', async () => {
+        prismaMock.product.findMany.mockResolvedValue([
+          {
+            id: 'prod-1',
+            name: 'Product 1',
+            isActive: true,
+            stock: 10,
+            cityId: 'city-1',
+            price: 10,
+            providerId: 'prov-1',
+            provider: { stripeAccountId: 'acct_1' },
+          },
+        ]);
+
+        prismaMock.order.create.mockResolvedValue({
+          id: 'ord-manual',
+          clientId: 'client-1',
+          providerOrders: [{ id: 'po-1', items: [] }],
+        });
+
+        const result = await service.create(
+          {
+            items: [
+              { productId: 'prod-1', quantity: 2 },
+              { productId: 'prod-1', quantity: 3 }, // duplicate, should aggregate to 5
+            ],
+            deliveryAddress: 'Calle Mayor 1',
+          } as any,
+          'client-1',
+        );
+
+        expect(prismaMock.order.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              clientId: 'client-1',
+              cityId: 'city-1',
+              totalPrice: 50, // 5 * 10
+            }),
+          }),
+        );
+        expect(result.id).toBe('ord-manual');
+      });
     });
   });
 });

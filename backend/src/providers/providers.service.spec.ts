@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -150,5 +150,111 @@ describe('ProvidersService', () => {
     expect(result.slug).not.toContain('--');
     expect(result.slug.startsWith('-')).toBe(false);
     expect(result.slug.endsWith('-')).toBe(false);
+  });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    describe('assertProviderUser', () => {
+      it('throws NotFoundException when user is null', async () => {
+        prismaMock.user.findUnique.mockResolvedValue(null);
+
+        await expect(service.getOwnProfile('missing-user')).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws NotFoundException when user is inactive', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'provider-user',
+          roles: [Role.PROVIDER],
+          active: false,
+        });
+
+        await expect(service.getOwnProfile('provider-user')).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('throws BadRequestException when user does not have PROVIDER role', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'client-user',
+          roles: [Role.CLIENT],
+          active: true,
+        });
+
+        await expect(service.getOwnProfile('client-user')).rejects.toThrow(
+          BadRequestException,
+        );
+      });
+    });
+
+    describe('publishOwnProfile', () => {
+      it('throws NotFoundException when provider profile does not exist', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'provider-user',
+          roles: [Role.PROVIDER],
+          active: true,
+        });
+        prismaMock.provider.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.publishOwnProfile('provider-user', true),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('publishes the profile when provider exists', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'provider-user',
+          roles: [Role.PROVIDER],
+          active: true,
+        });
+        prismaMock.provider.findUnique.mockResolvedValue({ id: 'prov-1' });
+        prismaMock.provider.update.mockResolvedValue({
+          id: 'prov-1',
+          isPublished: true,
+          city: null,
+          category: null,
+        });
+
+        const result = await service.publishOwnProfile('provider-user', true);
+
+        expect(prismaMock.provider.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { isPublished: true } }),
+        );
+        expect(result).toMatchObject({ isPublished: true });
+      });
+    });
+
+    describe('ensureUniqueSlug', () => {
+      it('appends suffix when slug is already taken', async () => {
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'provider-user',
+          roles: [Role.PROVIDER],
+          active: true,
+        });
+
+        // First call: slug is taken, second call: slug-1 is available
+        prismaMock.provider.findFirst
+          .mockResolvedValueOnce({ id: 'other-prov' }) // 'workshop' taken
+          .mockResolvedValueOnce(null); // 'workshop-1' available
+
+        prismaMock.provider.upsert.mockImplementation(
+          ({ create }: any) => create,
+        );
+
+        const result = await service.upsertOwnProfile('provider-user', {
+          businessName: 'Workshop',
+          cityId: 'city-1',
+          categoryId: 'cat-1',
+          description: 'desc',
+          workshopHistory: '',
+          photos: [],
+          isPublished: false,
+        });
+
+        expect(result.slug).toBe('workshop-1');
+      });
+    });
   });
 });
