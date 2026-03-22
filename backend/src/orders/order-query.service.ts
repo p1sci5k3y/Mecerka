@@ -5,7 +5,17 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderItemsService } from './order-items.service';
-import { DeliveryStatus, ProviderOrderStatus, Role } from '@prisma/client';
+import {
+  City,
+  DeliveryStatus,
+  ProviderOrderStatus,
+  Role,
+} from '@prisma/client';
+
+interface OrderWithTracking {
+  status: string;
+  deliveryOrder: { status: string } | null;
+}
 
 @Injectable()
 export class OrderQueryService {
@@ -14,7 +24,7 @@ export class OrderQueryService {
     private readonly orderItemsService: OrderItemsService,
   ) {}
 
-  private buildOrderTrackingStatus(order: any) {
+  private buildOrderTrackingStatus(order: OrderWithTracking) {
     const deliveryOrder = order.deliveryOrder;
 
     if (!deliveryOrder) {
@@ -37,7 +47,17 @@ export class OrderQueryService {
     }
   }
 
-  private toProviderScopedOrderView(order: any, providerId: string) {
+  private toProviderScopedOrderView<T extends { providerId: string }>(
+    order: {
+      id: string;
+      status: string;
+      createdAt: Date;
+      updatedAt: Date;
+      city?: City | null;
+      providerOrders: T[];
+    },
+    providerId: string,
+  ) {
     return {
       id: order.id,
       status: order.status,
@@ -45,7 +65,7 @@ export class OrderQueryService {
       updatedAt: order.updatedAt,
       city: order.city,
       providerOrders: order.providerOrders.filter(
-        (providerOrder: any) => providerOrder.providerId === providerId,
+        (providerOrder) => providerOrder.providerId === providerId,
       ),
     };
   }
