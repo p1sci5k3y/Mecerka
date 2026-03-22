@@ -147,8 +147,11 @@ export class SupportService {
         },
       });
       return true;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         return false;
       }
       throw error;
@@ -227,7 +230,7 @@ export class SupportService {
     const now = new Date();
     const stripe = this.getStripeClient();
 
-    return this.prisma.$transaction(async (tx: any) => {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.$executeRaw(
         Prisma.sql`SELECT 1 FROM "PlatformDonation" WHERE "id" = ${donationId}::uuid FOR UPDATE`,
       );
@@ -375,48 +378,50 @@ export class SupportService {
     }
 
     try {
-      const result = await this.prisma.$transaction(async (tx: any) => {
-        const session = await tx.donationSession.findUnique({
-          where: { externalSessionId },
-          include: {
-            donation: true,
-          },
-        });
+      const result = await this.prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const session = await tx.donationSession.findUnique({
+            where: { externalSessionId },
+            include: {
+              donation: true,
+            },
+          });
 
-        if (!session) {
-          throw new NotFoundException('Donation session not found');
-        }
+          if (!session) {
+            throw new NotFoundException('Donation session not found');
+          }
 
-        if (
-          session.status === PaymentSessionStatus.COMPLETED ||
-          session.donation.status === DonationStatus.COMPLETED
-        ) {
+          if (
+            session.status === PaymentSessionStatus.COMPLETED ||
+            session.donation.status === DonationStatus.COMPLETED
+          ) {
+            return {
+              donationId: session.donationId,
+              status: DonationStatus.COMPLETED,
+            };
+          }
+
+          await tx.donationSession.update({
+            where: { id: session.id },
+            data: {
+              status: PaymentSessionStatus.COMPLETED,
+            },
+          });
+
+          await tx.platformDonation.update({
+            where: { id: session.donationId },
+            data: {
+              status: DonationStatus.COMPLETED,
+              externalRef: externalSessionId,
+            },
+          });
+
           return {
             donationId: session.donationId,
             status: DonationStatus.COMPLETED,
           };
-        }
-
-        await tx.donationSession.update({
-          where: { id: session.id },
-          data: {
-            status: PaymentSessionStatus.COMPLETED,
-          },
-        });
-
-        await tx.platformDonation.update({
-          where: { id: session.donationId },
-          data: {
-            status: DonationStatus.COMPLETED,
-            externalRef: externalSessionId,
-          },
-        });
-
-        return {
-          donationId: session.donationId,
-          status: DonationStatus.COMPLETED,
-        };
-      });
+        },
+      );
 
       if (eventId) {
         await this.markDonationWebhookEventStatus(
@@ -451,45 +456,47 @@ export class SupportService {
     }
 
     try {
-      const result = await this.prisma.$transaction(async (tx: any) => {
-        const session = await tx.donationSession.findUnique({
-          where: { externalSessionId },
-          include: {
-            donation: true,
-          },
-        });
+      const result = await this.prisma.$transaction(
+        async (tx: Prisma.TransactionClient) => {
+          const session = await tx.donationSession.findUnique({
+            where: { externalSessionId },
+            include: {
+              donation: true,
+            },
+          });
 
-        if (!session) {
-          throw new NotFoundException('Donation session not found');
-        }
+          if (!session) {
+            throw new NotFoundException('Donation session not found');
+          }
 
-        if (session.status === PaymentSessionStatus.COMPLETED) {
+          if (session.status === PaymentSessionStatus.COMPLETED) {
+            return {
+              donationId: session.donationId,
+              status: DonationStatus.COMPLETED,
+            };
+          }
+
+          await tx.donationSession.update({
+            where: { id: session.id },
+            data: {
+              status: PaymentSessionStatus.FAILED,
+            },
+          });
+
+          await tx.platformDonation.update({
+            where: { id: session.donationId },
+            data: {
+              status: DonationStatus.FAILED,
+              externalRef: externalSessionId,
+            },
+          });
+
           return {
             donationId: session.donationId,
-            status: DonationStatus.COMPLETED,
-          };
-        }
-
-        await tx.donationSession.update({
-          where: { id: session.id },
-          data: {
-            status: PaymentSessionStatus.FAILED,
-          },
-        });
-
-        await tx.platformDonation.update({
-          where: { id: session.donationId },
-          data: {
             status: DonationStatus.FAILED,
-            externalRef: externalSessionId,
-          },
-        });
-
-        return {
-          donationId: session.donationId,
-          status: DonationStatus.FAILED,
-        };
-      });
+          };
+        },
+      );
 
       if (eventId) {
         await this.markDonationWebhookEventStatus(

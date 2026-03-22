@@ -42,10 +42,12 @@ export class ProductsService {
     });
 
     const reservedByProductId = new Map<string, number>(
-      reservations.map((reservation: any) => [
-        reservation.productId,
-        Number(reservation._sum.quantity ?? 0),
-      ]),
+      reservations.map(
+        (reservation: {
+          productId: string;
+          _sum: { quantity: number | null };
+        }) => [reservation.productId, Number(reservation._sum.quantity ?? 0)],
+      ),
     );
 
     return products.map((product) => ({
@@ -165,7 +167,17 @@ export class ProductsService {
     return client;
   }
 
-  private mapClientDiscount(discount: any) {
+  private mapClientDiscount(discount: {
+    id: string;
+    providerId: string;
+    clientId: string;
+    productId: string;
+    discountPrice: number | { toNumber?: () => number } | null;
+    active: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    client?: { id: string; name: string | null; email: string } | null;
+  }) {
     return {
       id: discount.id,
       providerId: discount.providerId,

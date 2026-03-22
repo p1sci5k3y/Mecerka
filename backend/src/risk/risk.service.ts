@@ -183,8 +183,8 @@ export class RiskService {
         });
 
         return { event, created: true };
-      } catch (error: any) {
-        if (error?.code === 'P2002') {
+      } catch (error: unknown) {
+        if ((error as { code?: string })?.code === 'P2002') {
           const existing = await this.prisma.riskEvent.findUniqueOrThrow({
             where: { dedupKey: input.dedupKey },
           });
