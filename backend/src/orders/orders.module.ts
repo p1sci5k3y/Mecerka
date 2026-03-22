@@ -4,6 +4,7 @@ import { OrderQueryService } from './order-query.service';
 import { OrderItemsService } from './order-items.service';
 import { OrderStatusService } from './order-status.service';
 import { CheckoutService } from './checkout.service';
+import { StockReservationService } from './stock-reservation.service';
 import { OrdersController } from './orders.controller';
 import { GeocodingModule } from '../geocoding/geocoding.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -20,6 +21,7 @@ import { PrismaOrderRepository } from './repositories/prisma-order.repository';
     OrderItemsService,
     OrderStatusService,
     CheckoutService,
+    StockReservationService,
     { provide: IOrderRepository, useClass: PrismaOrderRepository },
   ],
   exports: [OrdersService, OrderStatusService],

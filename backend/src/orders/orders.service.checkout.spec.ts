@@ -13,6 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { IOrderRepository } from './repositories/order.repository.interface';
 import { CheckoutService } from './checkout.service';
+import { StockReservationService } from './stock-reservation.service';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 
 const CLIENT_ID = 'client-1';
@@ -142,6 +143,7 @@ describe('OrdersService - checkoutFromCart', () => {
           useValue: { findById: jest.fn(), update: jest.fn() },
         },
         CheckoutService,
+        StockReservationService,
         OrderQueryService,
       ],
     }).compile();

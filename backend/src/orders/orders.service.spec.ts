@@ -21,6 +21,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CheckoutService } from './checkout.service';
+import { StockReservationService } from './stock-reservation.service';
 
 describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
   let service: OrdersService;
@@ -120,6 +121,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         },
         { provide: IOrderRepository, useValue: orderRepositoryMock },
         CheckoutService,
+        StockReservationService,
         OrderQueryService,
       ],
     }).compile();

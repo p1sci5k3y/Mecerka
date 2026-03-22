@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 
@@ -165,7 +166,7 @@ export class CartService {
     );
     const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
 
-    await this.prisma.$transaction(async (tx: any) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (!cartGroup.cityId) {
         await tx.cartGroup.update({
           where: { id: cartGroup.id },
@@ -318,7 +319,7 @@ export class CartService {
     );
     const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
 
-    await this.prisma.$transaction(async (tx: any) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.update({
         where: { id: cartItem.id },
         data: {
@@ -367,7 +368,7 @@ export class CartService {
       throw new NotFoundException('Cart item not found');
     }
 
-    await this.prisma.$transaction(async (tx: any) => {
+    await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.delete({
         where: { id: cartItem.id },
       });
@@ -390,7 +391,10 @@ export class CartService {
     });
   }
 
-  private async recalculateCartProvider(tx: any, cartProviderId: string) {
+  private async recalculateCartProvider(
+    tx: Prisma.TransactionClient,
+    cartProviderId: string,
+  ) {
     const items = await tx.cartItem.findMany({
       where: {
         cartProviderId,
@@ -402,12 +406,23 @@ export class CartService {
     });
 
     const itemCount = items.reduce(
-      (sum: number, item: any) => sum + item.quantity,
+      (
+        sum: number,
+        item: {
+          quantity: number;
+          effectiveUnitPriceSnapshot: Prisma.Decimal | null;
+        },
+      ) => sum + item.quantity,
       0,
     );
     const subtotalAmount = items.reduce(
-      (sum: number, item: any) =>
-        sum + Number(item.effectiveUnitPriceSnapshot) * item.quantity,
+      (
+        sum: number,
+        item: {
+          quantity: number;
+          effectiveUnitPriceSnapshot: Prisma.Decimal | null;
+        },
+      ) => sum + Number(item.effectiveUnitPriceSnapshot) * item.quantity,
       0,
     );
 

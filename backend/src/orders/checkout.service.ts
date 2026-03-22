@@ -15,6 +15,7 @@ import type {
   GeocodingPort,
 } from '../geocoding/geocoding.types';
 import { Money } from '../domain/value-objects';
+import { StockReservationService } from './stock-reservation.service';
 
 @Injectable()
 export class CheckoutService {
@@ -24,6 +25,7 @@ export class CheckoutService {
     private readonly prisma: PrismaService,
     @Inject(GEOCODING_SERVICE)
     private readonly geocodingService: GeocodingPort,
+    private readonly stockReservationService: StockReservationService,
   ) {}
 
   private logStructuredEvent(
@@ -393,57 +395,11 @@ export class CheckoutService {
         )}) FOR UPDATE`,
       );
 
-      const products = await tx.product.findMany({
-        where: {
-          id: {
-            in: productIds,
-          },
-        },
-        select: {
-          id: true,
-          stock: true,
-        },
-      });
-      const reservations = await tx.stockReservation.groupBy({
-        by: ['productId'],
-        where: {
-          productId: {
-            in: productIds,
-          },
-          status: 'ACTIVE',
-          expiresAt: {
-            gt: new Date(),
-          },
-        },
-        _sum: {
-          quantity: true,
-        },
-      });
-
-      const productStock = new Map(
-        products.map((product: any) => [product.id, Number(product.stock)]),
+      await this.stockReservationService.checkStockAvailability(
+        requestedItems,
+        productIds,
+        tx,
       );
-      const reservedStock = new Map(
-        reservations.map((reservation: any) => [
-          reservation.productId,
-          reservation._sum.quantity ?? 0,
-        ]),
-      );
-
-      for (const item of requestedItems) {
-        const currentStock = Number(
-          productStock.get(item.productId) ?? Number.NaN,
-        );
-        if (Number.isNaN(currentStock)) {
-          throw new ConflictException('STOCK_UNAVAILABLE');
-        }
-        const availableStock =
-          currentStock - Number(reservedStock.get(item.productId) ?? 0);
-
-        if (availableStock < item.quantity) {
-          throw new ConflictException('STOCK_UNAVAILABLE');
-        }
-      }
 
       const order = await tx.order.create({
         data: {
@@ -516,22 +472,6 @@ export class CheckoutService {
       });
 
       return order;
-    });
-  }
-
-  private async reserveStockForOrder(order: any): Promise<void> {
-    const reservationExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-    await this.prisma.stockReservation.createMany({
-      data: order.providerOrders.flatMap((providerOrder: any) =>
-        providerOrder.items.map((item: any) => ({
-          providerOrderId: providerOrder.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          status: 'ACTIVE',
-          expiresAt: reservationExpiresAt,
-        })),
-      ),
     });
   }
 
@@ -631,7 +571,7 @@ export class CheckoutService {
         totalPrice,
         normalizedKey,
       );
-      await this.reserveStockForOrder(order);
+      await this.stockReservationService.reserveStockForOrder(order);
       return this.initiatePaymentSession(order, clientId);
     } catch (error: any) {
       if (error?.code === 'P2002') {
