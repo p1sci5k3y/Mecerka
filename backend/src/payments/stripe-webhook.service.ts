@@ -69,11 +69,8 @@ export class StripeWebhookService {
         },
       });
       return true;
-    } catch (error: unknown) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
         const staleBefore = new Date(
           Date.now() - StripeWebhookService.STALE_WEBHOOK_RECEIVED_MS,
         );
@@ -124,7 +121,7 @@ export class StripeWebhookService {
   }
 
   private async resolveActiveStripePaymentAccountWithinClient(
-    client: Prisma.TransactionClient,
+    client: any,
     ownerType: PaymentAccountOwnerType,
     ownerId: string,
   ) {
@@ -175,13 +172,8 @@ export class StripeWebhookService {
   }
 
   private validateConfirmedProviderPayment(
-    providerOrder: {
-      id: string;
-      subtotalAmount: unknown;
-      order: { id: string };
-      providerId: string;
-    },
-    paymentSession: { id: string },
+    providerOrder: any,
+    paymentSession: any,
     expectedStripeAccountId: string,
     confirmation?: PaymentConfirmationPayload,
   ) {
@@ -264,256 +256,255 @@ export class StripeWebhookService {
     }
 
     try {
-      const result = await this.prisma.$transaction(
-        async (tx: Prisma.TransactionClient) => {
-          const now = new Date();
+      const result = await this.prisma.$transaction(async (tx: any) => {
+        const now = new Date();
 
-          const paymentSession = await tx.providerPaymentSession.findUnique({
-            where: { externalSessionId },
-            include: {
-              providerOrder: {
-                include: { items: true },
+        const paymentSession = await tx.providerPaymentSession.findUnique({
+          where: { externalSessionId },
+          include: {
+            providerOrder: {
+              include: { items: true },
+            },
+          },
+        });
+
+        if (!paymentSession) {
+          throw new NotFoundException('Payment session not found');
+        }
+
+        if (
+          paymentSession.status === PaymentSessionStatus.EXPIRED ||
+          paymentSession.status === PaymentSessionStatus.FAILED
+        ) {
+          throw new ConflictException(
+            'Inactive payment session cannot be confirmed',
+          );
+        }
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "StockReservation" WHERE "providerOrderId" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
+        );
+
+        const providerOrder = await tx.providerOrder.findUnique({
+          where: { id: paymentSession.providerOrderId },
+          include: {
+            order: {
+              select: {
+                id: true,
+                status: true,
               },
             },
-          });
-
-          if (!paymentSession) {
-            throw new NotFoundException('Payment session not found');
-          }
-
-          if (
-            paymentSession.status === PaymentSessionStatus.EXPIRED ||
-            paymentSession.status === PaymentSessionStatus.FAILED
-          ) {
-            throw new ConflictException(
-              'Inactive payment session cannot be confirmed',
-            );
-          }
-
-          await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM "ProviderOrder" WHERE "id" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
-          );
-
-          await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM "StockReservation" WHERE "providerOrderId" = ${paymentSession.providerOrderId}::uuid FOR UPDATE`,
-          );
-
-          const providerOrder = await tx.providerOrder.findUnique({
-            where: { id: paymentSession.providerOrderId },
-            include: {
-              order: {
-                select: {
-                  id: true,
-                  status: true,
-                },
-              },
-              reservations: {
-                where: { status: 'ACTIVE' },
-                select: {
-                  id: true,
-                  productId: true,
-                  quantity: true,
-                  expiresAt: true,
-                },
-              },
-              items: true,
-            },
-          });
-
-          if (!providerOrder) {
-            throw new NotFoundException('ProviderOrder not found');
-          }
-
-          if (
-            providerOrder.paymentRef &&
-            providerOrder.paymentRef !== externalSessionId
-          ) {
-            throw new ConflictException(
-              'Superseded payment session cannot be confirmed',
-            );
-          }
-
-          if (paymentSession.status === PaymentSessionStatus.COMPLETED) {
-            return {
-              message: 'Provider payment session already completed',
-              status: providerOrder.status,
-            };
-          }
-
-          if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
-            return {
-              message: 'ProviderOrder already paid',
-              status: providerOrder.status,
-            };
-          }
-
-          if (providerOrder.reservations.length === 0) {
-            throw new ConflictException(
-              'ProviderOrder has no active reservations to consume',
-            );
-          }
-
-          const hasExpiredReservations = providerOrder.reservations.some(
-            (reservation: { expiresAt?: Date | null }) =>
-              reservation.expiresAt instanceof Date &&
-              reservation.expiresAt.getTime() <= now.getTime(),
-          );
-          if (hasExpiredReservations) {
-            this.logger.warn(
-              `Stripe webhook ${eventId} confirmed expired reservation for providerOrder ${providerOrder.id} and session ${externalSessionId}`,
-            );
-          }
-
-          const paymentAccount =
-            await this.resolveActiveStripePaymentAccountWithinClient(
-              tx,
-              PaymentAccountOwnerType.PROVIDER,
-              providerOrder.providerId,
-            );
-
-          if (!paymentAccount?.externalAccountId) {
-            throw new ConflictException(
-              'Provider payment account is not active for this provider order',
-            );
-          }
-
-          this.validateConfirmedProviderPayment(
-            providerOrder,
-            paymentSession,
-            paymentAccount.externalAccountId,
-            confirmation,
-          );
-
-          await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM "Order" WHERE "id" = ${providerOrder.order.id}::uuid FOR UPDATE`,
-          );
-
-          const productIds = [
-            ...new Set<string>(
-              providerOrder.reservations.map(
-                (reservation: { productId: string }) => reservation.productId,
-              ),
-            ),
-          ].sort();
-
-          await tx.$executeRaw(
-            Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
-              productIds.map((id) => Prisma.sql`${id}::uuid`),
-            )}) FOR UPDATE`,
-          );
-
-          const reservationIds = providerOrder.reservations.map(
-            (reservation: { id: string }) => reservation.id,
-          );
-
-          const consumedReservations = await tx.stockReservation.updateMany({
-            where: {
-              id: {
-                in: reservationIds,
-              },
-              providerOrderId: providerOrder.id,
-              status: 'ACTIVE',
-            },
-            data: {
-              status: 'CONSUMED',
-            },
-          });
-
-          if (consumedReservations.count !== reservationIds.length) {
-            throw new ConflictException(
-              'Reservations changed during payment confirmation',
-            );
-          }
-
-          for (const reservation of providerOrder.reservations) {
-            const updated = await tx.product.updateMany({
-              where: {
-                id: reservation.productId,
-                stock: { gte: reservation.quantity },
-              },
-              data: {
-                stock: { decrement: reservation.quantity },
-              },
-            });
-
-            if (updated.count !== 1) {
-              throw new ConflictException(
-                'Concurrent stock update detected during payment confirmation',
-              );
-            }
-          }
-
-          await tx.providerPaymentSession.update({
-            where: { id: paymentSession.id },
-            data: {
-              status: PaymentSessionStatus.COMPLETED,
-            },
-          });
-
-          await tx.providerOrder.update({
-            where: { id: providerOrder.id },
-            data: {
-              paymentStatus: ProviderPaymentStatus.PAID,
-              status: ProviderOrderStatus.PAID,
-              paidAt: now,
-            },
-          });
-
-          const refreshedOrder = await tx.order.findUnique({
-            where: { id: providerOrder.order.id },
-            select: {
-              id: true,
-              status: true,
-              providerOrders: {
-                select: {
-                  id: true,
-                  paymentStatus: true,
-                },
+            reservations: {
+              where: { status: 'ACTIVE' },
+              select: {
+                id: true,
+                productId: true,
+                quantity: true,
+                expiresAt: true,
               },
             },
-          });
+            items: true,
+          },
+        });
 
-          if (!refreshedOrder) {
-            throw new NotFoundException('Order not found');
-          }
+        if (!providerOrder) {
+          throw new NotFoundException('ProviderOrder not found');
+        }
 
-          const allProviderOrdersPaid = refreshedOrder.providerOrders.every(
-            (sibling) => sibling.paymentStatus === ProviderPaymentStatus.PAID,
+        if (
+          providerOrder.paymentRef &&
+          providerOrder.paymentRef !== externalSessionId
+        ) {
+          throw new ConflictException(
+            'Superseded payment session cannot be confirmed',
           );
+        }
 
-          let updatedOrderStatus = refreshedOrder.status;
-          if (
-            allProviderOrdersPaid &&
-            refreshedOrder.status === DeliveryStatus.PENDING
-          ) {
-            updatedOrderStatus = DeliveryStatus.CONFIRMED;
-            await tx.order.update({
-              where: { id: refreshedOrder.id },
-              data: {
-                status: DeliveryStatus.CONFIRMED,
-                confirmedAt: now,
-              },
-            });
-          }
-
+        if (paymentSession.status === PaymentSessionStatus.COMPLETED) {
           return {
-            success: true,
-            orderId: refreshedOrder.id,
-            providerOrderId: providerOrder.id,
-            status: updatedOrderStatus,
-            paymentStatus: ProviderPaymentStatus.PAID,
-            paymentRef: externalSessionId,
-            _events: {
-              stateChanged: {
-                orderId: refreshedOrder.id,
-                status: updatedOrderStatus,
-                paymentRef: externalSessionId,
-              },
-              partialCancelled: null,
-            },
+            message: 'Provider payment session already completed',
+            status: providerOrder.status,
           };
-        },
-      );
+        }
+
+        if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
+          return {
+            message: 'ProviderOrder already paid',
+            status: providerOrder.status,
+          };
+        }
+
+        if (providerOrder.reservations.length === 0) {
+          throw new ConflictException(
+            'ProviderOrder has no active reservations to consume',
+          );
+        }
+
+        const hasExpiredReservations = providerOrder.reservations.some(
+          (reservation: { expiresAt?: Date | null }) =>
+            reservation.expiresAt instanceof Date &&
+            reservation.expiresAt.getTime() <= now.getTime(),
+        );
+        if (hasExpiredReservations) {
+          this.logger.warn(
+            `Stripe webhook ${eventId} confirmed expired reservation for providerOrder ${providerOrder.id} and session ${externalSessionId}`,
+          );
+        }
+
+        const paymentAccount =
+          await this.resolveActiveStripePaymentAccountWithinClient(
+            tx,
+            PaymentAccountOwnerType.PROVIDER,
+            providerOrder.providerId,
+          );
+
+        if (!paymentAccount?.externalAccountId) {
+          throw new ConflictException(
+            'Provider payment account is not active for this provider order',
+          );
+        }
+
+        this.validateConfirmedProviderPayment(
+          providerOrder,
+          paymentSession,
+          paymentAccount.externalAccountId,
+          confirmation,
+        );
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Order" WHERE "id" = ${providerOrder.order.id}::uuid FOR UPDATE`,
+        );
+
+        const productIds = [
+          ...new Set(
+            providerOrder.reservations.map(
+              (reservation: any) => reservation.productId,
+            ),
+          ),
+        ].sort();
+
+        await tx.$executeRaw(
+          Prisma.sql`SELECT 1 FROM "Product" WHERE "id" IN (${Prisma.join(
+            productIds.map((id) => Prisma.sql`${id}::uuid`),
+          )}) FOR UPDATE`,
+        );
+
+        const reservationIds = providerOrder.reservations.map(
+          (reservation: any) => reservation.id,
+        );
+
+        const consumedReservations = await tx.stockReservation.updateMany({
+          where: {
+            id: {
+              in: reservationIds,
+            },
+            providerOrderId: providerOrder.id,
+            status: 'ACTIVE',
+          },
+          data: {
+            status: 'CONSUMED',
+          },
+        });
+
+        if (consumedReservations.count !== reservationIds.length) {
+          throw new ConflictException(
+            'Reservations changed during payment confirmation',
+          );
+        }
+
+        for (const reservation of providerOrder.reservations) {
+          const updated = await tx.product.updateMany({
+            where: {
+              id: reservation.productId,
+              stock: { gte: reservation.quantity },
+            },
+            data: {
+              stock: { decrement: reservation.quantity },
+            },
+          });
+
+          if (updated.count !== 1) {
+            throw new ConflictException(
+              'Concurrent stock update detected during payment confirmation',
+            );
+          }
+        }
+
+        await tx.providerPaymentSession.update({
+          where: { id: paymentSession.id },
+          data: {
+            status: PaymentSessionStatus.COMPLETED,
+          },
+        });
+
+        await tx.providerOrder.update({
+          where: { id: providerOrder.id },
+          data: {
+            paymentStatus: ProviderPaymentStatus.PAID,
+            status: ProviderOrderStatus.PAID,
+            paidAt: now,
+          },
+        });
+
+        const refreshedOrder = await tx.order.findUnique({
+          where: { id: providerOrder.order.id },
+          select: {
+            id: true,
+            status: true,
+            providerOrders: {
+              select: {
+                id: true,
+                paymentStatus: true,
+              },
+            },
+          },
+        });
+
+        if (!refreshedOrder) {
+          throw new NotFoundException('Order not found');
+        }
+
+        const allProviderOrdersPaid = refreshedOrder.providerOrders.every(
+          (sibling: any) =>
+            sibling.paymentStatus === ProviderPaymentStatus.PAID,
+        );
+
+        let updatedOrderStatus = refreshedOrder.status;
+        if (
+          allProviderOrdersPaid &&
+          refreshedOrder.status === DeliveryStatus.PENDING
+        ) {
+          updatedOrderStatus = DeliveryStatus.CONFIRMED;
+          await tx.order.update({
+            where: { id: refreshedOrder.id },
+            data: {
+              status: DeliveryStatus.CONFIRMED,
+              confirmedAt: now,
+            },
+          });
+        }
+
+        return {
+          success: true,
+          orderId: refreshedOrder.id,
+          providerOrderId: providerOrder.id,
+          status: updatedOrderStatus,
+          paymentStatus: ProviderPaymentStatus.PAID,
+          paymentRef: externalSessionId,
+          _events: {
+            stateChanged: {
+              orderId: refreshedOrder.id,
+              status: updatedOrderStatus,
+              paymentRef: externalSessionId,
+            },
+            partialCancelled: null,
+          },
+        };
+      });
 
       if (result?._events) {
         this.eventEmitter.emit(
