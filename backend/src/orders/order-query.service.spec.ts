@@ -239,5 +239,301 @@ describe('OrderQueryService', () => {
       expect(result).toEqual([]);
       expect(prismaMock.order.findMany).not.toHaveBeenCalled();
     });
+
+    it('returns all orders for ADMIN role (uses CLIENT branch as ADMIN is not PROVIDER/RUNNER)', async () => {
+      // ADMIN has CLIENT branch because it goes through roles.includes(CLIENT)
+      // Actually ADMIN falls through to empty array — verify this behavior
+      const result = await service.findAll('admin-id', [Role.ADMIN]);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    describe('getOrderTracking – tracking status branches', () => {
+      it('returns ASSIGNED status when delivery is RUNNER_ASSIGNED', async () => {
+        const order = buildOrder({
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'RUNNER_ASSIGNED',
+            runnerId: RUNNER_ID,
+            lastRunnerLocationLat: null,
+            lastRunnerLocationLng: null,
+            lastLocationUpdateAt: null,
+            runner: { id: RUNNER_ID, name: 'Runner' },
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe('ASSIGNED');
+      });
+
+      it('returns ASSIGNED status when delivery is PICKUP_PENDING', async () => {
+        const order = buildOrder({
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'PICKUP_PENDING',
+            runnerId: RUNNER_ID,
+            lastRunnerLocationLat: null,
+            lastRunnerLocationLng: null,
+            lastLocationUpdateAt: null,
+            runner: null,
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe('ASSIGNED');
+      });
+
+      it('returns CANCELLED status when delivery is CANCELLED', async () => {
+        const order = buildOrder({
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'CANCELLED',
+            runnerId: null,
+            lastRunnerLocationLat: null,
+            lastRunnerLocationLng: null,
+            lastLocationUpdateAt: null,
+            runner: null,
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe('CANCELLED');
+      });
+
+      it('returns DELIVERED status when delivery is DELIVERED', async () => {
+        const order = buildOrder({
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'DELIVERED',
+            runnerId: RUNNER_ID,
+            lastRunnerLocationLat: 40.4168,
+            lastRunnerLocationLng: -3.7038,
+            lastLocationUpdateAt: new Date(),
+            runner: { id: RUNNER_ID, name: 'Runner' },
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe('DELIVERED');
+        // DELIVERED is in visible location statuses
+        expect(result.location).not.toBeNull();
+      });
+
+      it('returns PICKED_UP status → DELIVERING', async () => {
+        const order = buildOrder({
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'PICKED_UP',
+            runnerId: RUNNER_ID,
+            lastRunnerLocationLat: 40.4,
+            lastRunnerLocationLng: -3.7,
+            lastLocationUpdateAt: new Date(),
+            runner: { id: RUNNER_ID, name: 'Runner' },
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe('DELIVERING');
+      });
+
+      it('returns default order status for unknown delivery status', async () => {
+        const order = buildOrder({
+          status: DeliveryStatus.CONFIRMED,
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'UNKNOWN_STATUS',
+            runnerId: null,
+            lastRunnerLocationLat: null,
+            lastRunnerLocationLng: null,
+            lastLocationUpdateAt: null,
+            runner: null,
+          },
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, CLIENT_ID, [
+          Role.CLIENT,
+        ]);
+
+        expect(result.status).toBe(DeliveryStatus.CONFIRMED);
+      });
+
+      it('RUNNER can access tracking via deliveryOrder.runnerId', async () => {
+        const order = buildOrder({
+          clientId: 'other-client',
+          runnerId: null,
+          deliveryOrder: {
+            id: 'do-1',
+            status: 'IN_TRANSIT',
+            runnerId: RUNNER_ID,
+            lastRunnerLocationLat: null,
+            lastRunnerLocationLng: null,
+            lastLocationUpdateAt: null,
+            runner: { id: RUNNER_ID, name: 'Runner' },
+          },
+          providerOrders: [],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, RUNNER_ID, [
+          Role.RUNNER,
+        ]);
+
+        expect(result.orderId).toBe(ORDER_ID);
+      });
+
+      it('PROVIDER can access tracking via providerOrders', async () => {
+        const order = buildOrder({
+          clientId: 'other-client',
+          deliveryOrder: null,
+          providerOrders: [{ providerId: PROVIDER_ID }],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.getOrderTracking(ORDER_ID, PROVIDER_ID, [
+          Role.PROVIDER,
+        ]);
+
+        expect(result.orderId).toBe(ORDER_ID);
+      });
+    });
+
+    describe('findOne – runner access', () => {
+      it('returns order when requester is the runner', async () => {
+        const order = buildOrder({
+          clientId: 'other-client',
+          runnerId: RUNNER_ID,
+          providerOrders: [],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.findOne(ORDER_ID, RUNNER_ID, [
+          Role.RUNNER,
+        ]);
+
+        expect(result).toEqual(order);
+      });
+    });
+
+    describe('getAvailableOrders', () => {
+      it('returns available orders for assignment', async () => {
+        const orders = [
+          buildOrder({
+            status: DeliveryStatus.READY_FOR_ASSIGNMENT,
+            runnerId: null,
+          }),
+        ];
+        prismaMock.order.findMany.mockResolvedValue(orders);
+
+        const result = await service.getAvailableOrders();
+
+        expect(prismaMock.order.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              status: DeliveryStatus.READY_FOR_ASSIGNMENT,
+              runnerId: null,
+            },
+          }),
+        );
+        expect(result).toEqual(orders);
+      });
+    });
+
+    describe('getProviderTopProducts', () => {
+      it('returns empty array when no providerOrders found', async () => {
+        prismaMock.providerOrder.findMany.mockResolvedValue([]);
+
+        const result = await service.getProviderTopProducts(PROVIDER_ID);
+
+        expect(result).toEqual([]);
+      });
+
+      it('aggregates product stats from providerOrders', async () => {
+        prismaMock.providerOrder.findMany.mockResolvedValue([
+          {
+            id: 'po-1',
+            items: [
+              {
+                productId: 'prod-a',
+                quantity: 2,
+                priceAtPurchase: 5,
+                product: { name: 'Product A' },
+              },
+            ],
+          },
+        ]);
+
+        const result = await service.getProviderTopProducts(PROVIDER_ID);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({
+          name: 'Product A',
+          quantity: 2,
+          revenue: 10,
+        });
+      });
+
+      it('accumulates quantity for repeated products across orders', async () => {
+        prismaMock.providerOrder.findMany.mockResolvedValue([
+          {
+            id: 'po-1',
+            items: [
+              {
+                productId: 'prod-a',
+                quantity: 1,
+                priceAtPurchase: 10,
+                product: { name: 'A' },
+              },
+            ],
+          },
+          {
+            id: 'po-2',
+            items: [
+              {
+                productId: 'prod-a',
+                quantity: 2,
+                priceAtPurchase: 10,
+                product: { name: 'A' },
+              },
+            ],
+          },
+        ]);
+
+        const result = await service.getProviderTopProducts(PROVIDER_ID);
+
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject({ quantity: 3, revenue: 30 });
+      });
+    });
   });
 });

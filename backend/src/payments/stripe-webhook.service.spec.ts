@@ -322,4 +322,393 @@ describe('StripeWebhookService', () => {
       );
     });
   });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    // claimWebhookEvent: P2002 but stale RECEIVED → reclaimed (count=1)
+    it('reclama un evento RECEIVED expirado (stale) y lo reprocesa', async () => {
+      prismaMock.paymentWebhookEvent.create.mockRejectedValue({
+        code: 'P2002',
+      });
+      prismaMock.paymentWebhookEvent.updateMany.mockResolvedValue({ count: 1 });
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      setupSuccessfulTransaction();
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_stale`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toHaveProperty('success', true);
+    });
+
+    // claimWebhookEvent: error other than P2002 → rethrows
+    it('relanza el error si no es P2002 en claimWebhookEvent', async () => {
+      prismaMock.paymentWebhookEvent.create.mockRejectedValue(
+        new Error('unexpected DB error'),
+      );
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_unknown`,
+          EVENT_TYPE,
+          buildConfirmation(),
+        ),
+      ).rejects.toThrow('unexpected DB error');
+    });
+
+    // validateConfirmedProviderPayment: confirmation is undefined
+    it('lanza ConflictException si la confirmation payload está ausente', async () => {
+      setupSuccessfulTransaction();
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_noconf`,
+          EVENT_TYPE,
+          undefined,
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // validateConfirmedProviderPayment: amount mismatch
+    it('lanza ConflictException si el importe pagado no coincide', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_amtmismatch`,
+          EVENT_TYPE,
+          buildConfirmation({ amountReceived: 9999 }),
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // validateConfirmedProviderPayment: currency mismatch
+    it('lanza ConflictException si la moneda no coincide', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_curr`,
+          EVENT_TYPE,
+          buildConfirmation({ currency: 'usd' }),
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // validateConfirmedProviderPayment: accountId missing
+    it('lanza ConflictException si el accountId está ausente', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_noacct`,
+          EVENT_TYPE,
+          buildConfirmation({ accountId: null }),
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // validateConfirmedProviderPayment: accountId mismatch
+    it('lanza ConflictException si el accountId no coincide con el proveedor', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      await expect(
+        service.confirmProviderOrderPayment(
+          SESSION_ID,
+          `${EVENT_ID}_acctmismatch`,
+          EVENT_TYPE,
+          buildConfirmation({ accountId: 'acct_wrong' }),
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // Payment session status already COMPLETED → early return
+    it('retorna early cuando la sesión ya está COMPLETED', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue(
+              buildPaymentSession({ status: 'COMPLETED' as any }),
+            ),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_completed`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toMatchObject({
+        message: 'Provider payment session already completed',
+      });
+    });
+
+    // ProviderOrder already PAID → early return
+    it('retorna early cuando el providerOrder ya está PAID', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue(buildProviderOrder({ paymentStatus: 'PAID' })),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(true)),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_paid`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toMatchObject({ message: 'ProviderOrder already paid' });
+    });
+
+    // isProcessed: event does not exist → false
+    it('isProcessed returns false when event does not exist', async () => {
+      prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+
+      const result = await service.isProcessed('nonexistent-event');
+
+      expect(result).toBe(false);
+    });
+
+    // isProcessed: event in PROCESSED state → true
+    it('isProcessed returns true for PROCESSED status', async () => {
+      prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue({
+        status: 'PROCESSED',
+      });
+
+      const result = await service.isProcessed('processed-event');
+
+      expect(result).toBe(true);
+    });
+
+    // isProcessed: event in RECEIVED state → false
+    it('isProcessed returns false for RECEIVED status', async () => {
+      prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue({
+        status: 'RECEIVED',
+      });
+
+      const result = await service.isProcessed('received-event');
+
+      expect(result).toBe(false);
+    });
+
+    // Not all provider orders paid → status stays PENDING (no CONFIRMED transition)
+    it('no actualiza el estado de la orden a CONFIRMED si no todos los providerOrders están pagados', async () => {
+      prismaMock.paymentWebhookEvent.create.mockResolvedValue({});
+      prismaMock.paymentWebhookEvent.update.mockResolvedValue({});
+
+      const txMock = {
+        $executeRaw: jest.fn().mockResolvedValue(1),
+        providerPaymentSession: {
+          findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue(buildProviderOrder()),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        paymentAccount: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ externalAccountId: STRIPE_ACCOUNT_ID }),
+        },
+        user: { findUnique: jest.fn().mockResolvedValue(null) },
+        stockReservation: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        product: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        order: {
+          findUnique: jest.fn().mockResolvedValue(buildRefreshedOrder(false)), // not all paid
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      prismaMock.$transaction.mockImplementation((cb: any) => cb(txMock));
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_partial`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toHaveProperty('success', true);
+      // order.update should NOT be called for status change
+      expect(txMock.order.update).not.toHaveBeenCalled();
+    });
+  });
 });

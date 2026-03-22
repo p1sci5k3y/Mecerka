@@ -1,3 +1,4 @@
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from './cart.service';
@@ -608,6 +609,160 @@ describe('CartService', () => {
 
     expect(transactionCartProviderDelete).toHaveBeenCalledWith({
       where: { id: 'cart-provider-1' },
+    });
+  });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    describe('addItem', () => {
+      it('throws NotFoundException when product does not exist', async () => {
+        prismaMock.product.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.addItem('client-1', {
+            productId: 'missing-prod',
+            quantity: 1,
+          } as any),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws BadRequestException when cart has a different city than the product', async () => {
+        prismaMock.product.findFirst.mockResolvedValue({
+          id: 'prod-1',
+          cityId: 'city-2',
+          providerId: 'prov-1',
+          reference: 'REF',
+          name: 'Product A',
+          imageUrl: null,
+          price: 10,
+          discountPrice: null,
+          clientDiscounts: [],
+        });
+
+        // Cart exists with city-1
+        prismaMock.cartGroup.findFirst.mockResolvedValue({
+          id: 'cart-1',
+          clientId: 'client-1',
+          cityId: 'city-1', // different from product cityId
+          status: 'ACTIVE',
+          city: null,
+          providers: [],
+        });
+
+        await expect(
+          service.addItem('client-1', {
+            productId: 'prod-1',
+            quantity: 1,
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('sets cityId on cart when cart has no city assigned', async () => {
+        prismaMock.product.findFirst.mockResolvedValue({
+          id: 'prod-1',
+          cityId: 'city-1',
+          providerId: 'prov-1',
+          reference: 'REF',
+          name: 'Product A',
+          imageUrl: null,
+          price: 10,
+          discountPrice: null,
+          clientDiscounts: [],
+        });
+
+        // Cart has no cityId
+        prismaMock.cartGroup.findFirst.mockResolvedValue({
+          id: 'cart-1',
+          clientId: 'client-1',
+          cityId: null,
+          status: 'ACTIVE',
+          city: null,
+          providers: [],
+        });
+
+        const cartGroupUpdateMock = jest.fn().mockResolvedValue({});
+        const cartProviderUpsertMock = jest
+          .fn()
+          .mockResolvedValue({ id: 'cp-1' });
+        const cartItemFindUniqueMock = jest.fn().mockResolvedValue(null);
+        const cartItemCreateMock = jest.fn().mockResolvedValue({});
+
+        prismaMock.$transaction.mockImplementation(async (callback: any) =>
+          callback({
+            cartGroup: { update: cartGroupUpdateMock },
+            cartProvider: {
+              upsert: cartProviderUpsertMock,
+              update: jest.fn().mockResolvedValue({}),
+            },
+            cartItem: {
+              findUnique: cartItemFindUniqueMock,
+              create: cartItemCreateMock,
+              findMany: jest
+                .fn()
+                .mockResolvedValue([
+                  { quantity: 1, effectiveUnitPriceSnapshot: 10 },
+                ]),
+              update: jest.fn().mockResolvedValue({}),
+            },
+          }),
+        );
+
+        prismaMock.cartGroup.findUniqueOrThrow.mockResolvedValue({
+          id: 'cart-1',
+          providers: [],
+        });
+
+        await service.addItem('client-1', {
+          productId: 'prod-1',
+          quantity: 1,
+        } as any);
+
+        // cityId should have been set on cart
+        expect(cartGroupUpdateMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ cityId: 'city-1' }),
+          }),
+        );
+      });
+    });
+
+    describe('updateItemQuantity', () => {
+      it('throws NotFoundException when cart item does not exist', async () => {
+        prismaMock.cartItem.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.updateItemQuantity('client-1', 'missing-item', {
+            quantity: 2,
+          } as any),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws NotFoundException when product is no longer available', async () => {
+        prismaMock.cartItem.findFirst.mockResolvedValue({
+          id: 'item-1',
+          productId: 'prod-1',
+          cartProviderId: 'cp-1',
+          cartProvider: { cartGroupId: 'cart-1' },
+        });
+        prismaMock.product.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.updateItemQuantity('client-1', 'item-1', {
+            quantity: 2,
+          } as any),
+        ).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe('removeItem', () => {
+      it('throws NotFoundException when cart item does not exist', async () => {
+        prismaMock.cartItem.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.removeItem('client-1', 'missing-item'),
+        ).rejects.toThrow(NotFoundException);
+      });
     });
   });
 });

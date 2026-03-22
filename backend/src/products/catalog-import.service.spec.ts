@@ -414,4 +414,300 @@ describe('CatalogImportService', () => {
     expect(body).toContain("'=Unsafe Name");
     expect(body).toContain("'+Potential formula");
   });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    describe('validateImport', () => {
+      it('throws BadRequestException when file is missing', async () => {
+        await expect(
+          service.validateImport('provider-1', undefined),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when file buffer is empty', async () => {
+        await expect(
+          service.validateImport('provider-1', {
+            buffer: Buffer.alloc(0),
+          } as any),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws NotFoundException when provider does not exist', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.validateImport('missing-provider', {
+            buffer: Buffer.from('reference,name\nREF-001,Test'),
+            originalname: 'catalog.csv',
+          } as any),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('creates FAILED job when CSV rows have validation errors', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-fail',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              ',Missing Reference,desc,furniture,10.00,,5,', // missing reference
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+        expect(result.failedCount).toBeGreaterThan(0);
+      });
+
+      it('creates FAILED job for duplicate reference in file', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-dup',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair A,desc,furniture,10.00,,5,',
+              'REF-001,Chair B,desc,furniture,15.00,,3,', // duplicate ref
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+
+      it('creates FAILED job when category is unknown', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-cat',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair,desc,unknown-category,10.00,,5,',
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+
+      it('creates FAILED job when price is invalid', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-price',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair,desc,furniture,NOT_A_PRICE,,5,',
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+
+      it('creates FAILED job when stock is invalid (float)', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-stock',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair,desc,furniture,10.00,,1.5,', // float stock not valid
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+
+      it('creates FAILED job when image_url is invalid', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-imgurl',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair,desc,furniture,10.00,,5,not-a-valid-url',
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+
+      it('creates FAILED job when discount_price >= price', async () => {
+        prismaMock.provider.findUnique.mockResolvedValue({
+          userId: 'provider-1',
+          cityId: 'city-1',
+        });
+        prismaMock.category.findMany.mockResolvedValue([
+          { id: 'cat-1', name: 'Furniture', slug: 'furniture' },
+        ]);
+        prismaMock.productImportJob.create.mockImplementation(
+          ({ data }: any) => ({
+            id: 'job-discount',
+            ...data,
+          }),
+        );
+
+        const file = {
+          originalname: 'catalog.csv',
+          buffer: Buffer.from(
+            [
+              'reference,name,description,category,price,discount_price,stock,image_url',
+              'REF-001,Chair,desc,furniture,10.00,10.00,5,', // discount == price
+            ].join('\n'),
+          ),
+        };
+
+        const result = await service.validateImport('provider-1', file);
+
+        expect(result.status).toBe(ProductImportJobStatus.FAILED);
+      });
+    });
+
+    describe('getImportJob', () => {
+      it('throws NotFoundException when job does not exist', async () => {
+        prismaMock.productImportJob.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.getImportJob('provider-1', 'missing-job'),
+        ).rejects.toThrow(NotFoundException);
+      });
+    });
+
+    describe('applyImport', () => {
+      it('throws NotFoundException when job does not exist', async () => {
+        prismaMock.productImportJob.findFirst.mockResolvedValue(null);
+
+        await expect(
+          service.applyImport('provider-1', 'missing-job'),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('returns job immediately if already APPLIED', async () => {
+        const job = {
+          id: 'job-1',
+          status: ProductImportJobStatus.APPLIED,
+          payload: null,
+        };
+        prismaMock.productImportJob.findFirst.mockResolvedValue(job);
+
+        const result = await service.applyImport('provider-1', 'job-1');
+
+        expect(result).toEqual(job);
+      });
+
+      it('throws BadRequestException if job status is not VALIDATED', async () => {
+        prismaMock.productImportJob.findFirst.mockResolvedValue({
+          id: 'job-1',
+          status: ProductImportJobStatus.FAILED,
+          payload: null,
+        });
+
+        await expect(
+          service.applyImport('provider-1', 'job-1'),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('exportTemplate', () => {
+      it('returns a CSV template file', () => {
+        const result = service.exportTemplate();
+
+        expect(result.filename).toBe('catalog-template.csv');
+        expect(result.contentType).toContain('text/csv');
+        expect(result.buffer.toString('utf8')).toContain('reference');
+      });
+    });
+  });
 });
