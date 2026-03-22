@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -206,5 +210,110 @@ describe('ProductsService', () => {
         discountPrice: 15,
       }),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  describe('additional branch coverage - ProductsService', () => {
+    it('returns empty array from attachAvailableStock when products list is empty', async () => {
+      prismaMock.product.findMany.mockResolvedValue([]);
+      prismaMock.stockReservation.groupBy.mockResolvedValue([]);
+
+      const result = await service.findAll();
+
+      expect(result).toEqual([]);
+      expect(prismaMock.stockReservation.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when product does not exist in assertProviderOwnedProduct', async () => {
+      prismaMock.product.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.upsertClientDiscount('missing-prod', 'provider-1', {
+          clientId: 'client-1',
+          discountPrice: 10,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws NotFoundException when client is not found in assertClientUser', async () => {
+      prismaMock.product.findUnique.mockResolvedValue({
+        id: 'prod-1',
+        providerId: 'provider-1',
+        price: 20,
+        discountPrice: null,
+      });
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.upsertClientDiscount('prod-1', 'provider-1', {
+          clientId: 'inactive-client',
+          discountPrice: 10,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException when target user does not have CLIENT role', async () => {
+      prismaMock.product.findUnique.mockResolvedValue({
+        id: 'prod-1',
+        providerId: 'provider-1',
+        price: 20,
+        discountPrice: null,
+      });
+      prismaMock.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        active: true,
+        roles: ['RUNNER'],
+        name: 'Runner',
+        email: 'runner@example.com',
+      });
+
+      await expect(
+        service.upsertClientDiscount('prod-1', 'provider-1', {
+          clientId: 'user-1',
+          discountPrice: 10,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('sets availableStock to 0 when reserved stock exceeds physical stock', async () => {
+      prismaMock.product.findMany.mockResolvedValue([
+        {
+          id: 'prod-over',
+          name: 'Overbooked',
+          stock: 2,
+          price: 10,
+          provider: { id: 'p-1', name: 'P' },
+          city: { id: 'c-1', name: 'Madrid' },
+          category: { id: 'cat-1', name: 'X' },
+        },
+      ]);
+      prismaMock.stockReservation.groupBy.mockResolvedValue([
+        { productId: 'prod-over', _sum: { quantity: 100 } },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result[0]).toEqual(expect.objectContaining({ availableStock: 0 }));
+    });
+
+    it('uses 0 when reservation _sum.quantity is null', async () => {
+      prismaMock.product.findMany.mockResolvedValue([
+        {
+          id: 'prod-no-res',
+          name: 'NoRes',
+          stock: 5,
+          price: 10,
+          provider: { id: 'p-1', name: 'P' },
+          city: { id: 'c-1', name: 'Madrid' },
+          category: { id: 'cat-1', name: 'X' },
+        },
+      ]);
+      prismaMock.stockReservation.groupBy.mockResolvedValue([
+        { productId: 'prod-no-res', _sum: { quantity: null } },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result[0]).toEqual(expect.objectContaining({ availableStock: 5 }));
+    });
   });
 });

@@ -207,4 +207,184 @@ describe('RunnerGateway Security & Auth', () => {
       expect(mockSocket.join).toHaveBeenCalledWith('order:ord-123:client');
     });
   });
+
+  describe('additional branch coverage - RunnerGateway', () => {
+    it('disconnects client when no token is provided', async () => {
+      const mockSocket = {
+        id: 'socket-no-token',
+        handshake: { headers: {}, auth: {}, query: {} },
+        disconnect: jest.fn(),
+      } as any;
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('disconnects when user is inactive', async () => {
+      const mockSocket = {
+        id: 'socket-inactive',
+        handshake: { query: { token: 'valid-token' } },
+        disconnect: jest.fn(),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        sub: 'user-id',
+        roles: [Role.RUNNER],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: Math.floor(Date.now() / 1000),
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: false,
+        tokenVersion: 1,
+        mfaEnabled: false,
+        passwordChangedAt: null,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('disconnects when token was issued before password change', async () => {
+      const mockSocket = {
+        id: 'socket-old-token',
+        handshake: { query: { token: 'valid-token' } },
+        disconnect: jest.fn(),
+      } as any;
+
+      const passwordChangedAt = new Date(Date.now() - 1000);
+      const iatBefore = Math.floor((passwordChangedAt.getTime() - 5000) / 1000);
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        sub: 'user-id',
+        roles: [Role.RUNNER],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: iatBefore,
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 1,
+        mfaEnabled: false,
+        passwordChangedAt,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('disconnects when MFA is required but not authenticated', async () => {
+      const mockSocket = {
+        id: 'socket-no-mfa',
+        handshake: { query: { token: 'valid-token' } },
+        disconnect: jest.fn(),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        sub: 'user-id',
+        roles: [Role.RUNNER],
+        tokenVersion: 1,
+        mfaAuthenticated: false,
+        iat: Math.floor(Date.now() / 1000),
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 1,
+        mfaEnabled: true,
+        passwordChangedAt: null,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('allows ADMIN to join any order room', async () => {
+      const mockSocket = {
+        id: 'socket-admin',
+        data: {
+          userId: 'admin-user',
+          roles: [Role.ADMIN],
+        },
+        join: jest.fn(),
+      } as any;
+
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        id: 'ord-999',
+        clientId: 'client-1',
+        runnerId: 'runner-1',
+        providerOrders: [],
+      });
+
+      await gateway.handleJoinOrder({ orderId: 'ord-999' }, mockSocket);
+
+      expect(mockSocket.join).toHaveBeenCalledWith('order:ord-999');
+    });
+
+    it('allows PROVIDER to join an order room', async () => {
+      const mockSocket = {
+        id: 'socket-provider',
+        data: {
+          userId: 'provider-user',
+          roles: [Role.PROVIDER],
+        },
+        join: jest.fn(),
+      } as any;
+
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        id: 'ord-456',
+        clientId: 'client-1',
+        runnerId: 'runner-1',
+        providerOrders: [{ providerId: 'provider-user' }],
+      });
+
+      await gateway.handleJoinOrder({ orderId: 'ord-456' }, mockSocket);
+
+      expect(mockSocket.join).toHaveBeenCalledWith('order:ord-456');
+    });
+
+    it('throws WsException when order is not found', async () => {
+      const mockSocket = {
+        id: 'socket-runner',
+        data: { userId: 'runner-1', roles: [Role.RUNNER] },
+        join: jest.fn(),
+      } as any;
+
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        gateway.handleJoinOrder({ orderId: 'nonexistent' }, mockSocket),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('throws WsException when joinOrder called without userId', async () => {
+      const mockSocket = {
+        id: 'socket-unauth',
+        data: undefined,
+        join: jest.fn(),
+      } as any;
+
+      await expect(
+        gateway.handleJoinOrder({ orderId: 'ord-123' }, mockSocket),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('handleDisconnect cleans up rate limits for the disconnected user', () => {
+      const mockSocket = {
+        id: 'socket-disc',
+        data: { userId: 'runner-disc' },
+      } as any;
+
+      // Should not throw even if no rate limits stored
+      expect(() => gateway.handleDisconnect(mockSocket)).not.toThrow();
+    });
+
+    it('handleDisconnect works when socket has no data', () => {
+      const mockSocket = { id: 'socket-no-data', data: undefined } as any;
+      expect(() => gateway.handleDisconnect(mockSocket)).not.toThrow();
+    });
+  });
 });
