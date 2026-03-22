@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   Logger,
   ConflictException,
   NotFoundException,
@@ -7,6 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { IPaymentAccountRepository } from './repositories/payment-account.repository.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   DeliveryOrderStatus,
@@ -44,6 +46,8 @@ export class PaymentsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly configService: ConfigService,
     private readonly stripeWebhookService: StripeWebhookService,
+    @Inject(IPaymentAccountRepository)
+    private readonly paymentAccountRepository: IPaymentAccountRepository,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     if (!stripeSecretKey) {
@@ -225,26 +229,12 @@ export class PaymentsService {
     provider: PaymentAccountProvider,
     externalAccountId: string,
   ) {
-    return this.prisma.paymentAccount.upsert({
-      where: {
-        ownerType_ownerId_provider: {
-          ownerType,
-          ownerId,
-          provider,
-        },
-      },
-      update: {
-        externalAccountId,
-        isActive: true,
-      },
-      create: {
-        ownerType,
-        ownerId,
-        provider,
-        externalAccountId,
-        isActive: true,
-      },
-    });
+    return this.paymentAccountRepository.upsert(
+      ownerType,
+      ownerId,
+      provider,
+      externalAccountId,
+    );
   }
 
   async getActivePaymentAccount(
@@ -252,14 +242,11 @@ export class PaymentsService {
     ownerId: string,
     provider: PaymentAccountProvider,
   ) {
-    return this.prisma.paymentAccount.findFirst({
-      where: {
-        ownerType,
-        ownerId,
-        provider,
-        isActive: true,
-      },
-    });
+    return this.paymentAccountRepository.findActive(
+      ownerType,
+      ownerId,
+      provider,
+    );
   }
 
   private async resolveActiveStripePaymentAccount(
