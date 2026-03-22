@@ -26,7 +26,10 @@ import {
   OrderDeliveredEvent,
   OrderInTransitEvent,
 } from '../domain/events/order-events';
-import { IOrderRepository } from './repositories/order.repository.interface';
+import {
+  IOrderRepository,
+  ProviderOrderWithOrder,
+} from './repositories/order.repository.interface';
 
 @Injectable()
 export class OrderStatusService {
@@ -75,14 +78,19 @@ export class OrderStatusService {
         metadata,
       });
       await this.riskService.recalculateRiskScore(actorType, actorId);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(
-        `risk.orders.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+        `risk.orders.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${message}`,
       );
     }
   }
 
-  private getActingRole(po: any, userId: string, roles: Role[]): Role | null {
+  private getActingRole(
+    po: ProviderOrderWithOrder,
+    userId: string,
+    roles: Role[],
+  ): Role | null {
     if (roles.includes(Role.ADMIN)) return Role.ADMIN;
     if (po.order.runnerId === userId && roles.includes(Role.RUNNER))
       return Role.RUNNER;
