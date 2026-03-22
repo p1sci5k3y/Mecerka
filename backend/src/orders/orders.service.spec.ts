@@ -83,6 +83,19 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     orderRepositoryMock = {
       findById: jest.fn(),
       update: jest.fn(),
+      findWithProviderOrders: jest.fn(),
+      findWithProviderOrdersAndItems: jest.fn(),
+      findProviderOrderWithOrder: jest.fn(),
+      findProviderOrderById: jest.fn(),
+      updateStatus: jest.fn(),
+      updateProviderOrderStatusOptimistic: jest.fn(),
+      updateManyProviderOrdersStatus: jest.fn(),
+      acceptOrderOptimistic: jest.fn(),
+      completeOrderOptimistic: jest.fn(),
+      findRunnerProfile: jest.fn(),
+      cancelWithInventoryRestore: jest.fn(),
+      findByClientId: jest.fn(),
+      countByClient: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -115,7 +128,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
 
   describe('IN_TRANSIT Enforcement', () => {
     it('Should throw 409 (ConflictException) if Runner tries to mark IN_TRANSIT but ProviderOrder is not PICKED_UP', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({
+      orderRepositoryMock.findWithProviderOrders.mockResolvedValue({
         id: 'ord-123',
         runnerId: 'runner-123',
         status: DeliveryStatus.ASSIGNED,
@@ -131,7 +144,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     });
 
     it('Should mark IN_TRANSIT (200 OK logic) if Runner is correct and all active ProviderOrders are PICKED_UP', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({
+      orderRepositoryMock.findWithProviderOrders.mockResolvedValue({
         id: 'ord-123',
         runnerId: 'runner-123',
         status: DeliveryStatus.ASSIGNED,
@@ -140,7 +153,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
           { id: 'po-2', status: ProviderOrderStatus.REJECTED_BY_STORE }, // Ignore this one
         ],
       });
-      prismaMock.order.update.mockResolvedValue({
+      orderRepositoryMock.updateStatus.mockResolvedValue({
         id: 'ord-123',
         status: DeliveryStatus.IN_TRANSIT,
       });
@@ -148,10 +161,10 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       const result = await service.markInTransit('ord-123', 'runner-123');
 
       expect(result.status).toBe(DeliveryStatus.IN_TRANSIT);
-      expect(prismaMock.order.update).toHaveBeenCalledWith({
-        where: { id: 'ord-123' },
-        data: { status: DeliveryStatus.IN_TRANSIT },
-      });
+      expect(orderRepositoryMock.updateStatus).toHaveBeenCalledWith(
+        'ord-123',
+        DeliveryStatus.IN_TRANSIT,
+      );
       expect(eventEmitterMock.emit).toHaveBeenCalledWith(
         'order.stateChanged',
         expect.any(Object),
@@ -1445,14 +1458,18 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
 
   describe('CANCEL Enforcement', () => {
     it('Should cleanly cancel PENDING order if user is the CLIENT owner (200 OK logic)', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({
+      orderRepositoryMock.findWithProviderOrdersAndItems.mockResolvedValue({
         id: 'ord-123',
         clientId: 'client-123',
         status: DeliveryStatus.PENDING,
-        providerOrders: [{ id: 'po-1', status: ProviderOrderStatus.PENDING }],
+        providerOrders: [
+          { id: 'po-1', status: ProviderOrderStatus.PENDING, items: [] },
+        ],
       });
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        return { id: 'ord-123', status: DeliveryStatus.CANCELLED };
+      orderRepositoryMock.cancelWithInventoryRestore.mockResolvedValue({
+        id: 'ord-123',
+        status: DeliveryStatus.CANCELLED,
+        providerOrders: [],
       });
 
       const result = await service.cancelOrder('ord-123', 'client-123', [
@@ -1470,7 +1487,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     });
 
     it('Should throw 409 Conflict if CLIENT attempts to cancel a CONFIRMED order', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({
+      orderRepositoryMock.findWithProviderOrdersAndItems.mockResolvedValue({
         id: 'ord-123',
         clientId: 'client-123',
         status: DeliveryStatus.CONFIRMED,
@@ -1483,14 +1500,16 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
     });
 
     it('Should allow ADMIN to forcefully cancel a CONFIRMED order (200 OK logic)', async () => {
-      prismaMock.order.findUnique.mockResolvedValue({
+      orderRepositoryMock.findWithProviderOrdersAndItems.mockResolvedValue({
         id: 'ord-123',
         clientId: 'client-123',
         status: DeliveryStatus.CONFIRMED,
         providerOrders: [],
       });
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        return { id: 'ord-123', status: DeliveryStatus.CANCELLED };
+      orderRepositoryMock.cancelWithInventoryRestore.mockResolvedValue({
+        id: 'ord-123',
+        status: DeliveryStatus.CANCELLED,
+        providerOrders: [],
       });
 
       const result = await service.cancelOrder('ord-123', 'admin-999', [
@@ -1510,7 +1529,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
 
   describe('Runner acceptance constraints', () => {
     it('rejects a runner with inactive runner profile even if the role token is valid', async () => {
-      prismaMock.user.findUnique.mockResolvedValue({
+      orderRepositoryMock.findRunnerProfile.mockResolvedValue({
         stripeAccountId: 'acct_runner',
         runnerProfile: { isActive: false },
       });
@@ -1519,7 +1538,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         'Tu perfil de runner no esta activo para aceptar pedidos.',
       );
 
-      expect(prismaMock.order.findUnique).not.toHaveBeenCalled();
+      expect(orderRepositoryMock.findById).not.toHaveBeenCalled();
     });
   });
 });

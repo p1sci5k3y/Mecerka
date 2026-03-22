@@ -2,15 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import {
   DeliveryStatus,
-  Prisma,
   ProviderOrderStatus,
   RiskActorType,
   RiskCategory,
@@ -27,13 +26,15 @@ import {
   OrderDeliveredEvent,
   OrderInTransitEvent,
 } from '../domain/events/order-events';
+import { IOrderRepository } from './repositories/order.repository.interface';
 
 @Injectable()
 export class OrderStatusService {
   private readonly logger = new Logger(OrderStatusService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(IOrderRepository)
+    private readonly orderRepository: IOrderRepository,
     private readonly eventEmitter: EventEmitter2,
     @Optional() private readonly riskService?: RiskService,
   ) {}
@@ -93,72 +94,66 @@ export class OrderStatusService {
   }
 
   async evaluateReadyForAssignment(orderId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({
-        where: { id: orderId },
-        include: { providerOrders: true },
-      });
-      if (!order) return;
-      if (order.status !== DeliveryStatus.CONFIRMED) return;
+    const order = await this.orderRepository.findWithProviderOrders(orderId);
+    if (!order) return;
+    if (order.status !== DeliveryStatus.CONFIRMED) return;
 
-      const hasPendingOrPreparing = order.providerOrders.some((po) =>
-        (
-          [
-            ProviderOrderStatus.PENDING,
-            ProviderOrderStatus.ACCEPTED,
-            ProviderOrderStatus.PREPARING,
-          ] as ProviderOrderStatus[]
-        ).includes(po.status),
-      );
+    const hasPendingOrPreparing = order.providerOrders.some((po) =>
+      (
+        [
+          ProviderOrderStatus.PENDING,
+          ProviderOrderStatus.ACCEPTED,
+          ProviderOrderStatus.PREPARING,
+        ] as ProviderOrderStatus[]
+      ).includes(po.status),
+    );
 
-      const hasCancelledOrRejected = order.providerOrders.some((po) =>
-        (
-          [
-            ProviderOrderStatus.REJECTED_BY_STORE,
-            ProviderOrderStatus.CANCELLED,
-          ] as ProviderOrderStatus[]
-        ).includes(po.status),
-      );
+    const hasCancelledOrRejected = order.providerOrders.some((po) =>
+      (
+        [
+          ProviderOrderStatus.REJECTED_BY_STORE,
+          ProviderOrderStatus.CANCELLED,
+        ] as ProviderOrderStatus[]
+      ).includes(po.status),
+    );
 
-      if (hasPendingOrPreparing) {
-        return; // Wait for other providers
-      }
+    if (hasPendingOrPreparing) {
+      return; // Wait for other providers
+    }
 
-      if (hasCancelledOrRejected) {
-        // Partial Fulfillment Scenario
-        // The order remains in CONFIRMED state waiting for client decision
-        return {
-          event: 'order.partialCancelled',
-          data: { orderId },
-        };
-      }
-
-      // If all are READY_FOR_PICKUP (or PICKED_UP)
-      if (
-        !canTransitionOrder(order.status, DeliveryStatus.READY_FOR_ASSIGNMENT)
-      ) {
-        return; // Suppress and silently bypass illegal assignments
-      }
-
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: DeliveryStatus.READY_FOR_ASSIGNMENT },
-      });
-
-      this.logStructuredEvent(
-        'order.state_transition',
-        {
-          orderId,
-        },
-        'Order transitioned to READY_FOR_ASSIGNMENT',
-      );
-
-      // Event returned instead of emitted inside the transaction to prevent inconsistency
+    if (hasCancelledOrRejected) {
+      // Partial Fulfillment Scenario
+      // The order remains in CONFIRMED state waiting for client decision
       return {
-        event: 'order.stateChanged',
-        data: { orderId, status: DeliveryStatus.READY_FOR_ASSIGNMENT },
+        event: 'order.partialCancelled',
+        data: { orderId },
       };
-    });
+    }
+
+    // If all are READY_FOR_PICKUP (or PICKED_UP)
+    if (
+      !canTransitionOrder(order.status, DeliveryStatus.READY_FOR_ASSIGNMENT)
+    ) {
+      return; // Suppress and silently bypass illegal assignments
+    }
+
+    await this.orderRepository.updateStatus(
+      orderId,
+      DeliveryStatus.READY_FOR_ASSIGNMENT,
+    );
+
+    this.logStructuredEvent(
+      'order.state_transition',
+      {
+        orderId,
+      },
+      'Order transitioned to READY_FOR_ASSIGNMENT',
+    );
+
+    return {
+      event: 'order.stateChanged',
+      data: { orderId, status: DeliveryStatus.READY_FOR_ASSIGNMENT },
+    };
   }
 
   async updateProviderOrderStatus(
@@ -167,10 +162,8 @@ export class OrderStatusService {
     roles: Role[],
     status: ProviderOrderStatus,
   ) {
-    const po = await this.prisma.providerOrder.findUnique({
-      where: { id: providerOrderId },
-      include: { order: true },
-    });
+    const po =
+      await this.orderRepository.findProviderOrderWithOrder(providerOrderId);
     if (!po) throw new NotFoundException('ProviderOrder not found');
 
     const actingRole = this.getActingRole(po, userId, roles);
@@ -188,12 +181,14 @@ export class OrderStatusService {
     }
 
     // Optimistic Concurrency Update
-    const updated = await this.prisma.providerOrder.updateMany({
-      where: { id: providerOrderId, status: po.status },
-      data: { status },
-    });
+    const updatedCount =
+      await this.orderRepository.updateProviderOrderStatusOptimistic(
+        providerOrderId,
+        po.status,
+        status,
+      );
 
-    if (updated.count === 0) {
+    if (updatedCount === 0) {
       throw new ConflictException(
         'The order state has changed. Please refresh and try again.',
       );
@@ -207,12 +202,9 @@ export class OrderStatusService {
     ) {
       await this.evaluateReadyForAssignment(po.orderId);
     } else if (status === ProviderOrderStatus.PICKED_UP) {
-      // Logic for all items picked up is already in `markInTransit` for the runner, but we should evaluate it
-      // We can create a unified method later or check it here
-      const order = await this.prisma.order.findUnique({
-        where: { id: po.orderId },
-        include: { providerOrders: true },
-      });
+      const order = await this.orderRepository.findWithProviderOrders(
+        po.orderId,
+      );
       if (order?.status === DeliveryStatus.ASSIGNED) {
         const activeOrders = order.providerOrders.filter(
           (o) =>
@@ -223,10 +215,10 @@ export class OrderStatusService {
           (o) => o.status === ProviderOrderStatus.PICKED_UP,
         );
         if (allPickedUp) {
-          await this.prisma.order.update({
-            where: { id: order.id },
-            data: { status: DeliveryStatus.IN_TRANSIT },
-          });
+          await this.orderRepository.updateStatus(
+            order.id,
+            DeliveryStatus.IN_TRANSIT,
+          );
           this.logStructuredEvent(
             'order.state_transition',
             {
@@ -238,9 +230,8 @@ export class OrderStatusService {
       }
     }
 
-    const finalProviderOrder = await this.prisma.providerOrder.findUnique({
-      where: { id: providerOrderId },
-    });
+    const finalProviderOrder =
+      await this.orderRepository.findProviderOrderById(providerOrderId);
 
     if (
       finalProviderOrder &&
@@ -265,13 +256,7 @@ export class OrderStatusService {
   }
 
   async acceptOrder(id: string, runnerId: string) {
-    const runner = await this.prisma.user.findUnique({
-      where: { id: runnerId },
-      select: {
-        stripeAccountId: true,
-        runnerProfile: { select: { isActive: true } },
-      },
-    });
+    const runner = await this.orderRepository.findRunnerProfile(runnerId);
 
     if (!runner?.runnerProfile?.isActive) {
       throw new ForbiddenException(
@@ -285,26 +270,18 @@ export class OrderStatusService {
       );
     }
 
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.orderRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
     if (!canTransitionOrder(order.status, DeliveryStatus.ASSIGNED)) {
       throw new BadRequestException('Order cannot transition to ASSIGNED');
     }
 
-    const result = await this.prisma.order.updateMany({
-      where: {
-        id,
-        status: DeliveryStatus.READY_FOR_ASSIGNMENT,
-        runnerId: null,
-        clientId: { not: runnerId },
-      },
-      data: {
-        runnerId,
-        status: DeliveryStatus.ASSIGNED,
-      },
-    });
+    const count = await this.orderRepository.acceptOrderOptimistic(
+      id,
+      runnerId,
+    );
 
-    if (result.count === 0) {
+    if (count === 0) {
       throw new BadRequestException(
         'Order is already accepted, cannot be assigned, or you are trying to deliver your own order',
       );
@@ -320,11 +297,11 @@ export class OrderStatusService {
       'Order assigned to runner',
     );
 
-    return this.prisma.order.findUnique({ where: { id } });
+    return this.orderRepository.findById(id);
   }
 
   async completeOrder(id: string, runnerId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id } });
+    const order = await this.orderRepository.findById(id);
     if (!order) throw new NotFoundException('Order not found');
     if (!canTransitionOrder(order.status, DeliveryStatus.DELIVERED)) {
       throw new BadRequestException('Order cannot transition to DELIVERED');
@@ -333,18 +310,12 @@ export class OrderStatusService {
     // Note: Invariant Rule 2 verification
     // Must check if all sub-orders are PICKED_UP before delivering, or trust current DB status logic.
 
-    const result = await this.prisma.order.updateMany({
-      where: {
-        id,
-        runnerId,
-        status: DeliveryStatus.IN_TRANSIT,
-      },
-      data: {
-        status: DeliveryStatus.DELIVERED,
-      },
-    });
+    const count = await this.orderRepository.completeOrderOptimistic(
+      id,
+      runnerId,
+    );
 
-    if (result.count === 0) {
+    if (count === 0) {
       throw new BadRequestException(
         'Order cannot be completed in its current state (Must be IN_TRANSIT), or you are not the assigned runner',
       );
@@ -362,14 +333,11 @@ export class OrderStatusService {
       'Order marked as delivered',
     );
 
-    return this.prisma.order.findUnique({ where: { id } });
+    return this.orderRepository.findById(id);
   }
 
   async markInTransit(id: string, runnerId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { providerOrders: true },
-    });
+    const order = await this.orderRepository.findWithProviderOrders(id);
 
     if (!order) throw new NotFoundException('Order not found');
 
@@ -405,10 +373,10 @@ export class OrderStatusService {
       );
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: { status: DeliveryStatus.IN_TRANSIT },
-    });
+    const updated = await this.orderRepository.updateStatus(
+      id,
+      DeliveryStatus.IN_TRANSIT,
+    );
 
     const inTransitEvent: OrderInTransitEvent = {
       type: 'order.in_transit',
@@ -428,10 +396,7 @@ export class OrderStatusService {
 
   async cancelOrder(id: string, userId: string, roles: Role[]) {
     const isAdmin = roles.includes(Role.ADMIN);
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: { providerOrders: { include: { items: true } } },
-    });
+    const order = await this.orderRepository.findWithProviderOrdersAndItems(id);
 
     if (!order) throw new NotFoundException('Order not found');
 
@@ -467,7 +432,7 @@ export class OrderStatusService {
       throw new ConflictException('Illegal state transition to CANCELLED');
     }
 
-    const providerOrderUpdateIds = order.providerOrders
+    const providerOrderIdsToCancel = order.providerOrders
       .filter(
         (po) =>
           po.status !== ProviderOrderStatus.REJECTED_BY_STORE &&
@@ -475,38 +440,27 @@ export class OrderStatusService {
       )
       .map((po) => po.id);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      if (providerOrderUpdateIds.length > 0) {
-        // Restore inventory if we had confirmed the payment earlier
-        if (
-          order.status === DeliveryStatus.CONFIRMED ||
-          order.status === DeliveryStatus.READY_FOR_ASSIGNMENT ||
-          order.status === DeliveryStatus.ASSIGNED
-        ) {
-          for (const po of order.providerOrders) {
-            if (providerOrderUpdateIds.includes(po.id)) {
-              for (const item of po.items) {
-                await tx.product.update({
-                  where: { id: item.productId },
-                  data: { stock: { increment: item.quantity } },
-                });
-              }
-            }
-          }
-        }
+    const shouldRestoreInventory =
+      order.status === DeliveryStatus.CONFIRMED ||
+      order.status === DeliveryStatus.READY_FOR_ASSIGNMENT ||
+      order.status === DeliveryStatus.ASSIGNED;
 
-        await tx.providerOrder.updateMany({
-          where: { id: { in: providerOrderUpdateIds } },
-          data: { status: ProviderOrderStatus.CANCELLED },
-        });
-      }
+    const itemsToRestore = shouldRestoreInventory
+      ? order.providerOrders
+          .filter((po) => providerOrderIdsToCancel.includes(po.id))
+          .flatMap((po) =>
+            po.items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+            })),
+          )
+      : [];
 
-      return tx.order.update({
-        where: { id },
-        data: { status: DeliveryStatus.CANCELLED },
-        include: { providerOrders: { include: { items: true } } },
-      });
-    });
+    const updated = await this.orderRepository.cancelWithInventoryRestore(
+      id,
+      providerOrderIdsToCancel,
+      itemsToRestore,
+    );
 
     const cancelledEvent: OrderCancelledEvent = {
       type: 'order.cancelled',
