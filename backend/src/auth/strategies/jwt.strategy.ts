@@ -25,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKeyProvider: (
         _request: unknown,
         rawJwtToken: string,
-        done: (err: any, secret?: string) => void,
+        done: (err: unknown, secret?: string) => void,
       ) => {
         const currentSecret =
           process.env.JWT_SECRET_CURRENT || process.env.JWT_SECRET;

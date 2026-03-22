@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SkipThrottle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { DeliveryService } from './delivery.service';
 
@@ -30,7 +30,7 @@ export class DeliveryWebhooksController {
   @Post()
   async handleStripeWebhook(
     @Req() req: RequestWithRawBody,
-    @Res() res: any,
+    @Res() res: Response,
     @Headers('stripe-signature') signature: string,
   ) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
@@ -101,9 +101,9 @@ export class DeliveryWebhooksController {
           `Ignored delivery Stripe event ${event.id} of type ${event.type}`,
         );
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(
-        `Delivery webhook failed: event=${event.id} session=${externalSessionId} message=${error.message}`,
+        `Delivery webhook failed: event=${event.id} session=${externalSessionId} message=${(error as Error).message}`,
       );
       return res
         .status(HttpStatus.INTERNAL_SERVER_ERROR)

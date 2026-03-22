@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { PaymentsService } from './payments.service';
 
@@ -44,7 +44,7 @@ export class WebhooksController {
   @Post()
   async handleStripeWebhook(
     @Req() req: RequestWithRawBody,
-    @Res() res: any,
+    @Res() res: Response,
     @Headers('stripe-signature') signature: string,
   ) {
     if (!signature) {
@@ -67,9 +67,9 @@ export class WebhooksController {
         signature,
         this.webhookSecret,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.error(
-        `Webhook signature verification failed: ${err.message}`,
+        `Webhook signature verification failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       // Return a generic error to the client while logging the detailed exception internally
       return res
@@ -113,28 +113,30 @@ export class WebhooksController {
               ? paymentIntent.metadata
               : null,
         };
-        const result: any =
-          await this.paymentsService.confirmProviderOrderPayment(
-            paymentRef,
-            event.id,
-            event.type,
-            paymentConfirmation,
-          );
-        this.logger.log(
-          `Provider payment confirmed via Webhook. Session: ${paymentRef}. Status: ${result.status}`,
+        const result = await this.paymentsService.confirmProviderOrderPayment(
+          paymentRef,
+          event.id,
+          event.type,
+          paymentConfirmation,
         );
-      } catch (error: any) {
+        const status = 'status' in result ? result.status : 'unknown';
+        this.logger.log(
+          `Provider payment confirmed via Webhook. Session: ${paymentRef}. Status: ${status}`,
+        );
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         // Ignore known concurrent errors if already processed successfully by an overlapping webhook
-        if (error.message.includes('Concurrent stock update detected')) {
+        if (errorMessage.includes('Concurrent stock update detected')) {
           this.logger.warn(
-            `Ignored concurrent retry or conflict for provider payment ${paymentRef}: ${error.message}`,
+            `Ignored concurrent retry or conflict for provider payment ${paymentRef}: ${errorMessage}`,
           );
           return res.status(HttpStatus.OK).json({ received: true });
         }
 
         // Stripe requires a 500 status on unhandled backend errors so it can retry later
         this.logger.error(
-          `Error confirming provider payment for session ${paymentRef}: ${error.message}`,
+          `Error confirming provider payment for session ${paymentRef}: ${errorMessage}`,
         );
         return res
           .status(HttpStatus.INTERNAL_SERVER_ERROR)

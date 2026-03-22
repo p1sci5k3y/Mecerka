@@ -122,9 +122,9 @@ export class NominatimGeocodingService implements GeocodingPort {
         },
         signal: AbortSignal.timeout(5000),
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.warn(
-        `geocoding.request_failed message=${error.message ?? 'unknown'}`,
+        `geocoding.request_failed message=${(error as Error).message ?? 'unknown'}`,
       );
       throw new ServiceUnavailableException('Geocoding service unavailable');
     }

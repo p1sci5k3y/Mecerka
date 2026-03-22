@@ -43,13 +43,19 @@ async function bootstrap() {
     }),
   );
   // Restrict browser feature access via Permissions-Policy header
-  app.use((_req: any, res: any, next: any) => {
-    res.setHeader(
-      'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=()',
-    );
-    next();
-  });
+  app.use(
+    (
+      _req: import('express').Request,
+      res: import('express').Response,
+      next: import('express').NextFunction,
+    ) => {
+      res.setHeader(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=()',
+      );
+      next();
+    },
+  );
 
   const isDev = process.env.NODE_ENV !== 'production';
   const frontendUrl = process.env.FRONTEND_URL;

@@ -127,4 +127,171 @@ describe('DemoService', () => {
     expect(cleanupSpy).toHaveBeenCalledWith('admin-1');
     expect(seedSpy).toHaveBeenCalledWith('admin-1');
   });
+
+  it('skips seeding on bootstrap when DEMO_MODE is false', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'false';
+      return undefined;
+    });
+
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue(undefined);
+
+    await service.onApplicationBootstrap();
+
+    expect(seedSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips cleanup and seed on bootstrap when demo dataset is already complete', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(10);
+    prismaMock.product.count.mockResolvedValue(10);
+    prismaMock.order.count.mockResolvedValue(5);
+    prismaMock.deliveryOrder.count.mockResolvedValue(3);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue(undefined);
+
+    await service.onApplicationBootstrap();
+
+    expect(cleanupSpy).not.toHaveBeenCalled();
+    expect(seedSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips cleanup but runs seed when no existing demo data on bootstrap', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await service.onApplicationBootstrap();
+
+    expect(cleanupSpy).not.toHaveBeenCalled();
+    expect(seedSpy).toHaveBeenCalled();
+  });
+
+  it('logs warning and does not throw when bootstrap seed fails', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+
+    jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockRejectedValue(new Error('DB failure'));
+
+    await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
+  });
+
+  it('logs warning with unknown error string when bootstrap error is not an Error instance', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+
+    jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockRejectedValue('string error');
+
+    await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
+  });
+
+  it('seed() skips cleanup when there is no existing demo data', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'development';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await service.seed('admin-1');
+
+    expect(cleanupSpy).not.toHaveBeenCalled();
+    expect(seedSpy).toHaveBeenCalledWith('admin-1');
+  });
+
+  it('seed() runs cleanup when existing demo data is present', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'development';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(3);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await service.seed('admin-1');
+
+    expect(cleanupSpy).toHaveBeenCalledWith('admin-1');
+  });
+
+  it('allows demo endpoints when production with DEMO_MODE=true', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'production';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(0);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.deliveryOrder.count.mockResolvedValue(0);
+
+    jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await expect(service.seed('admin-1')).resolves.toBeDefined();
+  });
 });

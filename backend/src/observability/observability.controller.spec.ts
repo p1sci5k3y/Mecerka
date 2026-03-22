@@ -89,4 +89,89 @@ describe('ObservabilityController', () => {
       '30d',
     );
   });
+
+  it('uses default window for SLA when query window is omitted', async () => {
+    observabilityServiceMock.getSlaMetrics.mockResolvedValue({} as any);
+
+    await controller.getSlaMetrics({});
+
+    expect(observabilityServiceMock.getSlaMetrics).toHaveBeenCalledWith('24h');
+  });
+
+  it('uses default window for reconciliation when query window is omitted', async () => {
+    observabilityServiceMock.getReconciliation.mockResolvedValue({} as any);
+
+    await controller.getReconciliation({});
+
+    expect(observabilityServiceMock.getReconciliation).toHaveBeenCalledWith(
+      '24h',
+    );
+  });
+
+  it('passes explicit window to getMetrics', async () => {
+    observabilityServiceMock.getMetrics.mockResolvedValue({} as any);
+
+    await controller.getMetrics({ window: '7d' });
+
+    expect(observabilityServiceMock.getMetrics).toHaveBeenCalledWith('7d');
+  });
+
+  describe('RolesGuard branch coverage', () => {
+    it('allows access when no roles are required (no metadata)', () => {
+      const guard = new RolesGuard(new Reflector());
+      // Use a handler with no ROLES_KEY metadata
+      const context = {
+        getHandler: () => function noRolesHandler() {},
+        getClass: () => class NoRolesController {},
+        switchToHttp: () => ({
+          getRequest: () => ({ user: { userId: 'u1', roles: [Role.CLIENT] } }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(guard.canActivate(context)).toBe(true);
+    });
+
+    it('denies access when user is missing from request', () => {
+      const guard = new RolesGuard(new Reflector());
+      const context = {
+        getHandler: () => ObservabilityController.prototype.getMetrics,
+        getClass: () => ObservabilityController,
+        switchToHttp: () => ({
+          getRequest: () => ({ user: null }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(guard.canActivate(context)).toBe(false);
+    });
+
+    it('denies access when user.roles is not an array', () => {
+      const guard = new RolesGuard(new Reflector());
+      const context = {
+        getHandler: () => ObservabilityController.prototype.getMetrics,
+        getClass: () => ObservabilityController,
+        switchToHttp: () => ({
+          getRequest: () => ({
+            user: { userId: 'u1', roles: undefined },
+          }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(guard.canActivate(context)).toBe(false);
+    });
+
+    it('allows access when user has one of the required roles', () => {
+      const guard = new RolesGuard(new Reflector());
+      const context = {
+        getHandler: () => ObservabilityController.prototype.getMetrics,
+        getClass: () => ObservabilityController,
+        switchToHttp: () => ({
+          getRequest: () => ({
+            user: { userId: 'admin-1', roles: [Role.ADMIN] },
+          }),
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(guard.canActivate(context)).toBe(true);
+    });
+  });
 });
