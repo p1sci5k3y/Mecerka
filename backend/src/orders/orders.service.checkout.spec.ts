@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrderQueryService } from './order-query.service';
 import { OrderItemsService } from './order-items.service';
@@ -484,5 +488,306 @@ describe('OrdersService - checkoutFromCart', () => {
       prismaMock.order.findUniqueOrThrow.mock.invocationCallOrder[0];
 
     expect(createManyCallOrder).toBeLessThan(findUniqueOrThrowCallOrder);
+  });
+
+  // ─── branch coverage additions ────────────────────────────────────────────
+
+  describe('branch coverage', () => {
+    it('lanza BadRequestException cuando no hay idempotency key', async () => {
+      await expect(
+        service.checkoutFromCart(CLIENT_ID, validCheckoutDto as any, ''),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando el carrito no está ACTIVE', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        ...buildCart([
+          buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)]),
+        ]),
+        status: 'CHECKED_OUT',
+      });
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-status',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando el carrito no tiene cityId', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        ...buildCart([
+          buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)]),
+        ]),
+        cityId: null,
+      });
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-nocity',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando la ciudad del carrito no existe', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue({
+        ...buildCart([
+          buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)]),
+        ]),
+        city: null,
+      });
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-nocityobj',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando la ciudad del carrito está inactiva', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart(
+          [buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])],
+          { active: false },
+        ),
+      );
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-inactive',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando la cityId del dto no coincide con la del carrito', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])]),
+      );
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          { ...validCheckoutDto, cityId: 'city-different' } as any,
+          'idem-citymismatch',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza BadRequestException cuando todos los providers no tienen items', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [])]),
+      );
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-noitems',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('lanza ConflictException cuando el proveedor no tiene ubicación configurada', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])]),
+      );
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: PROVIDER_ID,
+          latitude: null,
+          longitude: null,
+          providerServiceRadiusKm: 10,
+        },
+      ]);
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-noloc',
+        ),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('retorna el pedido existente si la idempotency key ya existe para el mismo cliente', async () => {
+      const existingOrder = {
+        id: ORDER_ID,
+        clientId: CLIENT_ID,
+        providerOrders: [
+          {
+            id: PROVIDER_ORDER_ID,
+            items: [],
+            reservations: [],
+          },
+        ],
+      };
+      prismaMock.order.findUnique.mockResolvedValue(existingOrder);
+
+      const result = await service.checkoutFromCart(
+        CLIENT_ID,
+        validCheckoutDto as any,
+        'idem-existing',
+      );
+
+      expect(result).toHaveProperty('id', ORDER_ID);
+    });
+
+    it('lanza ForbiddenException si la idempotency key ya existe para otro cliente', async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: ORDER_ID,
+        clientId: 'another-client',
+        providerOrders: [],
+      });
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-stolen',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('retorna pedido duplicado al detectar P2002 (idempotency race condition)', async () => {
+      prismaMock.order.findUnique
+        .mockResolvedValueOnce(null) // initial check — no existing order
+        .mockResolvedValueOnce({
+          // after P2002, found the duplicate
+          id: ORDER_ID,
+          clientId: CLIENT_ID,
+          providerOrders: [
+            { id: PROVIDER_ORDER_ID, items: [], reservations: [] },
+          ],
+        });
+
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])]),
+      );
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: PROVIDER_ID,
+          latitude: 40.41,
+          longitude: -3.7,
+          providerServiceRadiusKm: 10,
+        },
+      ]);
+
+      const p2002Error: any = new Error('Unique constraint');
+      p2002Error.code = 'P2002';
+      prismaMock.$transaction.mockRejectedValue(p2002Error);
+
+      const result = await service.checkoutFromCart(
+        CLIENT_ID,
+        validCheckoutDto as any,
+        'idem-race',
+      );
+
+      expect(result).toHaveProperty('id', ORDER_ID);
+    });
+
+    it('lanza ForbiddenException si duplicado P2002 pertenece a otro cliente', async () => {
+      prismaMock.order.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: ORDER_ID,
+          clientId: 'other-client',
+          providerOrders: [],
+        });
+
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])]),
+      );
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: PROVIDER_ID,
+          latitude: 40.41,
+          longitude: -3.7,
+          providerServiceRadiusKm: 10,
+        },
+      ]);
+
+      const p2002Error: any = new Error('Unique constraint');
+      p2002Error.code = 'P2002';
+      prismaMock.$transaction.mockRejectedValue(p2002Error);
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-race2',
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('lanza BadRequestException cuando geocoding retorna null', async () => {
+      prismaMock.order.findUnique.mockResolvedValue(null);
+      prismaMock.cartGroup.findFirst.mockResolvedValue(
+        buildCart([buildProvider(PROVIDER_ID, [buildItem(PRODUCT_ID, 1, 10)])]),
+      );
+      prismaMock.user.findMany.mockResolvedValue([
+        {
+          id: PROVIDER_ID,
+          latitude: 40.41,
+          longitude: -3.7,
+          providerServiceRadiusKm: 10,
+        },
+      ]);
+      geocodingMock.geocodeAddress.mockResolvedValue(null);
+
+      await expect(
+        service.checkoutFromCart(
+          CLIENT_ID,
+          validCheckoutDto as any,
+          'idem-nogeo',
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('toReservationAwareOrder devuelve reservationExpiresAt null cuando no hay reservas', async () => {
+      const items = [buildItem(PRODUCT_ID, 1, 10)];
+      setupHappyPath(items);
+
+      // Override findUniqueOrThrow to return order with empty reservations
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        id: ORDER_ID,
+        clientId: CLIENT_ID,
+        status: DeliveryStatus.PENDING,
+        summaryDocument: null,
+        providerOrders: [
+          {
+            id: PROVIDER_ORDER_ID,
+            providerId: PROVIDER_ID,
+            items: items.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+            })),
+            reservations: [], // no reservations → null expiresAt
+          },
+        ],
+      });
+
+      const result = await service.checkoutFromCart(
+        CLIENT_ID,
+        validCheckoutDto as any,
+        'idem-noreservations',
+      );
+
+      expect((result as any).providerOrders[0].reservationExpiresAt).toBeNull();
+    });
   });
 });
