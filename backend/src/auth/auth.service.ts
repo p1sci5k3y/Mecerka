@@ -363,9 +363,28 @@ export class AuthService {
       };
     }
 
+    // 1. Check rate limit before doing any work
+    await this.checkEmailRateLimit(user.id);
+
     const resetToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // 2. Persist token to DB BEFORE sending email — ensures the link in the email is always valid
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        resetPasswordTokenHash: hashedToken,
+        resetPasswordExpiresAt: expiresAt,
+        lastEmailSentAt: new Date(),
+      },
+    });
+
+    // 3. Send email after token is safely persisted
     try {
       await this.emailService.sendPasswordResetEmail(user.email, resetToken);
     } catch (e) {
@@ -383,23 +402,6 @@ export class AuthService {
         'No se pudo enviar el correo de recuperación. Inténtalo de nuevo.',
       );
     }
-
-    // 0. Check Rate Limit
-    await this.checkEmailRateLimit(user.id);
-
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetPasswordTokenHash: hashedToken,
-        resetPasswordExpiresAt: expiresAt,
-        lastEmailSentAt: new Date(),
-      },
-    });
 
     return {
       message:
