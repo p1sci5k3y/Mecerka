@@ -69,8 +69,8 @@ export class StripeWebhookService {
         },
       });
       return true;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === 'P2002') {
         const staleBefore = new Date(
           Date.now() - StripeWebhookService.STALE_WEBHOOK_RECEIVED_MS,
         );
