@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DemoService } from './demo.service';
@@ -293,5 +293,180 @@ describe('DemoService', () => {
       .mockResolvedValue({ status: 'ok' });
 
     await expect(service.seed('admin-1')).resolves.toBeDefined();
+  });
+
+  describe('getDemoDatasetStatus branch coverage', () => {
+    it('isDemoDatasetComplete returns true when all counts meet thresholds', () => {
+      const status = { users: 7, products: 6, orders: 3, deliveries: 2 };
+      const result = (service as any).isDemoDatasetComplete(status);
+      expect(result).toBe(true);
+    });
+
+    it('isDemoDatasetComplete returns false when orders < 3', () => {
+      const status = { users: 7, products: 6, orders: 2, deliveries: 2 };
+      const result = (service as any).isDemoDatasetComplete(status);
+      expect(result).toBe(false);
+    });
+
+    it('isDemoDatasetComplete returns false when deliveries < 2', () => {
+      const status = { users: 7, products: 6, orders: 3, deliveries: 1 };
+      const result = (service as any).isDemoDatasetComplete(status);
+      expect(result).toBe(false);
+    });
+
+    it('isDemoDatasetComplete returns false when users < DEMO_USERS.length', () => {
+      const status = { users: 3, products: 6, orders: 3, deliveries: 2 };
+      const result = (service as any).isDemoDatasetComplete(status);
+      expect(result).toBe(false);
+    });
+
+    it('isDemoDatasetComplete returns false when products < DEMO_PRODUCTS.length', () => {
+      const status = { users: 7, products: 3, orders: 3, deliveries: 2 };
+      const result = (service as any).isDemoDatasetComplete(status);
+      expect(result).toBe(false);
+    });
+
+    it('hasAnyDemoData returns false when all counts are 0', () => {
+      const status = { users: 0, products: 0, orders: 0, deliveries: 0 };
+      const result = (service as any).hasAnyDemoData(status);
+      expect(result).toBe(false);
+    });
+
+    it('hasAnyDemoData returns true when only products > 0', () => {
+      const status = { users: 0, products: 1, orders: 0, deliveries: 0 };
+      const result = (service as any).hasAnyDemoData(status);
+      expect(result).toBe(true);
+    });
+
+    it('hasAnyDemoData returns true when only orders > 0', () => {
+      const status = { users: 0, products: 0, orders: 1, deliveries: 0 };
+      const result = (service as any).hasAnyDemoData(status);
+      expect(result).toBe(true);
+    });
+
+    it('hasAnyDemoData returns true when only deliveries > 0', () => {
+      const status = { users: 0, products: 0, orders: 0, deliveries: 1 };
+      const result = (service as any).hasAnyDemoData(status);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('ensureDemoAdmin', () => {
+    it('returns existing admin without registering when already in DB', async () => {
+      const existingAdmin = { id: 'existing-admin-id' };
+      prismaMock.user.findUnique.mockResolvedValue(existingAdmin);
+
+      const result = await (service as any).ensureDemoAdmin();
+
+      expect(result).toEqual(existingAdmin);
+    });
+
+    it('registers a new admin when not found in DB', async () => {
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      const registerAndVerifySpy = jest
+        .spyOn<any, any>(service as any, 'registerAndVerifyUser')
+        .mockResolvedValue({ id: 'new-admin-id' });
+
+      const result = await (service as any).ensureDemoAdmin();
+
+      expect(registerAndVerifySpy).toHaveBeenCalled();
+      expect(result).toEqual({ id: 'new-admin-id' });
+    });
+  });
+
+  describe('getDemoPassword', () => {
+    it('returns the configured password when DEMO_PASSWORD is set', () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'DEMO_PASSWORD') return 'MyPassword123!';
+        return undefined;
+      });
+
+      const result = (service as any).getDemoPassword();
+      expect(result).toBe('MyPassword123!');
+    });
+
+    it('throws ConflictException when DEMO_PASSWORD is not set', () => {
+      configService.get.mockImplementation(() => undefined);
+
+      expect(() => (service as any).getDemoPassword()).toThrow(
+        ConflictException,
+      );
+    });
+
+    it('throws ConflictException when DEMO_PASSWORD is empty string', () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'DEMO_PASSWORD') return '   ';
+        return undefined;
+      });
+
+      expect(() => (service as any).getDemoPassword()).toThrow(
+        ConflictException,
+      );
+    });
+  });
+
+  describe('assertDemoEnabled', () => {
+    it('does not throw when not in production', () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'development';
+        if (key === 'DEMO_MODE') return 'false';
+        return undefined;
+      });
+
+      expect(() => (service as any).assertDemoEnabled()).not.toThrow();
+    });
+
+    it('does not throw in production when DEMO_MODE=true', () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'production';
+        if (key === 'DEMO_MODE') return 'true';
+        return undefined;
+      });
+
+      expect(() => (service as any).assertDemoEnabled()).not.toThrow();
+    });
+
+    it('throws ForbiddenException in production when DEMO_MODE=false', () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'NODE_ENV') return 'production';
+        if (key === 'DEMO_MODE') return 'false';
+        return undefined;
+      });
+
+      expect(() => (service as any).assertDemoEnabled()).toThrow(
+        ForbiddenException,
+      );
+    });
+  });
+
+  describe('onApplicationBootstrap additional coverage', () => {
+    it('repairs demo data when there is partial data but no admin in DB', async () => {
+      configService.get.mockImplementation((key: string) => {
+        if (key === 'DEMO_MODE') return 'true';
+        return undefined;
+      });
+      prismaMock.user.count.mockResolvedValue(3);
+      prismaMock.product.count.mockResolvedValue(2);
+      prismaMock.order.count.mockResolvedValue(0);
+      prismaMock.deliveryOrder.count.mockResolvedValue(0);
+      prismaMock.user.findUnique.mockResolvedValue(null);
+
+      const registerSpy = jest
+        .spyOn<any, any>(service as any, 'registerAndVerifyUser')
+        .mockResolvedValue({ id: 'new-admin' });
+      const cleanupSpy = jest
+        .spyOn<any, any>(service as any, 'cleanupDemoData')
+        .mockResolvedValue(undefined);
+      const seedSpy = jest
+        .spyOn<any, any>(service as any, 'seedDemoData')
+        .mockResolvedValue({ status: 'ok' });
+
+      await service.onApplicationBootstrap();
+
+      expect(registerSpy).toHaveBeenCalled();
+      expect(cleanupSpy).toHaveBeenCalled();
+      expect(seedSpy).toHaveBeenCalled();
+    });
   });
 });
