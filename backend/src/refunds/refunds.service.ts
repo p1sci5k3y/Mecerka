@@ -122,9 +122,9 @@ export class RefundsService {
         metadata,
       });
       await this.riskService.recalculateRiskScore(actorType, actorId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.warn(
-        `risk.refund.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+        `risk.refund.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${(error as Error).message}`,
       );
     }
   }

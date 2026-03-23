@@ -22,6 +22,7 @@ import { assertTestEnvironment } from '../../test/test-env';
 import { IOrderRepository } from './repositories/order.repository.interface';
 import { PrismaOrderRepository } from './repositories/prisma-order.repository';
 import { CheckoutService } from './checkout.service';
+import { IPaymentAccountRepository } from '../payments/repositories/payment-account.repository.interface';
 
 jest.setTimeout(20000);
 
@@ -53,6 +54,10 @@ describe('OrdersService - Provider Payment Domain', () => {
         },
         PrismaOrderRepository,
         { provide: IOrderRepository, useClass: PrismaOrderRepository },
+        {
+          provide: IPaymentAccountRepository,
+          useValue: { findActive: jest.fn(), upsert: jest.fn() },
+        },
         {
           provide: CheckoutService,
           useValue: { checkoutFromCart: jest.fn() },

@@ -14,12 +14,14 @@ import {
   ProviderOrderStatus,
   ProviderPaymentStatus,
 } from '@prisma/client';
+import { IPaymentAccountRepository } from './repositories/payment-account.repository.interface';
 
 jest.mock('stripe');
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
   let prismaMock: any;
+  let paymentAccountRepoMock: { findActive: jest.Mock; upsert: jest.Mock };
   let configServiceMock: { get: jest.Mock };
   let stripePaymentIntentsCreate: jest.Mock;
   let stripePaymentIntentsRetrieve: jest.Mock;
@@ -103,6 +105,7 @@ describe('PaymentsService', () => {
       $transaction: jest.fn(),
     };
     eventEmitterMock = { emit: jest.fn() };
+    paymentAccountRepoMock = { findActive: jest.fn(), upsert: jest.fn() };
 
     configServiceMock = {
       get: jest.fn((key: string) => {
@@ -119,6 +122,10 @@ describe('PaymentsService', () => {
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: ConfigService, useValue: configServiceMock },
+        {
+          provide: IPaymentAccountRepository,
+          useValue: paymentAccountRepoMock,
+        },
       ],
     }).compile();
 
@@ -1550,14 +1557,15 @@ describe('PaymentsService', () => {
   });
 
   it('maps provider payment account ownership through the shared payment account model', async () => {
-    prismaMock.paymentAccount.upsert.mockResolvedValue({
+    const expected = {
       id: 'pa-1',
       ownerType: PaymentAccountOwnerType.PROVIDER,
       ownerId: 'provider-1',
       provider: PaymentAccountProvider.STRIPE,
       externalAccountId: 'acct_provider_1',
       isActive: true,
-    });
+    };
+    paymentAccountRepoMock.upsert.mockResolvedValue(expected);
 
     const result = await service.upsertPaymentAccount(
       PaymentAccountOwnerType.PROVIDER,
@@ -1566,26 +1574,12 @@ describe('PaymentsService', () => {
       'acct_provider_1',
     );
 
-    expect(prismaMock.paymentAccount.upsert).toHaveBeenCalledWith({
-      where: {
-        ownerType_ownerId_provider: {
-          ownerType: PaymentAccountOwnerType.PROVIDER,
-          ownerId: 'provider-1',
-          provider: PaymentAccountProvider.STRIPE,
-        },
-      },
-      update: {
-        externalAccountId: 'acct_provider_1',
-        isActive: true,
-      },
-      create: {
-        ownerType: PaymentAccountOwnerType.PROVIDER,
-        ownerId: 'provider-1',
-        provider: PaymentAccountProvider.STRIPE,
-        externalAccountId: 'acct_provider_1',
-        isActive: true,
-      },
-    });
+    expect(paymentAccountRepoMock.upsert).toHaveBeenCalledWith(
+      PaymentAccountOwnerType.PROVIDER,
+      'provider-1',
+      PaymentAccountProvider.STRIPE,
+      'acct_provider_1',
+    );
     expect(result).toEqual(
       expect.objectContaining({
         ownerType: PaymentAccountOwnerType.PROVIDER,
