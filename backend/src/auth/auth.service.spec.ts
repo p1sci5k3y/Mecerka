@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../email/email.service';
+import { AuthEmailWorkflowService } from './auth-email-workflow.service';
 
 describe('AuthService.register', () => {
   let service: AuthService;
@@ -32,6 +33,7 @@ describe('AuthService.register', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        AuthEmailWorkflowService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: { sign: jest.fn() } },
         { provide: EmailService, useValue: emailServiceMock },
@@ -218,6 +220,7 @@ describe('AuthService – branch coverage', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        AuthEmailWorkflowService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: JwtService, useValue: jwtMock },
         { provide: EmailService, useValue: emailMock },

@@ -33,6 +33,10 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
+function isSupportedLocale(locale: string): locale is "en" | "es" {
+  return locale === "en" || locale === "es"
+}
+
 export default async function RootLayout({
   children,
   params
@@ -43,7 +47,7 @@ export default async function RootLayout({
   const { locale } = await params;
 
   // Ensure that the incoming `locale` is valid
-  if (!['en', 'es'].includes(locale as any)) {
+  if (!isSupportedLocale(locale)) {
     notFound();
   }
 

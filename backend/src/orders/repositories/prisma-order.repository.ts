@@ -28,12 +28,12 @@ export class PrismaOrderRepository implements IOrderRepository {
 
   findByClientId(
     clientId: string,
-    params?: { skip?: number; take?: number; status?: string },
+    params?: { skip?: number; take?: number; status?: DeliveryStatus },
   ): Promise<Order[]> {
     return this.prisma.order.findMany({
       where: {
         clientId,
-        ...(params?.status ? { status: params.status as any } : {}),
+        ...(params?.status ? { status: params.status } : {}),
       },
       skip: params?.skip,
       take: params?.take,
@@ -54,10 +54,10 @@ export class PrismaOrderRepository implements IOrderRepository {
     return this.prisma.order.count({ where: { clientId } });
   }
 
-  updateStatus(id: string, status: string): Promise<Order> {
+  updateStatus(id: string, status: DeliveryStatus): Promise<Order> {
     return this.prisma.order.update({
       where: { id },
-      data: { status: status as any },
+      data: { status },
     });
   }
 

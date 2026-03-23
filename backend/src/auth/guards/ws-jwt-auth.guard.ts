@@ -9,6 +9,10 @@ import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
+type AuthenticatedSocket = Socket & {
+  user?: unknown;
+};
+
 @Injectable()
 export class WsJwtAuthGuard implements CanActivate {
   private readonly logger = new Logger('WsJwtAuthGuard');
@@ -26,7 +30,7 @@ export class WsJwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      const client: Socket = context.switchToWs().getClient<Socket>();
+      const client = context.switchToWs().getClient<AuthenticatedSocket>();
       // Extract token from handshake query or headers
       // Standard practice: client connects with ?token=... or Authorization header
       const token =
@@ -43,7 +47,7 @@ export class WsJwtAuthGuard implements CanActivate {
       });
 
       // Attach user to socket object so it can be accessed in Gateway
-      (client as any).user = payload;
+      client.user = payload;
 
       return true;
     } catch (err) {

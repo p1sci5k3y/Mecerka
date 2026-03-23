@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as QRCode from 'qrcode';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TOTP, NobleCryptoPlugin, ScureBase32Plugin } from 'otplib';
 import { EmailService } from '../email/email.service';
@@ -14,6 +15,12 @@ const totp = new TOTP({
 @Injectable()
 export class MfaService {
   private readonly logger = new Logger(MfaService.name);
+  private readonly userMfaStateSelect = {
+    mfaSecret: true,
+    mfaEnabled: true,
+    mfaFailedAttempts: true,
+    mfaLockUntil: true,
+  } satisfies Prisma.UserSelect;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -60,23 +67,22 @@ export class MfaService {
   }
 
   async verifyMfaToken(userId: string, token: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: this.userMfaStateSelect,
+    });
     if (!user?.mfaSecret) {
       return false;
     }
 
     // Check for lockout
-    // Casting to any to avoid IDE persistent cache errors (fields exist in DB and build passes)
-
-    const userWithMfa = user as any;
-
-    if (userWithMfa.mfaLockUntil && userWithMfa.mfaLockUntil > new Date()) {
+    if (user.mfaLockUntil && user.mfaLockUntil > new Date()) {
       return false; // User is locked out
     }
 
     let isValid = false;
     try {
-      const secret = userWithMfa.mfaSecret as string;
+      const secret = user.mfaSecret;
       const currentStep = Math.floor(Date.now() / 1000 / 30);
 
       this.logger.debug(
@@ -102,35 +108,37 @@ export class MfaService {
     }
 
     if (isValid) {
+      const enableMfaData: Prisma.UserUpdateInput = {
+        mfaEnabled: true,
+        mfaFailedAttempts: 0,
+        mfaLockUntil: null,
+      };
+
       await this.prisma.user.update({
         where: { id: userId },
-
-        data: {
-          mfaEnabled: true,
-          mfaFailedAttempts: 0,
-          mfaLockUntil: null,
-        } as any,
+        data: enableMfaData,
       });
       return true;
     } else {
       // Increment failed attempts and potentially lock
 
-      const attempts = ((userWithMfa.mfaFailedAttempts as number) || 0) + 1;
+      const attempts = (user.mfaFailedAttempts || 0) + 1;
 
-      let lockUntil = userWithMfa.mfaLockUntil as Date | null;
+      let lockUntil = user.mfaLockUntil;
 
       if (attempts >= 5) {
         // Lock for 15 minutes
         lockUntil = new Date(Date.now() + 15 * 60 * 1000);
       }
 
+      const failedAttemptData: Prisma.UserUpdateInput = {
+        mfaFailedAttempts: attempts,
+        mfaLockUntil: lockUntil,
+      };
+
       await this.prisma.user.update({
         where: { id: userId },
-
-        data: {
-          mfaFailedAttempts: attempts,
-          mfaLockUntil: lockUntil,
-        } as any,
+        data: failedAttemptData,
       });
 
       return false;

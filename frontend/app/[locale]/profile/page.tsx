@@ -51,6 +51,35 @@ function ProfileContent() {
   const [country, setCountry] = useState("ES")
   const [fiscalId, setFiscalId] = useState("")
 
+  const getErrorInfo = (error: unknown) => {
+    const fallback = {
+      message: "Ha ocurrido un error",
+      statusCode: null as number | null,
+    }
+
+    if (error instanceof Error) {
+      return {
+        message: error.message || fallback.message,
+        statusCode: null,
+      }
+    }
+
+    if (typeof error === "object" && error !== null) {
+      const message =
+        "message" in error && typeof error.message === "string"
+          ? error.message
+          : fallback.message
+      const statusCode =
+        "statusCode" in error && typeof error.statusCode === "number"
+          ? error.statusCode
+          : null
+
+      return { message, statusCode }
+    }
+
+    return fallback
+  }
+
   const availableRoles = (["PROVIDER", "RUNNER"] as const).filter(
     (role) => !user?.roles?.includes(role),
   )
@@ -85,8 +114,8 @@ function ProfileContent() {
       // Update local storage / user context state lazily if possible, 
       // but reloading is a quick way to refresh the 'hasPin' state from login.
       setTimeout(() => globalThis.location.reload(), 1500)
-    } catch (error: any) {
-      toast.error(error.message || "Error al configurar el PIN.")
+    } catch (error: unknown) {
+      toast.error(getErrorInfo(error).message || "Error al configurar el PIN.")
     } finally {
       setSettingPin(false)
     }
@@ -110,10 +139,8 @@ function ProfileContent() {
       toast.success(response.message || "Solicitud tramitada correctamente.")
       setFiscalId("")
       setTimeout(() => globalThis.location.reload(), 1200)
-    } catch (error: any) {
-      const statusCode = error?.statusCode
-      const message =
-        error?.message || "No se pudo tramitar la solicitud de rol."
+    } catch (error: unknown) {
+      const { statusCode, message } = getErrorInfo(error)
 
       if (statusCode === 401) {
         toast.error("Tu sesión ha caducado. Vuelve a iniciar sesión.")

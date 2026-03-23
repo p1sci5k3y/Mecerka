@@ -15,6 +15,7 @@ import { IOrderRepository } from './repositories/order.repository.interface';
 import { CheckoutService } from './checkout.service';
 import { StockReservationService } from './stock-reservation.service';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
+import { LegacyManualOrderCreationService } from './legacy-manual-order-creation.service';
 
 const CLIENT_ID = 'client-1';
 const PROVIDER_ID = 'provider-1';
@@ -144,6 +145,7 @@ describe('OrdersService - checkoutFromCart', () => {
         },
         CheckoutService,
         StockReservationService,
+        LegacyManualOrderCreationService,
         OrderQueryService,
       ],
     }).compile();

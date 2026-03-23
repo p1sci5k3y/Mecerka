@@ -8,6 +8,20 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 
+function getErrorMessage(error: unknown, fallback: string) {
+    if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof error.message === "string" &&
+        error.message.trim().length > 0
+    ) {
+        return error.message
+    }
+
+    return fallback
+}
+
 export default function VerifyEmailPage() {
     const searchParams = useSearchParams()
     const token = searchParams.get("token")
@@ -29,9 +43,14 @@ export default function VerifyEmailPage() {
                 await authService.verifyEmail(token)
                 setStatus("success")
                 setMessage("Tu cuenta ha sido verificada correctamente. Ya puedes iniciar sesión.")
-            } catch (error: any) {
+            } catch (error: unknown) {
                 setStatus("error")
-                setMessage(error.message || "Enlace expirado o inválido. Tu cuenta no pudo ser verificada.")
+                setMessage(
+                    getErrorMessage(
+                        error,
+                        "Enlace expirado o inválido. Tu cuenta no pudo ser verificada.",
+                    ),
+                )
             }
         }
 

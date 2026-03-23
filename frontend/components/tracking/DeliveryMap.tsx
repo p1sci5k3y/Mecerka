@@ -9,8 +9,12 @@ import { ordersService } from '@/lib/services/orders-service';
 import { Play, Square, MapPin } from 'lucide-react';
 import { getTrackingBaseUrl } from '@/lib/runtime-config';
 
+type LeafletDefaultIconPrototype = typeof L.Icon.Default.prototype & {
+    _getIconUrl?: unknown;
+};
+
 // Fix for default markers in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as LeafletDefaultIconPrototype)._getIconUrl;
 L.Icon.Default.mergeOptions({
     iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
     iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -61,7 +65,7 @@ async function geocode(address: string, fallbackLat: number, fallbackLng: number
     return { lat: fallbackLat, lng: fallbackLng };
 }
 
-interface DeliveryMapProps {
+export interface DeliveryMapProps {
     orderId: number;
     initialLat?: number;
     initialLng?: number;

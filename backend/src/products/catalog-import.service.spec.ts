@@ -4,6 +4,7 @@ import { ProductImportFormat, ProductImportJobStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogFileParser } from './catalog-file.parser';
 import { CatalogImportService } from './catalog-import.service';
+import { CatalogImportValidationService } from './catalog-import-validation.service';
 
 describe('CatalogImportService', () => {
   let service: CatalogImportService;
@@ -34,6 +35,7 @@ describe('CatalogImportService', () => {
       providers: [
         CatalogImportService,
         CatalogFileParser,
+        CatalogImportValidationService,
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();

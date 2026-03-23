@@ -18,6 +18,20 @@ function resolveSafeReturnTo(value: string | null) {
   return value
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim().length > 0
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
 export default function RegisterPage() {
   const t = useTranslations('Auth')
   const { register } = useAuth()
@@ -68,8 +82,13 @@ export default function RegisterPage() {
       await register({ name, email, password })
       toast.success("Cuenta creada. Revisa tu correo electrónico para validarla.", { icon: "🌿" })
       setIsSuccess(true)
-    } catch (error: any) {
-      toast.error(error.message || "Error: No se pudo crear la cuenta con los datos proporcionados.")
+    } catch (error: unknown) {
+      toast.error(
+        getErrorMessage(
+          error,
+          "Error: No se pudo crear la cuenta con los datos proporcionados.",
+        ),
+      )
     } finally {
       setLoading(false)
     }

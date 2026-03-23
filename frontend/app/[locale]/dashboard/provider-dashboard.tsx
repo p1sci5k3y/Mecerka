@@ -5,12 +5,13 @@ import { ShoppingBag, TrendingUp, TrendingDown, Calendar, Receipt, Package, Load
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { getApiBaseUrl } from '@/lib/runtime-config';
+import type { Order, SalesChartData } from '@/lib/types';
 
 export function ProviderDashboard() {
     const { user } = useAuth();
     const [stats, setStats] = useState({ totalRevenue: 0, totalOrders: 0, itemsSold: 0, averageTicket: 0 });
-    const [salesData, setSalesData] = useState<any[]>([]);
-    const [recentOrders, setRecentOrders] = useState<any[]>([]);
+    const [salesData, setSalesData] = useState<SalesChartData[]>([]);
+    const [recentOrders, setRecentOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

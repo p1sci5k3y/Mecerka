@@ -1,4 +1,5 @@
 import {
+  DeliveryStatus,
   Order,
   OrderItem,
   ProviderOrder,
@@ -17,13 +18,13 @@ export abstract class IOrderRepository {
   abstract update(id: string, data: Prisma.OrderUpdateInput): Promise<Order>;
   abstract findByClientId(
     clientId: string,
-    params?: { skip?: number; take?: number; status?: string },
+    params?: { skip?: number; take?: number; status?: DeliveryStatus },
   ): Promise<Order[]>;
   abstract findWithProviderOrders(
     id: string,
   ): Promise<(Order & { providerOrders: ProviderOrder[] }) | null>;
   abstract countByClient(clientId: string): Promise<number>;
-  abstract updateStatus(id: string, status: string): Promise<Order>;
+  abstract updateStatus(id: string, status: DeliveryStatus): Promise<Order>;
 
   abstract findWithProviderOrdersAndItems(
     id: string,

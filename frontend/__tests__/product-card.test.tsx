@@ -28,11 +28,13 @@ const baseProduct = {
   price: 45.0,
   basePrice: 45.0,
   discountPrice: null,
+  stock: 12,
   city: "Sevilla",
-  imageUrl: null,
+  imageUrl: undefined,
   category: "Cerámica",
   providerId: "prov-sev",
   provider: { name: "Taller Sevilla" },
+  createdAt: "2026-03-01T10:00:00.000Z",
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────

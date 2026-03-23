@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
 import { useAuth } from '@/contexts/auth-context';
+import type { Order, OrderItem } from '@/lib/types';
 import { Loader2, Route, CheckCircle, Clock, Navigation, MapPin, Truck, CheckCircle2, Package, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -8,8 +9,8 @@ import { getApiBaseUrl } from '@/lib/runtime-config';
 
 export function RunnerDashboard() {
     const { user } = useAuth();
-    const [activeOrders, setActiveOrders] = useState<any[]>([]);
-    const [completedOrders, setCompletedOrders] = useState<any[]>([]);
+    const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+    const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -17,8 +18,8 @@ export function RunnerDashboard() {
             if (!user) return;
             try {
                 const data = await ordersService.getAll(); // Filtered by runnerId in backend
-                setActiveOrders(data.filter((o: any) => o.status !== 'DELIVERED'));
-                setCompletedOrders(data.filter((o: any) => o.status === 'DELIVERED'));
+                setActiveOrders(data.filter((order) => order.status !== 'DELIVERED'));
+                setCompletedOrders(data.filter((order) => order.status === 'DELIVERED'));
             } catch (error) {
                 console.error('Error loading runner dashboard:', error);
             } finally {
@@ -74,7 +75,10 @@ export function RunnerDashboard() {
     }
 
     const earnings = completedOrders.reduce((sum, order) => {
-        const orderTotal = order.items.reduce((acc: number, item: any) => acc + Number(item.priceAtPurchase) * item.quantity, 0);
+        const orderTotal = order.items.reduce(
+            (acc: number, item: OrderItem) => acc + Number(item.priceAtPurchase) * item.quantity,
+            0,
+        );
         return sum + (orderTotal * 0.1); // Assuming 10% commission for the runner
     }, 0);
 
@@ -86,8 +90,8 @@ export function RunnerDashboard() {
         // Refresh
         setLoading(true);
         const data = await ordersService.getAll();
-        setActiveOrders(data.filter((o: any) => o.status !== 'DELIVERED'));
-        setCompletedOrders(data.filter((o: any) => o.status === 'DELIVERED'));
+        setActiveOrders(data.filter((order) => order.status !== 'DELIVERED'));
+        setCompletedOrders(data.filter((order) => order.status === 'DELIVERED'));
         setLoading(false);
     };
 
@@ -186,7 +190,7 @@ export function RunnerDashboard() {
                                 <div className={`p-5 rounded-xl border ${idx === 0 ? 'border-[#df795d]/50 bg-[#df795d]/5' : 'border-border/50 bg-background'}`}>
                                     <div className="flex justify-between items-start mb-2">
                                         <h3 className="font-bold text-lg text-slate-900 dark:text-slate-100">
-                                            Entrega a {order.user?.name || 'Cliente'}
+                                            Entrega a Cliente
                                         </h3>
                                         <span className="text-xs font-semibold px-2 py-1 bg-white border border-border rounded text-[#df795d]">
                                             #{order.id.slice(0, 8).toUpperCase()}

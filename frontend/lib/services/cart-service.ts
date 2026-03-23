@@ -7,8 +7,23 @@ import type {
   CartView,
   CheckoutOrderResult,
   CheckoutCartPayload,
+  CheckoutProviderOrderResult,
   Product,
 } from "@/lib/types"
+
+type RawCheckoutProviderOrderResult = Omit<
+  CheckoutProviderOrderResult,
+  "id" | "providerId" | "deliveryDistanceKm" | "coverageLimitKm"
+> & {
+  id: string | number
+  providerId: string | number
+  deliveryDistanceKm?: number | string | null
+  coverageLimitKm?: number | string | null
+}
+
+type RawCheckoutOrderResult = Omit<CheckoutOrderResult, "providerOrders"> & {
+  providerOrders?: RawCheckoutProviderOrderResult[]
+}
 
 function mapCartItem(
   item: BackendCartItem,
@@ -140,7 +155,7 @@ export const cartService = {
   },
 
   async checkout(payload: CheckoutCartPayload, idempotencyKey: string) {
-    const data = await api.post<any>("/cart/checkout", payload, {
+    const data = await api.post<RawCheckoutOrderResult>("/cart/checkout", payload, {
       headers: {
         "Idempotency-Key": idempotencyKey,
       },
@@ -162,7 +177,7 @@ export const cartService = {
             ? Number(data.discoveryRadiusKm)
             : null,
       providerOrders: Array.isArray(data.providerOrders)
-        ? data.providerOrders.map((providerOrder: any) => ({
+        ? data.providerOrders.map((providerOrder) => ({
             id: String(providerOrder.id),
             providerId: String(providerOrder.providerId),
             paymentStatus: providerOrder.paymentStatus,

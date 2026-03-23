@@ -1,5 +1,11 @@
 import { api } from "@/lib/api"
-import type { Order, BackendOrder, CreateOrderPayload, OrderItem } from "@/lib/types"
+import type {
+  BackendOrder,
+  BackendOrderItem,
+  CreateOrderPayload,
+  Order,
+  OrderItem,
+} from "@/lib/types"
 
 function transformOrder(bo: BackendOrder): Order {
   // If backend returns items directly (e.g., from an old endpoint) vs nested providerOrders
@@ -81,7 +87,7 @@ function transformOrder(bo: BackendOrder): Order {
   }
 }
 
-function mapBackendItem(item: any): OrderItem {
+function mapBackendItem(item: BackendOrderItem): OrderItem {
   const baseUnitPrice =
     item.unitBasePriceSnapshot != null
       ? Number.parseFloat(item.unitBasePriceSnapshot)

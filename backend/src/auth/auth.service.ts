@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import * as argon2 from 'argon2';
 import { Role, User } from '@prisma/client';
 import * as crypto from 'node:crypto';
+import { AuthEmailWorkflowService } from './auth-email-workflow.service';
 
 type AuthProfileRecord = {
   id: string;
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly authEmailWorkflowService: AuthEmailWorkflowService,
   ) {
     // empty
   }
@@ -189,24 +191,7 @@ export class AuthService {
   }
 
   async verifyEmail(token: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { verificationToken: token },
-    });
-    if (
-      !user?.verificationTokenExpiresAt ||
-      user.verificationTokenExpiresAt < new Date()
-    ) {
-      throw new BadRequestException(
-        'Token de verificación inválido o expirado.',
-      );
-    }
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerified: true, verificationToken: null },
-    });
-
-    return { message: 'Cuenta verificada con éxito.' };
+    return this.authEmailWorkflowService.verifyEmail(token);
   }
 
   async findById(id: string): Promise<AuthProfileRecord | null> {
@@ -233,7 +218,7 @@ export class AuthService {
     const otpCode = crypto.randomInt(100000, 1000000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    await this.checkEmailRateLimit(user.id);
+    await this.authEmailWorkflowService.assertEmailRateLimit(user.id);
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -268,145 +253,10 @@ export class AuthService {
   }
 
   async resendVerificationEmail(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // Prevent enumeration
-      return {
-        message:
-          'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
-      };
-    }
-    if (user.emailVerified) {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email)
-        .digest('hex')
-        .substring(0, 8);
-      this.logger.warn(
-        `Resend verification requested for already verified account: ${emailHash}`,
-      );
-      return {
-        message:
-          'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
-      };
-    }
-
-    const verificationToken = crypto.randomUUID();
-
-    // 0. Check Rate Limit
-    await this.checkEmailRateLimit(user.id);
-
-    // 1. Save token to DB FIRST — so any subsequent email link is always valid
-    try {
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          verificationToken,
-          verificationTokenExpiresAt: new Date(
-            Date.now() + 24 * 60 * 60 * 1000,
-          ),
-          lastEmailSentAt: new Date(),
-        },
-      });
-    } catch (e) {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email)
-        .digest('hex')
-        .substring(0, 8);
-      this.logger.error(
-        `Failed to save verification token to DB for ${emailHash}:`,
-        e,
-      );
-      throw new BadRequestException(
-        'No se pudo procesar la solicitud. Por favor, inténtalo de nuevo.',
-      );
-    }
-
-    // 2. Send email AFTER the token is safely persisted
-    try {
-      await this.emailService.sendVerificationEmail(
-        user.email,
-        verificationToken,
-      );
-    } catch (e) {
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(email)
-        .digest('hex')
-        .substring(0, 8);
-      this.logger.error(
-        `Failed to resend verification email for ${emailHash}:`,
-        e,
-      );
-      // Token is already saved — user can retry the resend action from the UI
-      this.logger.warn(
-        `Verification email resend failed for ${emailHash}. Token is saved; user can retry.`,
-      );
-      throw new BadRequestException(
-        'No se pudo enviar el correo de verificación. Por favor, inténtalo de nuevo.',
-      );
-    }
-
-    return {
-      message:
-        'Si el correo existe y no ha sido verificado, se ha enviado un nuevo enlace.',
-    };
+    return this.authEmailWorkflowService.resendVerificationEmail(email);
   }
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      // Prevent email enumeration
-      return {
-        message:
-          'Si el correo existe, recibirás un enlace para restablecer tu contraseña.',
-      };
-    }
-
-    // 1. Check rate limit before doing any work
-    await this.checkEmailRateLimit(user.id);
-
-    const resetToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    const hashedToken = crypto
-      .createHash('sha256')
-      .update(resetToken)
-      .digest('hex');
-
-    // 2. Persist token to DB BEFORE sending email — ensures the link in the email is always valid
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetPasswordTokenHash: hashedToken,
-        resetPasswordExpiresAt: expiresAt,
-        lastEmailSentAt: new Date(),
-      },
-    });
-
-    // 3. Send email after token is safely persisted
-    try {
-      await this.emailService.sendPasswordResetEmail(user.email, resetToken);
-    } catch (e) {
-      // Create a deterministic hash of the email to avoid PII leak in logs
-      const emailHash = crypto
-        .createHash('sha256')
-        .update(user.email)
-        .digest('hex')
-        .substring(0, 16);
-      this.logger.error(
-        `Failed to send password reset email to user [${emailHash}]:`,
-        e,
-      );
-      throw new BadRequestException(
-        'No se pudo enviar el correo de recuperación. Inténtalo de nuevo.',
-      );
-    }
-
-    return {
-      message:
-        'Si el correo existe, recibirás un enlace para restablecer tu contraseña.',
-    };
+    return this.authEmailWorkflowService.forgotPassword(email);
   }
 
   async logout(userId: string) {
@@ -423,60 +273,10 @@ export class AuthService {
   }
 
   async verifyResetToken(token: string) {
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-    const user = await this.prisma.user.findUnique({
-      where: { resetPasswordTokenHash: hashedToken },
-    });
-
-    if (user?.resetPasswordExpiresAt) {
-      const expiresAt = user.resetPasswordExpiresAt;
-      if (expiresAt < new Date()) {
-        throw new BadRequestException(
-          'El token de restablecimiento ha expirado.',
-        );
-      }
-      return user;
-    } else {
-      throw new BadRequestException(
-        'El token de restablecimiento es inválido.',
-      );
-    }
+    return this.authEmailWorkflowService.verifyResetToken(token);
   }
 
   async resetPassword(token: string, newPassword: string) {
-    const user = await this.verifyResetToken(token);
-
-    const hashedPassword = await argon2.hash(newPassword);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetPasswordTokenHash: null,
-        resetPasswordExpiresAt: null,
-        passwordChangedAt: new Date(),
-      },
-    });
-
-    return { message: 'Tu contraseña ha sido restablecida con éxito.' };
-  }
-
-  private async checkEmailRateLimit(userId: string): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { lastEmailSentAt: true },
-    });
-
-    if (user?.lastEmailSentAt) {
-      const now = new Date();
-      const diffSeconds =
-        (now.getTime() - user.lastEmailSentAt.getTime()) / 1000;
-      if (diffSeconds < 90) {
-        const remaining = Math.ceil(90 - diffSeconds);
-        throw new BadRequestException(
-          `Por seguridad, solo puedes solicitar un correo cada 90 segundos. Por favor, espera ${remaining} segundos más.`,
-        );
-      }
-    }
+    return this.authEmailWorkflowService.resetPassword(token, newPassword);
   }
 }

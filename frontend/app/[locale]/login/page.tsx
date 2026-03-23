@@ -21,6 +21,23 @@ function resolveSafeReturnTo(value: string | null) {
   return value
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
 export default function LoginPage() {
   const t = useTranslations('Auth')
   const { login } = useAuth()
@@ -71,8 +88,8 @@ export default function LoginPage() {
         toast.success("Bienvenido a Mecerka", { icon: "🌿" })
         router.replace(returnTo ?? getPrimaryRouteForRoles(response?.user?.roles))
       }
-    } catch (error: any) {
-      toast.error(error.message || "Credenciales inválidas.")
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Credenciales inválidas."))
     } finally {
       setLoading(false)
     }
@@ -91,7 +108,7 @@ export default function LoginPage() {
       setAuthSessionHint()
       toast.success("Bienvenido a Mecerka", { icon: "🌿" })
       router.replace(returnTo ?? getPrimaryRouteForRoles(pendingRoles))
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error)
       toast.error("Código incorrecto.")
     } finally {

@@ -33,6 +33,23 @@ function RunnerContent() {
     const [loading, setLoading] = useState(true)
     const [actionLocked, setActionLocked] = useState(false)
 
+    const getErrorMessage = (error: unknown, fallback: string) => {
+        if (error instanceof Error && error.message) {
+            return error.message
+        }
+
+        if (
+            typeof error === "object" &&
+            error !== null &&
+            "message" in error &&
+            typeof error.message === "string"
+        ) {
+            return error.message
+        }
+
+        return fallback
+    }
+
     const fetchData = async (silent = false) => {
         if (!silent) setLoading(true)
         try {
@@ -63,11 +80,23 @@ function RunnerContent() {
             await ordersService.accept(orderId)
             toast.success("¡Pedido aceptado! Modo Ruta Activa iniciado.")
             fetchData(true)
-        } catch (e: any) {
-            if (e?.response?.status === 409 || e?.response?.status === 400) {
+        } catch (error: unknown) {
+            const message = getErrorMessage(
+                error,
+                "Error al aceptar pedido",
+            )
+            if (
+                typeof error === "object" &&
+                error !== null &&
+                "response" in error &&
+                typeof error.response === "object" &&
+                error.response !== null &&
+                "status" in error.response &&
+                (error.response.status === 409 || error.response.status === 400)
+            ) {
                 toast.error("El pedido ya no está disponible o tu estado actual no permite aceptar más envíos.")
             } else {
-                toast.error(e?.response?.data?.message || "Error al aceptar pedido")
+                toast.error(message)
             }
             fetchData(true)
         } finally {
@@ -82,8 +111,8 @@ function RunnerContent() {
             await ordersService.markInTransit(orderId)
             toast.success("¡Bolsas recogidas! Modo Entrega Final activado.")
             fetchData(true)
-        } catch (e: any) {
-            toast.error(e?.response?.data?.message || "Error al iniciar entrega")
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, "Error al iniciar entrega"))
             fetchData(true)
         } finally {
             setActionLocked(false)
@@ -97,8 +126,8 @@ function RunnerContent() {
             await ordersService.complete(orderId)
             toast.success("¡Misión cumplida! Entrega completada exitosamente.")
             fetchData(true)
-        } catch (e: any) {
-            toast.error(e?.response?.data?.message || "Error al completar pedido")
+        } catch (error: unknown) {
+            toast.error(getErrorMessage(error, "Error al completar pedido"))
             fetchData(true)
         } finally {
             setActionLocked(false)

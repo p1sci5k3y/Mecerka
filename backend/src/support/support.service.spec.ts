@@ -10,6 +10,7 @@ import {
   PaymentAccountProvider,
   PaymentSessionStatus,
 } from '@prisma/client';
+import { DonationPaymentService } from './donation-payment.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupportService } from './support.service';
 
@@ -84,6 +85,7 @@ describe('SupportService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SupportService,
+        DonationPaymentService,
         { provide: PrismaService, useValue: prismaMock },
         {
           provide: ConfigService,
@@ -456,6 +458,7 @@ describe('SupportService', () => {
     const module = await Test.createTestingModule({
       providers: [
         SupportService,
+        DonationPaymentService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: ConfigService, useValue: { get: configGetMock } },
       ],
