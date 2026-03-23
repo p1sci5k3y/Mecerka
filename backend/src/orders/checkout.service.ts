@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -8,13 +7,12 @@ import {
 } from '@nestjs/common';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { DeliveryStatus, ProviderOrderStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import type {
   GeocodedAddress,
   GeocodingPort,
 } from '../geocoding/geocoding.types';
-import { Money } from '../domain/value-objects';
 import { StockReservationService } from './stock-reservation.service';
 import {
   CheckoutDeliveryPlanningResult,

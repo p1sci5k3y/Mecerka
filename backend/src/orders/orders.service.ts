@@ -1,11 +1,8 @@
 import {
-  BadRequestException,
   Inject,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
   ConflictException,
-  Logger,
 } from '@nestjs/common';
 import { OrderStatusService } from './order-status.service';
 import { OrderQueryService } from './order-query.service';

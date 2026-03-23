@@ -8,20 +8,17 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  DeliveryOrderStatus,
   PaymentAccountOwnerType,
   PaymentAccountProvider,
   Prisma,
   RiskActorType,
   RiskCategory,
   Role,
-  RunnerPaymentStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RiskService } from '../risk/risk.service';
 import { AssignDeliveryRunnerDto } from './dto/assign-delivery-runner.dto';
 import { ConfirmDeliveryDto } from './dto/confirm-delivery.dto';
-import { IncidentReporterRoleValue } from './delivery-incident.constants';
 import { CreateDeliveryIncidentDto } from './dto/create-delivery-incident.dto';
 import { CreateDeliveryOrderDto } from './dto/create-delivery-order.dto';
 import { UpdateDeliveryLocationDto } from './dto/update-delivery-location.dto';

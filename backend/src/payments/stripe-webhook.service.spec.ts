@@ -7,7 +7,6 @@ import { PaymentWebhookEventService } from './payment-webhook-event.service';
 import { ProviderPaymentConfirmationService } from './provider-payment-confirmation.service';
 import {
   DeliveryStatus,
-  PaymentAccountOwnerType,
   PaymentSessionStatus,
   ProviderOrderStatus,
   ProviderPaymentStatus,

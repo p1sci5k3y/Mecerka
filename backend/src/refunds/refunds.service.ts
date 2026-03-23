@@ -15,7 +15,6 @@ import { RefundStatusValue, RefundStatusValues } from './refund.constants';
 import {
   RefundBoundary,
   RefundBaseRecord,
-  RefundDataClient,
   SanitizedRefund,
   RefundBoundaryService,
 } from './refund-boundary.service';

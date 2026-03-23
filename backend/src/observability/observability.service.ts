@@ -3,11 +3,8 @@ import {
   DeliveryIncidentStatus,
   DeliveryOrderStatus,
   DeliveryStatus,
-  PaymentSessionStatus,
-  ProviderPaymentStatus,
   RefundStatus,
   RiskLevel,
-  RunnerPaymentStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ObservabilityReconciliationService } from './observability-reconciliation.service';
@@ -18,7 +15,6 @@ import {
   ObservabilityReconciliation,
   ObservabilitySlaMetrics,
   ObservabilityWindow,
-  ReconciliationCheckResult,
 } from './observability.types';
 
 @Injectable()
