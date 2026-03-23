@@ -573,8 +573,8 @@ export class CheckoutService {
       );
       await this.stockReservationService.reserveStockForOrder(order);
       return this.initiatePaymentSession(order, clientId);
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === 'P2002') {
         const duplicatedOrder = await (this.prisma.order as any).findUnique({
           where: {
             checkoutIdempotencyKey: normalizedKey,

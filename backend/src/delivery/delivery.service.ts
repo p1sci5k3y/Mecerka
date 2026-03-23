@@ -102,9 +102,9 @@ export class DeliveryService {
         metadata,
       });
       await this.riskService.recalculateRiskScore(actorType, actorId);
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.warn(
-        `risk.delivery.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${error.message}`,
+        `risk.delivery.integration_failed actorType=${actorType} actorId=${actorId} category=${category} message=${(error as Error).message}`,
       );
     }
   }
@@ -726,8 +726,8 @@ export class DeliveryService {
         },
       });
       return true;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === 'P2002') {
         return false;
       }
       throw error;
@@ -1694,7 +1694,7 @@ export class DeliveryService {
           lastLocationUpdateAt: updated.lastLocationUpdateAt,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (
         error instanceof ConflictException &&
         error.message === 'Runner location jump exceeds allowed threshold'
