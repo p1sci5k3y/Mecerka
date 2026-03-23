@@ -168,6 +168,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend production dependencies
+        run: cd backend && npm ci --omit=dev
+
+      - name: Install frontend production dependencies
+        run: cd frontend && npm ci --omit=dev --legacy-peer-deps
       
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
@@ -176,6 +189,7 @@ jobs:
           path: '.'
           format: 'HTML'
           out: 'reports'
+          args: '--nodeAuditSkipDevDependencies --nodePackageSkipDevDependencies'
           
       - uses: actions/upload-artifact@v4
         with:

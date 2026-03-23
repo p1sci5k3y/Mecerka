@@ -130,7 +130,6 @@ function cartWithItem() {
 
 // ── Import component after mocks ─────────────────────────────────────────────
 // Dynamic import so vi.mock() hoisting fires first in the test file scope.
-let CartPage: React.ComponentType
 beforeEach(async () => {
   vi.resetModules()
   // Re-import is handled per describe block below; here we just reset state

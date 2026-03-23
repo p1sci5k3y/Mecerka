@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
+  DeliveryStatus,
   Order,
-  OrderItem,
   ProviderOrder,
   ProviderOrderStatus,
   Prisma,
@@ -12,7 +12,6 @@ import {
   OrderWithProviderOrdersAndItems,
   ProviderOrderWithOrder,
 } from './order.repository.interface';
-import { DeliveryStatus } from '@prisma/client';
 
 @Injectable()
 export class PrismaOrderRepository implements IOrderRepository {

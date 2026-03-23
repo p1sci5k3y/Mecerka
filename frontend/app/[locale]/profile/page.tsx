@@ -34,6 +34,12 @@ const roleLabel: Record<string, string> = {
   RUNNER: "Repartidor"
 }
 
+const REQUESTABLE_ROLES = ["PROVIDER", "RUNNER"] as const
+
+function getAvailableRoles(userRoles?: string[]) {
+  return REQUESTABLE_ROLES.filter((role) => !userRoles?.includes(role))
+}
+
 export default function ProfilePage() {
   return (
     <ProtectedRoute>
@@ -80,9 +86,7 @@ function ProfileContent() {
     return fallback
   }
 
-  const availableRoles = (["PROVIDER", "RUNNER"] as const).filter(
-    (role) => !user?.roles?.includes(role),
-  )
+  const availableRoles = getAvailableRoles(user?.roles)
 
   const roleRequestLabel: Record<"PROVIDER" | "RUNNER", string> = {
     PROVIDER: "Solicitar alta como proveedor",
@@ -90,14 +94,16 @@ function ProfileContent() {
   }
 
   useEffect(() => {
-    if (availableRoles.length === 0) {
+    const nextAvailableRoles = getAvailableRoles(user?.roles)
+
+    if (nextAvailableRoles.length === 0) {
       return
     }
 
     setRequestedRole((current) =>
-      availableRoles.includes(current) ? current : availableRoles[0],
+      nextAvailableRoles.includes(current) ? current : nextAvailableRoles[0],
     )
-  }, [availableRoles])
+  }, [user?.roles])
 
   const handlePinSetup = async (e: React.FormEvent) => {
     e.preventDefault()

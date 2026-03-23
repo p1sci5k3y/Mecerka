@@ -5,12 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  DeliveryStatus,
   PaymentAccountOwnerType,
   PaymentAccountProvider,
   PaymentSessionStatus,
   Prisma,
-  ProviderOrderStatus,
   ProviderPaymentStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';

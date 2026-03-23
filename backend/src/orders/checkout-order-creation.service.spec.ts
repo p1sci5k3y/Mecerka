@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { DeliveryStatus, ProviderOrderStatus, Prisma } from '@prisma/client';
+import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import { CheckoutOrderCreationService } from './checkout-order-creation.service';
 
 describe('CheckoutOrderCreationService', () => {

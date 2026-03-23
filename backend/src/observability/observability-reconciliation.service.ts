@@ -1,5 +1,4 @@
 import {
-  DeliveryOrderStatus,
   DeliveryStatus,
   PaymentSessionStatus,
   ProviderPaymentStatus,

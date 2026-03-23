@@ -21,11 +21,7 @@ import {
 } from './utils/state-machine';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RiskService } from '../risk/risk.service';
-import {
-  OrderCancelledEvent,
-  OrderDeliveredEvent,
-  OrderInTransitEvent,
-} from '../domain/events/order-events';
+import { OrderCancelledEvent } from '../domain/events/order-events';
 import {
   IOrderRepository,
   ProviderOrderWithOrder,
