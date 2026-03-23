@@ -3,6 +3,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConflictException } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 import { StripeWebhookService } from './stripe-webhook.service';
+import { PaymentWebhookEventService } from './payment-webhook-event.service';
+import { ProviderPaymentConfirmationService } from './provider-payment-confirmation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ConfigService } from '@nestjs/config';
@@ -119,6 +121,8 @@ describe('PaymentsService', () => {
       providers: [
         PaymentsService,
         StripeWebhookService,
+        PaymentWebhookEventService,
+        ProviderPaymentConfirmationService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
         { provide: ConfigService, useValue: configServiceMock },

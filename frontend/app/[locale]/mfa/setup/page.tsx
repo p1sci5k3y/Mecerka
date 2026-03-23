@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { authService } from "@/lib/services/auth-service"
+import { authService, type MfaSetupResponse } from "@/lib/services/auth-service"
 import { Loader2, ShieldCheck } from "lucide-react"
 import Image from "next/image"
 import { getPrimaryRouteForUser } from "@/lib/role-navigation"
@@ -45,7 +45,7 @@ export default function MfaSetupPage() {
         e.preventDefault()
         setLoading(true)
         try {
-            const res: any = await authService.setupMfa(emailOtp)
+            const res: MfaSetupResponse = await authService.setupMfa(emailOtp)
             if (res.qrCode) {
                 setQrCode(res.qrCode)
                 setStep(2)

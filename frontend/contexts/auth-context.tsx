@@ -10,7 +10,13 @@ import {
   type ReactNode,
 } from "react"
 import { usePathname } from "@/lib/navigation"
-import { authService, type LoginPayload, type RegisterPayload } from "@/lib/services/auth-service"
+import {
+  authService,
+  type LoginPayload,
+  type LoginResponse,
+  type RegisterPayload,
+  type RegisterResponse,
+} from "@/lib/services/auth-service"
 import type { User } from "@/lib/types"
 import {
   clearAuthSessionHint,
@@ -25,8 +31,8 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (payload: LoginPayload) => Promise<any>
-  register: (payload: RegisterPayload) => Promise<any>
+  login: (payload: LoginPayload) => Promise<LoginResponse>
+  register: (payload: RegisterPayload) => Promise<RegisterResponse>
   logout: () => Promise<void>
 }
 
@@ -47,7 +53,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
   const hydrateUser = useCallback(async () => {
     try {
-      const user = await authService.getProfile() as User
+      const user = await authService.getProfile()
       setAuthSessionHint()
       setState({ user, isLoading: false, isAuthenticated: true })
     } catch {
@@ -70,7 +76,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   }, [hydrateUser, pathname])
 
   const login = useCallback(async (payload: LoginPayload) => {
-    const response: any = await authService.login(payload)
+    const response = await authService.login(payload)
     if (!response?.mfaRequired) {
       setAuthSessionHint()
       await hydrateUser()

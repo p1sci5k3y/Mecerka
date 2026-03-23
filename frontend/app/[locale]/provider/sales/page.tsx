@@ -28,6 +28,22 @@ function ProviderKanbanContent() {
   // TODO: Conectar WebSocket inmersivo real en lugar o además de polling
   // const { socket } = useSocket()
 
+  const getErrorStatus = (error: unknown) => {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "response" in error &&
+      typeof error.response === "object" &&
+      error.response !== null &&
+      "status" in error.response &&
+      typeof error.response.status === "number"
+    ) {
+      return error.response.status
+    }
+
+    return null
+  }
+
   // Refetch orders silently
   const fetchOrders = async (silent = false) => {
     try {
@@ -56,8 +72,8 @@ function ProviderKanbanContent() {
       // Refetch silencioso
       toast.success("Pedido actualizado correctamente")
       fetchOrders(true)
-    } catch (err: any) {
-      if (err.response?.status === 409) {
+    } catch (error: unknown) {
+      if (getErrorStatus(error) === 409) {
         toast.error("El estado del pedido cambió hace unos segundos. Reiniciando vista...")
       } else {
         toast.error("Error al actualizar el pedido.")
@@ -73,7 +89,7 @@ function ProviderKanbanContent() {
         description: "El sistema buscará alternativas si es posible."
       })
       fetchOrders(true)
-    } catch (err: any) {
+    } catch {
       toast.error("Error al rechazar. Verificando estado...")
       fetchOrders(true)
     }

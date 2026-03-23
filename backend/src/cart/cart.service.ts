@@ -6,33 +6,14 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
+import { CartProductPricingService } from './cart-product-pricing.service';
 
 @Injectable()
 export class CartService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private resolveAppliedDiscountPrice(
-    basePrice: number,
-    publicDiscountPrice?: number | null,
-    clientDiscountPrice?: number | null,
-  ) {
-    const discountCandidates = [
-      publicDiscountPrice,
-      clientDiscountPrice,
-    ].filter(
-      (value): value is number =>
-        value != null &&
-        Number.isFinite(value) &&
-        value > 0 &&
-        value < basePrice,
-    );
-
-    if (discountCandidates.length === 0) {
-      return null;
-    }
-
-    return Math.min(...discountCandidates);
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cartProductPricingService: CartProductPricingService,
+  ) {}
 
   private buildCartInclude() {
     return {
@@ -108,45 +89,11 @@ export class CartService {
   }
 
   async addItem(clientId: string, dto: AddCartItemDto) {
-    const product = await this.prisma.product.findFirst({
-      where: {
-        id: dto.productId,
-        isActive: true,
-        provider: {
-          active: true,
-          stripeAccountId: {
-            not: null,
-          },
-        },
-      },
-      select: {
-        id: true,
-        providerId: true,
-        cityId: true,
-        reference: true,
-        name: true,
-        imageUrl: true,
-        price: true,
-        discountPrice: true,
-        clientDiscounts: {
-          where: {
-            clientId,
-            active: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
-          select: {
-            discountPrice: true,
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not available');
-    }
+    const product =
+      await this.cartProductPricingService.resolveActiveProductSnapshot(
+        clientId,
+        dto.productId,
+      );
 
     const cartGroup = await this.getOrCreateActiveCartGroup(clientId);
     if (cartGroup.cityId && cartGroup.cityId !== product.cityId) {
@@ -154,17 +101,6 @@ export class CartService {
         'You cannot mix products from different cities in the same cart',
       );
     }
-
-    const clientDiscountPrice =
-      product.clientDiscounts[0]?.discountPrice != null
-        ? Number(product.clientDiscounts[0].discountPrice)
-        : null;
-    const appliedDiscountPrice = this.resolveAppliedDiscountPrice(
-      Number(product.price),
-      product.discountPrice != null ? Number(product.discountPrice) : null,
-      clientDiscountPrice,
-    );
-    const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       if (!cartGroup.cityId) {
@@ -197,7 +133,7 @@ export class CartService {
         where: {
           cartProviderId_productId: {
             cartProviderId: cartProvider.id,
-            productId: product.id,
+            productId: product.productId,
           },
         },
       });
@@ -210,23 +146,23 @@ export class CartService {
             productReferenceSnapshot: product.reference,
             productNameSnapshot: product.name,
             imageUrlSnapshot: product.imageUrl,
-            unitPriceSnapshot: product.price,
-            discountPriceSnapshot: appliedDiscountPrice,
-            effectiveUnitPriceSnapshot: effectiveUnitPrice,
+            unitPriceSnapshot: product.unitPrice,
+            discountPriceSnapshot: product.discountPrice,
+            effectiveUnitPriceSnapshot: product.effectiveUnitPrice,
           },
         });
       } else {
         await tx.cartItem.create({
           data: {
             cartProviderId: cartProvider.id,
-            productId: product.id,
+            productId: product.productId,
             quantity: dto.quantity,
             productReferenceSnapshot: product.reference,
             productNameSnapshot: product.name,
             imageUrlSnapshot: product.imageUrl,
-            unitPriceSnapshot: product.price,
-            discountPriceSnapshot: appliedDiscountPrice,
-            effectiveUnitPriceSnapshot: effectiveUnitPrice,
+            unitPriceSnapshot: product.unitPrice,
+            discountPriceSnapshot: product.discountPrice,
+            effectiveUnitPriceSnapshot: product.effectiveUnitPrice,
           },
         });
       }
@@ -271,53 +207,11 @@ export class CartService {
       throw new NotFoundException('Cart item not found');
     }
 
-    const product = await this.prisma.product.findFirst({
-      where: {
-        id: cartItem.productId,
-        isActive: true,
-        provider: {
-          active: true,
-          stripeAccountId: {
-            not: null,
-          },
-        },
-      },
-      select: {
-        reference: true,
-        name: true,
-        imageUrl: true,
-        price: true,
-        discountPrice: true,
-        clientDiscounts: {
-          where: {
-            clientId,
-            active: true,
-          },
-          orderBy: {
-            updatedAt: 'desc',
-          },
-          take: 1,
-          select: {
-            discountPrice: true,
-          },
-        },
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not available');
-    }
-
-    const clientDiscountPrice =
-      product.clientDiscounts[0]?.discountPrice != null
-        ? Number(product.clientDiscounts[0].discountPrice)
-        : null;
-    const appliedDiscountPrice = this.resolveAppliedDiscountPrice(
-      Number(product.price),
-      product.discountPrice != null ? Number(product.discountPrice) : null,
-      clientDiscountPrice,
-    );
-    const effectiveUnitPrice = appliedDiscountPrice ?? Number(product.price);
+    const product =
+      await this.cartProductPricingService.resolveActiveProductSnapshot(
+        clientId,
+        cartItem.productId,
+      );
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.update({
@@ -327,9 +221,9 @@ export class CartService {
           productReferenceSnapshot: product.reference,
           productNameSnapshot: product.name,
           imageUrlSnapshot: product.imageUrl,
-          unitPriceSnapshot: product.price,
-          discountPriceSnapshot: appliedDiscountPrice,
-          effectiveUnitPriceSnapshot: effectiveUnitPrice,
+          unitPriceSnapshot: product.unitPrice,
+          discountPriceSnapshot: product.discountPrice,
+          effectiveUnitPriceSnapshot: product.effectiveUnitPrice,
         },
       });
 

@@ -16,6 +16,8 @@ import { OrderItemsService } from './order-items.service';
 import { OrderStatusService } from './order-status.service';
 import { PaymentsService } from '../payments/payments.service';
 import { StripeWebhookService } from '../payments/stripe-webhook.service';
+import { PaymentWebhookEventService } from '../payments/payment-webhook-event.service';
+import { ProviderPaymentConfirmationService } from '../payments/provider-payment-confirmation.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { assertTestEnvironment } from '../../test/test-env';
@@ -23,6 +25,7 @@ import { IOrderRepository } from './repositories/order.repository.interface';
 import { PrismaOrderRepository } from './repositories/prisma-order.repository';
 import { CheckoutService } from './checkout.service';
 import { IPaymentAccountRepository } from '../payments/repositories/payment-account.repository.interface';
+import { LegacyManualOrderCreationService } from './legacy-manual-order-creation.service';
 
 jest.setTimeout(20000);
 
@@ -40,6 +43,8 @@ describe('OrdersService - Provider Payment Domain', () => {
         OrderStatusService,
         PaymentsService,
         StripeWebhookService,
+        PaymentWebhookEventService,
+        ProviderPaymentConfirmationService,
         PrismaService,
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
         {
@@ -62,6 +67,7 @@ describe('OrdersService - Provider Payment Domain', () => {
           provide: CheckoutService,
           useValue: { checkoutFromCart: jest.fn() },
         },
+        LegacyManualOrderCreationService,
         {
           provide: OrderQueryService,
           useValue: {

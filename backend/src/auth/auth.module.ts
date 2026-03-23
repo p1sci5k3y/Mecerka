@@ -7,6 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../prisma/prisma.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { MfaService } from './mfa.service';
+import { AuthEmailWorkflowService } from './auth-email-workflow.service';
 
 @Module({
   imports: [
@@ -28,7 +29,7 @@ import { MfaService } from './mfa.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, MfaService],
+  providers: [AuthService, AuthEmailWorkflowService, JwtStrategy, MfaService],
   exports: [AuthService, MfaService, JwtModule],
 })
 export class AuthModule {}

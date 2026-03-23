@@ -18,6 +18,8 @@ import Stripe from 'stripe';
 import { PrismaService } from '../prisma/prisma.service';
 import { RiskService } from '../risk/risk.service';
 import { RefundStatusValues, RefundTypeValues } from './refund.constants';
+import { RefundBoundaryService } from './refund-boundary.service';
+import { RefundRequestQueryService } from './refund-request-query.service';
 import { RefundsService } from './refunds.service';
 
 jest.mock('stripe');
@@ -76,6 +78,8 @@ describe('RefundsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RefundsService,
+        RefundBoundaryService,
+        RefundRequestQueryService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: RiskService, useValue: riskServiceMock },
         {

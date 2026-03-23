@@ -3,6 +3,8 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { StripeWebhookService } from './stripe-webhook.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PaymentWebhookEventService } from './payment-webhook-event.service';
+import { ProviderPaymentConfirmationService } from './provider-payment-confirmation.service';
 import {
   DeliveryStatus,
   PaymentAccountOwnerType,
@@ -107,6 +109,8 @@ describe('StripeWebhookService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StripeWebhookService,
+        PaymentWebhookEventService,
+        ProviderPaymentConfirmationService,
         { provide: PrismaService, useValue: prismaMock },
         { provide: EventEmitter2, useValue: eventEmitterMock },
       ],

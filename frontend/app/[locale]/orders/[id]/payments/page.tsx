@@ -62,6 +62,23 @@ function paymentStatusLabel(status: string) {
   }
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
 function fallbackProviderPayments(order: Order | null): ProviderOrderPaymentSummary[] {
   if (!order?.providerOrders) {
     return []
@@ -225,15 +242,17 @@ export default function OrderPaymentsPage() {
                   "Este entorno no puede preparar pagos Stripe reales."
               : null,
           )
-        } catch (error: any) {
+        } catch (error: unknown) {
           setPaymentsAggregate(null)
           setAggregateError(
-            error?.message ||
+            getErrorMessage(
+              error,
               "No pudimos preparar las sesiones de pago para este pedido.",
+            ),
           )
         }
-      } catch (error: any) {
-        setPageError(error?.message || "No pudimos cargar el pedido.")
+      } catch (error: unknown) {
+        setPageError(getErrorMessage(error, "No pudimos cargar el pedido."))
       } finally {
         if (mode === "initial") {
           setLoading(false)
@@ -300,9 +319,9 @@ export default function OrderPaymentsPage() {
           "La sesión de pago ya está preparada en backend, pero este entorno local no puede completar Stripe.",
         )
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.message || "No pudimos preparar el pago de este comercio.",
+        getErrorMessage(error, "No pudimos preparar el pago de este comercio."),
       )
     } finally {
       setPreparingProviderId(null)
@@ -326,9 +345,9 @@ export default function OrderPaymentsPage() {
           "El pago del reparto está separado y preparado, pero este entorno local no puede completar Stripe.",
         )
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.message || "No pudimos preparar el pago del reparto.",
+        getErrorMessage(error, "No pudimos preparar el pago del reparto."),
       )
     } finally {
       setPreparingRunner(false)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { loadStripe } from "@stripe/stripe-js"
+import { loadStripe, type Stripe } from "@stripe/stripe-js"
 import {
   Elements,
   PaymentElement,
@@ -14,7 +14,7 @@ import { useLocale } from "next-intl"
 import { Button } from "@/components/ui/button"
 import { getPublicRuntimeConfig } from "@/lib/runtime-config"
 
-const stripePromises: Record<string, Promise<any>> = {}
+const stripePromises: Record<string, Promise<Stripe | null>> = {}
 
 function getStripe(publishableKey: string, accountId: string) {
   const cacheKey = `${publishableKey}:${accountId}`

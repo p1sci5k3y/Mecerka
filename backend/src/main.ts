@@ -5,6 +5,7 @@ import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exce
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppLoggerService } from './common/logging/app-logger.service';
+import type { AbstractHttpAdapter } from '@nestjs/core';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
@@ -23,7 +24,9 @@ async function bootstrap() {
 
   // Exception Filtering
   const { httpAdapter } = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapter as any));
+  app.useGlobalFilters(
+    new PrismaClientExceptionFilter(httpAdapter as AbstractHttpAdapter),
+  );
 
   // Content Security Policy is enabled with explicit directives to mitigate XSS
   app.use(helmet());

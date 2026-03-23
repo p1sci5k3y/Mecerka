@@ -24,6 +24,8 @@ export class WebhooksController {
   private readonly logger = new Logger(WebhooksController.name);
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
+  private readonly stripeApiVersion: Stripe.LatestApiVersion =
+    '2026-02-25.clover';
 
   constructor(
     private readonly paymentsService: PaymentsService,
@@ -36,7 +38,7 @@ export class WebhooksController {
     }
 
     this.stripe = new Stripe(stripeKey, {
-      apiVersion: '2026-02-25.clover' as any,
+      apiVersion: this.stripeApiVersion,
     });
     this.webhookSecret = webhookKey;
   }

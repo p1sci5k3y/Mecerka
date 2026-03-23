@@ -3,6 +3,7 @@ import { AuthService } from '../auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../../email/email.service';
+import { AuthEmailWorkflowService } from '../auth-email-workflow.service';
 
 // Mock implementations
 const mockPrismaService = {
@@ -14,6 +15,12 @@ const mockPrismaService = {
 
 const mockJwtService = {};
 const mockEmailService = {};
+const mockAuthEmailWorkflowService = {
+  verifyEmail: jest.fn(),
+  forgotPassword: jest.fn(),
+  resetPassword: jest.fn(),
+  resendVerification: jest.fn(),
+};
 
 describe('Temporary Password Feature (Planned State Transitions)', () => {
   let authService: AuthService;
@@ -26,6 +33,10 @@ describe('Temporary Password Feature (Planned State Transitions)', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: EmailService, useValue: mockEmailService },
+        {
+          provide: AuthEmailWorkflowService,
+          useValue: mockAuthEmailWorkflowService,
+        },
       ],
     }).compile();
 

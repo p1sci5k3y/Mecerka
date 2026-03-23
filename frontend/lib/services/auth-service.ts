@@ -13,13 +13,33 @@ export interface RegisterPayload {
   name?: string;
 }
 
+export interface RegisterResponse {
+  message: string;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  mfaRequired: boolean;
+  user: {
+    id: string;
+    email: string;
+    roles: User["roles"];
+    mfaEnabled: boolean;
+    hasPin: boolean;
+  };
+}
+
+export interface MfaSetupResponse {
+  qrCode?: string;
+}
+
 export const authService = {
   async register(payload: RegisterPayload) {
-    return api.post('/auth/register', payload);
+    return api.post<RegisterResponse>('/auth/register', payload);
   },
 
   async login(payload: LoginPayload) {
-    return api.post('/auth/login', payload);
+    return api.post<LoginResponse>('/auth/login', payload);
   },
 
   async logout() {
@@ -36,7 +56,7 @@ export const authService = {
   },
 
   async setupMfa(otpCode: string) {
-    return api.post('/auth/mfa/setup', { otpCode });
+    return api.post<MfaSetupResponse>('/auth/mfa/setup', { otpCode });
   },
 
   async verifyMfa(token: string) {

@@ -34,6 +34,20 @@ function buildIdempotencyKey() {
   return `cart-checkout-${Date.now()}`
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim().length > 0
+  ) {
+    return error.message
+  }
+
+  return fallback
+}
+
 export default function CartPage() {
   return <CartContent />
 }
@@ -138,9 +152,12 @@ function CartContent() {
         "Pedido oficial creado. Ahora debes revisar los pagos separados por comercio.",
       )
       window.location.assign(`/${locale}/orders/${createdOrder.id}/payments`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(
-        error?.message || "No pudimos crear el pedido oficial desde el carrito.",
+        getErrorMessage(
+          error,
+          "No pudimos crear el pedido oficial desde el carrito.",
+        ),
       )
     } finally {
       setCheckingOut(false)
