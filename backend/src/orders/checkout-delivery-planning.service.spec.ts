@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { CheckoutDeliveryPlanningService } from './checkout-delivery-planning.service';
+import { Money } from '../domain/value-objects';
 
 describe('CheckoutDeliveryPlanningService', () => {
   let service: CheckoutDeliveryPlanningService;
@@ -84,14 +85,19 @@ describe('CheckoutDeliveryPlanningService', () => {
       distanceKm: expect.any(Number),
       coverageLimitKm: 6,
     });
-    expect(result.deliveryPricing).toEqual({
-      deliveryDistanceKm: expect.any(Number),
-      runnerBaseFee: 3.5,
-      runnerPerKmFee: 0.9,
-      runnerExtraPickupFee: 1.5,
-      deliveryFee: expect.any(Number),
-    });
-    expect(result.deliveryPricing.deliveryFee).toBeGreaterThan(3.5);
+    expect(result.deliveryPricing.deliveryDistanceKm).toEqual(
+      expect.any(Number),
+    );
+    expect(result.deliveryPricing.runnerBaseFee.equals(Money.of(3.5))).toBe(
+      true,
+    );
+    expect(result.deliveryPricing.runnerPerKmFee.equals(Money.of(0.9))).toBe(
+      true,
+    );
+    expect(
+      result.deliveryPricing.runnerExtraPickupFee.equals(Money.of(1.5)),
+    ).toBe(true);
+    expect(result.deliveryPricing.deliveryFee.amount).toBeGreaterThan(3.5);
   });
 
   it('rejects providers without configured coordinates', async () => {

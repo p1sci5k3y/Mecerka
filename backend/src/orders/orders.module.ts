@@ -12,6 +12,9 @@ import { RiskModule } from '../risk/risk.module';
 import { IOrderRepository } from './repositories/order.repository.interface';
 import { PrismaOrderRepository } from './repositories/prisma-order.repository';
 import { LegacyManualOrderCreationService } from './legacy-manual-order-creation.service';
+import { CheckoutCartValidationService } from './checkout-cart-validation.service';
+import { CheckoutDeliveryPlanningService } from './checkout-delivery-planning.service';
+import { CheckoutOrderCreationService } from './checkout-order-creation.service';
 
 @Module({
   imports: [PrismaModule, RiskModule, GeocodingModule],
@@ -22,6 +25,9 @@ import { LegacyManualOrderCreationService } from './legacy-manual-order-creation
     OrderItemsService,
     OrderStatusService,
     CheckoutService,
+    CheckoutCartValidationService,
+    CheckoutDeliveryPlanningService,
+    CheckoutOrderCreationService,
     StockReservationService,
     LegacyManualOrderCreationService,
     { provide: IOrderRepository, useClass: PrismaOrderRepository },

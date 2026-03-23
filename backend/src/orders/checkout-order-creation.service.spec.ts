@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
+import { Money } from '../domain/value-objects';
 import { CheckoutOrderCreationService } from './checkout-order-creation.service';
 
 describe('CheckoutOrderCreationService', () => {
@@ -97,13 +98,13 @@ describe('CheckoutOrderCreationService', () => {
         ]),
         deliveryPricing: {
           deliveryDistanceKm: 0.5,
-          runnerBaseFee: 3.5,
-          runnerPerKmFee: 0.9,
-          runnerExtraPickupFee: 1.5,
-          deliveryFee: 3.95,
+          runnerBaseFee: Money.of(3.5),
+          runnerPerKmFee: Money.of(0.9),
+          runnerExtraPickupFee: Money.of(1.5),
+          deliveryFee: Money.of(3.95),
         },
       },
-      20,
+      Money.of(20),
       'idem-1',
     );
 
@@ -205,13 +206,13 @@ describe('CheckoutOrderCreationService', () => {
           providerCoverageMap: new Map(),
           deliveryPricing: {
             deliveryDistanceKm: 0,
-            runnerBaseFee: 3.5,
-            runnerPerKmFee: 0.9,
-            runnerExtraPickupFee: 1.5,
-            deliveryFee: 3.5,
+            runnerBaseFee: Money.of(3.5),
+            runnerPerKmFee: Money.of(0.9),
+            runnerExtraPickupFee: Money.of(1.5),
+            deliveryFee: Money.of(3.5),
           },
         },
-        0,
+        Money.of(0),
         'idem-empty',
       ),
     ).rejects.toThrow(

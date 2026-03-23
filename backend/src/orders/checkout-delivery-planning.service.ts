@@ -1,5 +1,11 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import type {
   GeocodedAddress,
   GeocodingPort,
@@ -35,10 +41,10 @@ type ProviderLocation = {
 
 export type DeliveryPricingSnapshot = {
   deliveryDistanceKm: number;
-  runnerBaseFee: number;
-  runnerPerKmFee: number;
-  runnerExtraPickupFee: number;
-  deliveryFee: number;
+  runnerBaseFee: Money;
+  runnerPerKmFee: Money;
+  runnerExtraPickupFee: Money;
+  deliveryFee: Money;
 };
 
 export type CheckoutDeliveryPlanningResult = {
@@ -47,9 +53,11 @@ export type CheckoutDeliveryPlanningResult = {
   deliveryPricing: DeliveryPricingSnapshot;
 };
 
+@Injectable()
 export class CheckoutDeliveryPlanningService {
   constructor(
     private readonly prisma: PrismaService,
+    @Inject(GEOCODING_SERVICE)
     private readonly geocodingService: GeocodingPort,
   ) {}
 
@@ -211,21 +219,14 @@ export class CheckoutDeliveryPlanningService {
       Math.max(...providerCoverage.map((coverage) => coverage.distanceKm), 0),
     );
     const additionalPickupCount = Math.max(providerCount - 1, 0);
-    const runnerBaseFee = Money.of(Number(city.baseDeliveryFee ?? 3.5)).amount;
-    const runnerPerKmFee = Money.of(
-      Number(city.deliveryPerKmFee ?? 0.9),
-    ).amount;
-    const runnerExtraPickupFee = Money.of(
-      Number(city.extraPickupFee ?? 1.5),
-    ).amount;
-    const distanceFee =
-      Money.of(runnerPerKmFee).multiply(deliveryDistanceKm).amount;
-    const extraPickupCharge = Money.of(runnerExtraPickupFee).multiply(
+    const runnerBaseFee = Money.of(Number(city.baseDeliveryFee ?? 3.5));
+    const runnerPerKmFee = Money.of(Number(city.deliveryPerKmFee ?? 0.9));
+    const runnerExtraPickupFee = Money.of(Number(city.extraPickupFee ?? 1.5));
+    const distanceFee = runnerPerKmFee.multiply(deliveryDistanceKm);
+    const extraPickupCharge = runnerExtraPickupFee.multiply(
       additionalPickupCount,
-    ).amount;
-    const deliveryFee = Money.of(runnerBaseFee)
-      .add(Money.of(distanceFee))
-      .add(Money.of(extraPickupCharge)).amount;
+    );
+    const deliveryFee = runnerBaseFee.add(distanceFee).add(extraPickupCharge);
 
     return {
       deliveryDistanceKm,

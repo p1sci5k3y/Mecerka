@@ -11,6 +11,8 @@ describe('RunnerGateway Security & Auth', () => {
   let jwtServiceMock: Partial<JwtService>;
   let prismaMock: any;
   let configServiceMock: Partial<ConfigService>;
+  let emitMock: jest.Mock;
+  let toMock: jest.Mock;
 
   beforeEach(async () => {
     jwtServiceMock = {
@@ -40,6 +42,9 @@ describe('RunnerGateway Security & Auth', () => {
     }).compile();
 
     gateway = module.get<RunnerGateway>(RunnerGateway);
+    emitMock = jest.fn();
+    toMock = jest.fn().mockReturnValue({ emit: emitMock });
+    gateway.server = { to: toMock } as any;
   });
 
   afterEach(() => {
@@ -135,6 +140,125 @@ describe('RunnerGateway Security & Auth', () => {
 
       expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
       expect(mockSocket.data).toBeUndefined();
+    });
+
+    it('falls back to JWT_SECRET_PREVIOUS when the current secret fails', async () => {
+      const mockSocket = {
+        id: 'socket-fallback-secret',
+        handshake: { headers: { authorization: 'Bearer rotated-token' } },
+        disconnect: jest.fn(),
+      } as any;
+
+      (configServiceMock.get as jest.Mock).mockImplementation((key: string) => {
+        if (key === 'JWT_SECRET_CURRENT') return 'current-secret';
+        if (key === 'JWT_SECRET_PREVIOUS') return 'previous-secret';
+        if (key === 'JWT_SECRET') return 'fallback-secret';
+        return undefined;
+      });
+
+      const retryModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          RunnerGateway,
+          { provide: JwtService, useValue: jwtServiceMock },
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: ConfigService, useValue: configServiceMock },
+        ],
+      }).compile();
+
+      gateway = retryModule.get<RunnerGateway>(RunnerGateway);
+      gateway.server = {
+        to: jest.fn().mockReturnValue({ emit: jest.fn() }),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock)
+        .mockRejectedValueOnce(new Error('JWT Error'))
+        .mockResolvedValueOnce({
+          sub: 'user-fallback',
+          roles: [Role.RUNNER],
+          tokenVersion: 1,
+          mfaAuthenticated: true,
+          iat: Math.floor(Date.now() / 1000),
+        });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 1,
+        mfaEnabled: false,
+        passwordChangedAt: null,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(jwtServiceMock.verifyAsync).toHaveBeenNthCalledWith(
+        1,
+        'rotated-token',
+        { secret: 'current-secret' },
+      );
+      expect(jwtServiceMock.verifyAsync).toHaveBeenNthCalledWith(
+        2,
+        'rotated-token',
+        { secret: 'previous-secret' },
+      );
+      expect(mockSocket.disconnect).not.toHaveBeenCalled();
+      expect(mockSocket.data).toEqual({
+        userId: 'user-fallback',
+        roles: [Role.RUNNER],
+      });
+    });
+
+    it('disconnects when the JWT payload has no subject', async () => {
+      const mockSocket = {
+        id: 'socket-no-sub',
+        handshake: { auth: { token: 'auth-token' } },
+        disconnect: jest.fn(),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        roles: [Role.RUNNER],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: Math.floor(Date.now() / 1000),
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(jwtServiceMock.verifyAsync).toHaveBeenCalledWith('auth-token', {
+        secret: 'test-secret',
+      });
+      expect(mockSocket.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('extracts the access token from the cookie before auth and query fallbacks', async () => {
+      const mockSocket = {
+        id: 'socket-cookie-token',
+        handshake: {
+          headers: { cookie: 'foo=bar; access_token=cookie-token%20123' },
+          auth: { token: 'auth-token' },
+          query: { token: 'query-token' },
+        },
+        disconnect: jest.fn(),
+      } as any;
+
+      (jwtServiceMock.verifyAsync as jest.Mock).mockResolvedValue({
+        sub: 'user-cookie',
+        roles: [Role.CLIENT],
+        tokenVersion: 1,
+        mfaAuthenticated: true,
+        iat: Math.floor(Date.now() / 1000),
+      });
+      (prismaMock.user!.findUnique as jest.Mock).mockResolvedValue({
+        active: true,
+        tokenVersion: 1,
+        mfaEnabled: false,
+        passwordChangedAt: null,
+      });
+
+      await gateway.handleConnection(mockSocket);
+
+      expect(jwtServiceMock.verifyAsync).toHaveBeenCalledWith(
+        'cookie-token 123',
+        { secret: 'test-secret' },
+      );
+      expect(mockSocket.disconnect).not.toHaveBeenCalled();
     });
   });
 
@@ -385,6 +509,131 @@ describe('RunnerGateway Security & Auth', () => {
     it('handleDisconnect works when socket has no data', () => {
       const mockSocket = { id: 'socket-no-data', data: undefined } as any;
       expect(() => gateway.handleDisconnect(mockSocket)).not.toThrow();
+    });
+
+    it('constructor rejects missing JWT secrets', async () => {
+      (configServiceMock.get as jest.Mock).mockReturnValue('');
+
+      await expect(
+        Test.createTestingModule({
+          providers: [
+            RunnerGateway,
+            { provide: JwtService, useValue: jwtServiceMock },
+            { provide: PrismaService, useValue: prismaMock },
+            { provide: ConfigService, useValue: configServiceMock },
+          ],
+        }).compile(),
+      ).rejects.toThrow('JWT_SECRET configuration is missing');
+    });
+
+    it('rejects invalid location payloads', async () => {
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 120, lng: -3.7 },
+          { data: { userId: 'runner-1', roles: [Role.RUNNER] } } as any,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('rejects location updates from unauthenticated sockets', async () => {
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+          { data: undefined } as any,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('rejects location updates from non-runners', async () => {
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+          { data: { userId: 'client-1', roles: [Role.CLIENT] } } as any,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('rejects location updates from a socket that is not the assigned runner', async () => {
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        runnerId: 'runner-2',
+        status: 'IN_TRANSIT',
+      });
+
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+          { data: { userId: 'runner-1', roles: [Role.RUNNER] } } as any,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('rejects location updates unless the order is IN_TRANSIT', async () => {
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        runnerId: 'runner-1',
+        status: 'ASSIGNED',
+      });
+
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+          { data: { userId: 'runner-1', roles: [Role.RUNNER] } } as any,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('rate limits repeated location updates for the same runner and order', async () => {
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        runnerId: 'runner-1',
+        status: 'IN_TRANSIT',
+      });
+
+      const socket = {
+        data: { userId: 'runner-1', roles: [Role.RUNNER] },
+      } as any;
+
+      await gateway.handleUpdateLocation(
+        { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+        socket,
+      );
+
+      await expect(
+        gateway.handleUpdateLocation(
+          { orderId: 'order-1', lat: 40.41, lng: -3.71 },
+          socket,
+        ),
+      ).rejects.toThrow(WsException);
+    });
+
+    it('broadcasts a valid location update only to the client room', async () => {
+      (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
+        runnerId: 'runner-1',
+        status: 'IN_TRANSIT',
+      });
+
+      await gateway.handleUpdateLocation(
+        { orderId: 'order-1', lat: 40.4, lng: -3.7 },
+        { data: { userId: 'runner-1', roles: [Role.RUNNER] } } as any,
+      );
+
+      expect(toMock).toHaveBeenCalledWith('order:order-1:client');
+      expect(emitMock).toHaveBeenCalledWith('locationUpdated', {
+        orderId: 'order-1',
+        lat: 40.4,
+        lng: -3.7,
+      });
+    });
+
+    it('broadcasts order state changes to the general order room', () => {
+      gateway.handleOrderStateChanged({
+        orderId: 'order-1',
+        status: 'DELIVERED' as any,
+      });
+
+      expect(toMock).toHaveBeenCalledWith('order:order-1');
+      expect(emitMock).toHaveBeenCalledWith('orderStatusChanged', {
+        orderId: 'order-1',
+        status: 'DELIVERED',
+      });
     });
   });
 });

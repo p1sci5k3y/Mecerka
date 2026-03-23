@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { CheckoutCartValidationService } from './checkout-cart-validation.service';
+import { Money } from '../domain/value-objects';
 
 describe('CheckoutCartValidationService', () => {
   let service: CheckoutCartValidationService;
@@ -124,6 +125,6 @@ describe('CheckoutCartValidationService', () => {
 
     expect(result.providerOrders).toHaveLength(1);
     expect(result.providerOrders[0]?.providerId).toBe('provider-1');
-    expect(result.totalPrice).toBe(20);
+    expect(result.totalPrice.equals(Money.of(20))).toBe(true);
   });
 });

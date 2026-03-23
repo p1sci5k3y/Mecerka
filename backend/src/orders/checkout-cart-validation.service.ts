@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
 import { Money } from '../domain/value-objects';
@@ -40,9 +40,10 @@ export type ValidatedCheckoutCart = {
   };
   checkoutCity: CheckoutCity;
   providerOrders: CheckoutProviderGroup[];
-  totalPrice: number;
+  totalPrice: Money;
 };
 
+@Injectable()
 export class CheckoutCartValidationService {
   constructor(private readonly prisma: PrismaService) {}
 
@@ -123,7 +124,7 @@ export class CheckoutCartValidationService {
       (acc: Money, provider) =>
         acc.add(Money.of(Number(provider.subtotalAmount))),
       Money.of(0),
-    ).amount;
+    );
 
     return {
       cart: {

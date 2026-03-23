@@ -1,18 +1,14 @@
 import {
   BadRequestException,
   ForbiddenException,
-  Inject,
   Injectable,
   Logger,
 } from '@nestjs/common';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
+import { Money } from '../domain/value-objects';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
-import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
-import type {
-  GeocodedAddress,
-  GeocodingPort,
-} from '../geocoding/geocoding.types';
+import type { GeocodedAddress } from '../geocoding/geocoding.types';
 import { StockReservationService } from './stock-reservation.service';
 import {
   CheckoutDeliveryPlanningResult,
@@ -65,26 +61,14 @@ type CheckoutOrderRecord = Awaited<
 @Injectable()
 export class CheckoutService {
   private readonly logger = new Logger(CheckoutService.name);
-  private readonly deliveryPlanningService: CheckoutDeliveryPlanningService;
-  private readonly cartValidationService: CheckoutCartValidationService;
-  private readonly orderCreationService: CheckoutOrderCreationService;
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(GEOCODING_SERVICE)
-    private readonly geocodingService: GeocodingPort,
+    private readonly deliveryPlanningService: CheckoutDeliveryPlanningService,
+    private readonly cartValidationService: CheckoutCartValidationService,
+    private readonly orderCreationService: CheckoutOrderCreationService,
     private readonly stockReservationService: StockReservationService,
-  ) {
-    this.deliveryPlanningService = new CheckoutDeliveryPlanningService(
-      this.prisma,
-      this.geocodingService,
-    );
-    this.cartValidationService = new CheckoutCartValidationService(this.prisma);
-    this.orderCreationService = new CheckoutOrderCreationService(
-      this.prisma,
-      this.stockReservationService,
-    );
-  }
+  ) {}
 
   private logStructuredEvent(
     event: string,
@@ -157,7 +141,7 @@ export class CheckoutService {
       >;
       deliveryPricing: CheckoutDeliveryPlanningResult['deliveryPricing'];
     },
-    totalPrice: number,
+    totalPrice: Money,
     normalizedKey: string,
   ): Promise<CheckoutOrderRecord> {
     return this.orderCreationService.createOrderWithSuborders(

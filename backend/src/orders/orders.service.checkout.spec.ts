@@ -13,6 +13,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GEOCODING_SERVICE } from '../geocoding/geocoding.constants';
 import { IOrderRepository } from './repositories/order.repository.interface';
 import { CheckoutService } from './checkout.service';
+import { CheckoutCartValidationService } from './checkout-cart-validation.service';
+import { CheckoutDeliveryPlanningService } from './checkout-delivery-planning.service';
+import { CheckoutOrderCreationService } from './checkout-order-creation.service';
 import { StockReservationService } from './stock-reservation.service';
 import { DeliveryStatus, ProviderOrderStatus } from '@prisma/client';
 import { LegacyManualOrderCreationService } from './legacy-manual-order-creation.service';
@@ -144,6 +147,9 @@ describe('OrdersService - checkoutFromCart', () => {
           useValue: { findById: jest.fn(), update: jest.fn() },
         },
         CheckoutService,
+        CheckoutCartValidationService,
+        CheckoutDeliveryPlanningService,
+        CheckoutOrderCreationService,
         StockReservationService,
         LegacyManualOrderCreationService,
         OrderQueryService,

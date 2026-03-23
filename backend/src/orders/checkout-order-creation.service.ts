@@ -1,6 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DeliveryStatus, Prisma, ProviderOrderStatus } from '@prisma/client';
 import { CheckoutCartDto } from '../cart/dto/checkout-cart.dto';
+import { Money } from '../domain/value-objects';
 import { PrismaService } from '../prisma/prisma.service';
 import { CheckoutDeliveryPlanningResult } from './checkout-delivery-planning.service';
 import { StockReservationService } from './stock-reservation.service';
@@ -24,6 +25,7 @@ type CheckoutCart = {
   cityId: string;
 };
 
+@Injectable()
 export class CheckoutOrderCreationService {
   constructor(
     private readonly prisma: PrismaService,
@@ -36,7 +38,7 @@ export class CheckoutOrderCreationService {
     cart: CheckoutCart,
     providerOrders: CheckoutProviderGroup[],
     addresses: CheckoutDeliveryPlanningResult,
-    totalPrice: number,
+    totalPrice: Money,
     normalizedKey: string,
   ) {
     const { geocodedAddress, providerCoverageMap, deliveryPricing } = addresses;
@@ -69,8 +71,8 @@ export class CheckoutOrderCreationService {
         data: {
           clientId,
           cityId: cart.cityId,
-          totalPrice,
-          deliveryFee: deliveryPricing.deliveryFee,
+          totalPrice: totalPrice.amount,
+          deliveryFee: deliveryPricing.deliveryFee.amount,
           deliveryDistanceKm: deliveryPricing.deliveryDistanceKm,
           status: DeliveryStatus.PENDING,
           checkoutIdempotencyKey: normalizedKey,
@@ -80,9 +82,9 @@ export class CheckoutOrderCreationService {
           deliveryLat: geocodedAddress.latitude,
           deliveryLng: geocodedAddress.longitude,
           discoveryRadiusKm: dto.discoveryRadiusKm,
-          runnerBaseFee: deliveryPricing.runnerBaseFee,
-          runnerPerKmFee: deliveryPricing.runnerPerKmFee,
-          runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee,
+          runnerBaseFee: deliveryPricing.runnerBaseFee.amount,
+          runnerPerKmFee: deliveryPricing.runnerPerKmFee.amount,
+          runnerExtraPickupFee: deliveryPricing.runnerExtraPickupFee.amount,
           providerOrders: {
             create: providerOrders.map((provider) => {
               const coverage = providerCoverageMap.get(provider.providerId);
@@ -120,7 +122,7 @@ export class CheckoutOrderCreationService {
         data: {
           orderId: order.id,
           displayNumber: this.buildOrderSummaryDisplayNumber(order.id),
-          totalAmount: totalPrice,
+          totalAmount: totalPrice.amount,
           currency: 'EUR',
         },
       });

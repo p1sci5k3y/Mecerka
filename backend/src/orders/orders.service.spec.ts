@@ -21,6 +21,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CheckoutService } from './checkout.service';
+import { CheckoutCartValidationService } from './checkout-cart-validation.service';
+import { CheckoutDeliveryPlanningService } from './checkout-delivery-planning.service';
+import { CheckoutOrderCreationService } from './checkout-order-creation.service';
 import { StockReservationService } from './stock-reservation.service';
 import { LegacyManualOrderCreationService } from './legacy-manual-order-creation.service';
 
@@ -122,6 +125,9 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
         },
         { provide: IOrderRepository, useValue: orderRepositoryMock },
         CheckoutService,
+        CheckoutCartValidationService,
+        CheckoutDeliveryPlanningService,
+        CheckoutOrderCreationService,
         StockReservationService,
         LegacyManualOrderCreationService,
         OrderQueryService,
