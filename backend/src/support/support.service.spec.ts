@@ -444,4 +444,190 @@ describe('SupportService', () => {
       'Unsupported donation currency',
     );
   });
+
+  it('throws ServiceUnavailableException when STRIPE_SECRET_KEY is not configured', async () => {
+    configGetMock.mockImplementation((key: string) => {
+      if (key === 'STRIPE_SECRET_KEY') return undefined;
+      if (key === 'DONATIONS_ENABLED') return 'true';
+      if (key === 'DONATIONS_STRIPE_ENABLED') return 'true';
+      return 'dummy';
+    });
+    // Recreate service without cached stripe instance
+    const module = await Test.createTestingModule({
+      providers: [
+        SupportService,
+        { provide: PrismaService, useValue: prismaMock },
+        { provide: ConfigService, useValue: { get: configGetMock } },
+      ],
+    }).compile();
+    const freshService = module.get<SupportService>(SupportService);
+    await expect(
+      freshService.prepareDonationPayment('donation-1'),
+    ).rejects.toThrow('Stripe donation support is not configured');
+  });
+
+  it('returns already-processed when claimDonationWebhookEvent finds duplicate (P2002)', async () => {
+    const p2002 = Object.assign(new Error('Unique constraint'), {
+      code: 'P2002',
+    });
+    prismaMock.donationWebhookEvent.create.mockRejectedValue(p2002);
+
+    const result = await service.confirmDonationPayment('pi_any', 'evt_dup');
+    expect(result).toEqual({ message: 'Donation webhook already processed' });
+  });
+
+  it('rethrows non-P2002 errors from claimDonationWebhookEvent', async () => {
+    prismaMock.donationWebhookEvent.create.mockRejectedValue(
+      new Error('db crash'),
+    );
+    await expect(
+      service.confirmDonationPayment('pi_any', 'evt_1'),
+    ).rejects.toThrow('db crash');
+  });
+
+  it('throws NotFoundException from getDonation when donation does not exist', async () => {
+    prismaMock.platformDonation.findUnique.mockResolvedValue(null);
+    await expect(service.getDonation('missing-id', 'user-1')).rejects.toThrow(
+      'Donation not found',
+    );
+  });
+
+  it('throws NotFoundException from prepareDonationPayment when donation not found in transaction', async () => {
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_1' });
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        $executeRaw: jest.fn(),
+        platformDonation: { findUnique: jest.fn().mockResolvedValue(null) },
+      }),
+    );
+    await expect(
+      service.prepareDonationPayment('missing-donation'),
+    ).rejects.toThrow('Donation not found');
+  });
+
+  it('throws ForbiddenException from prepareDonationPayment when donor mismatch', async () => {
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        $executeRaw: jest.fn(),
+        platformDonation: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'donation-1',
+            donorUserId: 'owner-user',
+            status: 'PENDING',
+            sessions: [],
+          }),
+        },
+      }),
+    );
+    await expect(
+      service.prepareDonationPayment('donation-1', 'other-user'),
+    ).rejects.toThrow('You do not have access to this donation');
+  });
+
+  it('throws ConflictException from prepareDonationPayment when donation already COMPLETED', async () => {
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        $executeRaw: jest.fn(),
+        platformDonation: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'donation-1',
+            donorUserId: null,
+            status: 'COMPLETED',
+            sessions: [],
+          }),
+        },
+      }),
+    );
+    await expect(service.prepareDonationPayment('donation-1')).rejects.toThrow(
+      'Donation is already completed',
+    );
+  });
+
+  it('returns COMPLETED early from confirmDonationPayment when session is already completed', async () => {
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_c' });
+    prismaMock.donationWebhookEvent.update.mockResolvedValue({});
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        donationSession: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'session-1',
+            donationId: 'donation-1',
+            status: PaymentSessionStatus.COMPLETED,
+            donation: { status: 'PENDING' },
+          }),
+        },
+      }),
+    );
+    const result = await service.confirmDonationPayment('pi_done', 'evt_c');
+    expect(result).toEqual({
+      donationId: 'donation-1',
+      status: DonationStatus.COMPLETED,
+    });
+  });
+
+  it('processes failDonationPayment without eventId (no webhook claiming)', async () => {
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        donationSession: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'session-1',
+            donationId: 'donation-1',
+            status: PaymentSessionStatus.CREATED,
+            donation: { status: 'PENDING' },
+          }),
+          update: jest.fn().mockResolvedValue({}),
+        },
+        platformDonation: { update: jest.fn().mockResolvedValue({}) },
+      }),
+    );
+    const result = await service.failDonationPayment('pi_fail');
+    expect(result).toEqual({
+      donationId: 'donation-1',
+      status: DonationStatus.FAILED,
+    });
+    expect(prismaMock.donationWebhookEvent.create).not.toHaveBeenCalled();
+  });
+
+  it('returns COMPLETED from failDonationPayment when session already completed', async () => {
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_f' });
+    prismaMock.donationWebhookEvent.update.mockResolvedValue({});
+    prismaMock.$transaction.mockImplementation(async (cb: any) =>
+      cb({
+        ...prismaMock,
+        donationSession: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'session-1',
+            donationId: 'donation-1',
+            status: PaymentSessionStatus.COMPLETED,
+            donation: { status: 'COMPLETED' },
+          }),
+        },
+      }),
+    );
+    const result = await service.failDonationPayment('pi_done', 'evt_f');
+    expect(result).toEqual({
+      donationId: 'donation-1',
+      status: DonationStatus.COMPLETED,
+    });
+  });
+
+  it('marks webhook as failed and rethrows when failDonationPayment transaction throws', async () => {
+    prismaMock.donationWebhookEvent.create.mockResolvedValue({ id: 'evt_err' });
+    prismaMock.donationWebhookEvent.update.mockResolvedValue({});
+    prismaMock.$transaction.mockRejectedValue(new Error('fail-tx'));
+
+    await expect(
+      service.failDonationPayment('pi_any', 'evt_err'),
+    ).rejects.toThrow('fail-tx');
+    expect(prismaMock.donationWebhookEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'FAILED' }),
+      }),
+    );
+  });
 });
