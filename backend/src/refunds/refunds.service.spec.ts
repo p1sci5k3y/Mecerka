@@ -1072,6 +1072,361 @@ describe('RefundsService', () => {
       });
     });
 
+    describe('validateRefundType – delivery boundary', () => {
+      it('throws BadRequestException when delivery refund uses a provider type', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: { findUnique: jest.fn() },
+            deliveryOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'delivery-1',
+                runnerId: 'runner-1',
+                deliveryFee: 8.5,
+                currency: 'EUR',
+                paymentRef: 'pi_delivery_1',
+                paymentStatus: RunnerPaymentStatus.PAID,
+                order: { clientId: 'client-1' },
+              }),
+            },
+            deliveryIncident: { findUnique: jest.fn() },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              deliveryOrderId: 'delivery-1',
+              type: RefundTypeValues.PROVIDER_PARTIAL, // wrong type for delivery
+              amount: 3,
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when delivery full refund amount does not match captured', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: { findUnique: jest.fn() },
+            deliveryOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'delivery-1',
+                runnerId: 'runner-1',
+                deliveryFee: 8.5,
+                currency: 'EUR',
+                paymentRef: 'pi_delivery_1',
+                paymentStatus: RunnerPaymentStatus.PAID,
+                order: { clientId: 'client-1' },
+              }),
+            },
+            deliveryIncident: { findUnique: jest.fn() },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              deliveryOrderId: 'delivery-1',
+              type: RefundTypeValues.DELIVERY_FULL,
+              amount: 5, // wrong - captured is 8.5
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when delivery partial refund amount >= captured', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: { findUnique: jest.fn() },
+            deliveryOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'delivery-1',
+                runnerId: 'runner-1',
+                deliveryFee: 8.5,
+                currency: 'EUR',
+                paymentRef: 'pi_delivery_1',
+                paymentStatus: RunnerPaymentStatus.PAID,
+                order: { clientId: 'client-1' },
+              }),
+            },
+            deliveryIncident: { findUnique: jest.fn() },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              deliveryOrderId: 'delivery-1',
+              type: RefundTypeValues.DELIVERY_PARTIAL,
+              amount: 9, // >= captured (8.5)
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('ensureIncidentMatchesBoundary', () => {
+      it('throws NotFoundException when incidentId is provided but incident does not exist', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                providerId: 'provider-1',
+                subtotalAmount: 50,
+                paymentRef: 'pi_provider_1',
+                paymentStatus: ProviderPaymentStatus.PAID,
+                order: {
+                  id: 'order-1',
+                  clientId: 'client-1',
+                  deliveryOrder: { id: 'delivery-1' },
+                },
+              }),
+            },
+            deliveryOrder: { findUnique: jest.fn() },
+            deliveryIncident: {
+              findUnique: jest.fn().mockResolvedValue(null), // incident not found
+            },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              providerOrderId: 'po-1',
+              incidentId: 'incident-missing',
+              type: RefundTypeValues.PROVIDER_PARTIAL,
+              amount: 10,
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(NotFoundException);
+      });
+
+      it('throws BadRequestException when incident does not belong to delivery boundary', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: { findUnique: jest.fn() },
+            deliveryOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'delivery-1',
+                runnerId: 'runner-1',
+                deliveryFee: 8.5,
+                currency: 'EUR',
+                paymentRef: 'pi_delivery_1',
+                paymentStatus: RunnerPaymentStatus.PAID,
+                order: { clientId: 'client-1' },
+              }),
+            },
+            deliveryIncident: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'incident-1',
+                deliveryOrderId: 'other-delivery', // mismatch
+              }),
+            },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              deliveryOrderId: 'delivery-1',
+              incidentId: 'incident-1',
+              type: RefundTypeValues.DELIVERY_PARTIAL,
+              amount: 3,
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('throws BadRequestException when incident does not belong to provider order', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            providerOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'po-1',
+                providerId: 'provider-1',
+                subtotalAmount: 50,
+                paymentRef: 'pi_provider_1',
+                paymentStatus: ProviderPaymentStatus.PAID,
+                order: {
+                  id: 'order-1',
+                  clientId: 'client-1',
+                  deliveryOrder: { id: 'delivery-1' },
+                },
+              }),
+            },
+            deliveryOrder: { findUnique: jest.fn() },
+            deliveryIncident: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'incident-1',
+                deliveryOrderId: 'other-delivery', // mismatch with incidentDeliveryOrderId (delivery-1)
+              }),
+            },
+            refundRequest: {
+              count: jest.fn().mockResolvedValue(0),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+          }),
+        );
+
+        await expect(
+          service.requestRefund(
+            {
+              providerOrderId: 'po-1',
+              incidentId: 'incident-1',
+              type: RefundTypeValues.PROVIDER_PARTIAL,
+              amount: 10,
+              currency: 'EUR',
+            },
+            'client-1',
+            [Role.CLIENT],
+          ),
+        ).rejects.toThrow(BadRequestException);
+      });
+    });
+
+    describe('getRefund – client delivery order access', () => {
+      it('allows client to read refund linked to their delivery order', async () => {
+        (prismaMock as any).refundRequest = {
+          ...prismaMock.refundRequest,
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'refund-del',
+            requestedById: 'other-user',
+            incidentId: null,
+            providerOrderId: null,
+            deliveryOrderId: 'delivery-1',
+            type: RefundTypeValues.DELIVERY_PARTIAL,
+            status: RefundStatusValues.REQUESTED,
+            amount: 3,
+            currency: 'EUR',
+            reviewedById: null,
+            externalRefundId: null,
+            createdAt: new Date(),
+            reviewedAt: null,
+            completedAt: null,
+            providerOrder: null,
+            deliveryOrder: {
+              order: { clientId: 'client-1' },
+            },
+          }),
+        };
+
+        const refund = await service.getRefund('refund-del', 'client-1', [
+          Role.CLIENT,
+        ]);
+        expect(refund.id).toBe('refund-del');
+      });
+    });
+
+    describe('transitionRefundStatus – delivery boundary log', () => {
+      it('transitions delivery boundary refund and logs DELIVERY_ORDER type', async () => {
+        const updated = {
+          id: 'refund-del',
+          status: RefundStatusValues.UNDER_REVIEW,
+          providerOrderId: null,
+          deliveryOrderId: 'delivery-1',
+          incidentId: null,
+          type: RefundTypeValues.DELIVERY_PARTIAL,
+          amount: 3,
+          currency: 'EUR',
+          requestedById: 'client-1',
+          reviewedById: 'admin-1',
+          externalRefundId: null,
+          createdAt: new Date(),
+          reviewedAt: new Date(),
+          completedAt: null,
+        };
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            refundRequest: {
+              findUnique: jest.fn().mockResolvedValue({
+                ...updated,
+                status: RefundStatusValues.REQUESTED,
+                reviewedAt: null,
+              }),
+              update: jest.fn().mockResolvedValue(updated),
+            },
+          }),
+        );
+
+        const result = await service.reviewRefund('refund-del', 'admin-1', [
+          Role.ADMIN,
+        ]);
+        expect(result.status).toBe(RefundStatusValues.UNDER_REVIEW);
+      });
+    });
+
+    describe('listProviderOrderRefunds – ADMIN and CLIENT access', () => {
+      it('returns refunds for ADMIN', async () => {
+        prismaMock.providerOrder.findUnique.mockResolvedValue(
+          makeProviderBoundary(),
+        );
+        (prismaMock as any).refundRequest = {
+          ...prismaMock.refundRequest,
+          findMany: jest.fn().mockResolvedValue([]),
+        };
+
+        const refunds = await service.listProviderOrderRefunds(
+          'po-1',
+          'admin-1',
+          [Role.ADMIN],
+        );
+        expect(refunds).toEqual([]);
+      });
+
+      it('returns refunds for the client owner', async () => {
+        prismaMock.providerOrder.findUnique.mockResolvedValue(
+          makeProviderBoundary(),
+        );
+        (prismaMock as any).refundRequest = {
+          ...prismaMock.refundRequest,
+          findMany: jest.fn().mockResolvedValue([]),
+        };
+
+        const refunds = await service.listProviderOrderRefunds(
+          'po-1',
+          'client-1',
+          [Role.CLIENT],
+        );
+        expect(refunds).toEqual([]);
+      });
+    });
+
     describe('executeRefund – edge cases', () => {
       it('throws NotFoundException when refund does not exist', async () => {
         prismaMock.$transaction.mockImplementation(async (cb: any) =>
@@ -1172,6 +1527,105 @@ describe('RefundsService', () => {
         await expect(
           service.executeRefund('refund-1', 'admin-1', [Role.ADMIN]),
         ).rejects.toThrow(ConflictException);
+      });
+
+      it('throws ConflictException when delivery boundary has no runner assigned', async () => {
+        prismaMock.$transaction.mockImplementation(async (cb: any) =>
+          cb({
+            $executeRaw: jest.fn(),
+            refundRequest: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'refund-1',
+                status: RefundStatusValues.APPROVED,
+                providerOrderId: null,
+                deliveryOrderId: 'delivery-1',
+                amount: 4,
+                reviewedById: 'admin-1',
+                reviewedAt: new Date(),
+              }),
+              update: jest.fn(),
+              aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+            },
+            providerOrder: { findUnique: jest.fn() },
+            deliveryOrder: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: 'delivery-1',
+                runnerId: null, // no runner
+                deliveryFee: 8.5,
+                currency: 'EUR',
+                paymentRef: 'pi_delivery_1',
+                paymentStatus: RunnerPaymentStatus.PAID,
+                order: { clientId: 'client-1' },
+              }),
+            },
+          }),
+        );
+
+        await expect(
+          service.executeRefund('refund-1', 'admin-1', [Role.ADMIN]),
+        ).rejects.toThrow(ConflictException);
+      });
+
+      it('uses stripe account from user.stripeAccountId upsert when paymentAccount not found', async () => {
+        prismaMock.paymentAccount.findFirst.mockResolvedValue(null);
+        prismaMock.user.findUnique.mockResolvedValue({
+          stripeAccountId: 'acct_from_user',
+        });
+        prismaMock.paymentAccount.upsert = jest.fn().mockResolvedValue({
+          externalAccountId: 'acct_from_user',
+          isActive: true,
+        });
+
+        const txRefundUpdate = jest
+          .fn()
+          .mockImplementation(({ data }: any) => ({ id: 'refund-1', ...data }));
+
+        prismaMock.$transaction
+          .mockImplementationOnce(async (cb: any) =>
+            cb({
+              $executeRaw: jest.fn(),
+              refundRequest: {
+                findUnique: jest.fn().mockResolvedValue({
+                  id: 'refund-1',
+                  status: RefundStatusValues.APPROVED,
+                  providerOrderId: 'po-1',
+                  deliveryOrderId: null,
+                  amount: 10,
+                  reviewedById: 'admin-1',
+                  reviewedAt: new Date(),
+                }),
+                update: txRefundUpdate,
+                aggregate: jest.fn().mockResolvedValue({ _sum: { amount: 0 } }),
+              },
+              providerOrder: {
+                findUnique: jest.fn().mockResolvedValue(makeProviderBoundary()),
+              },
+              deliveryOrder: { findUnique: jest.fn() },
+            }),
+          )
+          .mockImplementationOnce(async (cb: any) =>
+            cb({
+              $executeRaw: jest.fn(),
+              refundRequest: {
+                findUnique: jest.fn().mockResolvedValue({
+                  id: 'refund-1',
+                  status: RefundStatusValues.EXECUTING,
+                  providerOrderId: 'po-1',
+                  deliveryOrderId: null,
+                  amount: 10,
+                  reviewedById: 'admin-1',
+                  reviewedAt: new Date(),
+                }),
+                update: txRefundUpdate,
+              },
+            }),
+          );
+
+        const refund = await service.executeRefund('refund-1', 'admin-1', [
+          Role.ADMIN,
+        ]);
+        expect(refund.status).toBe(RefundStatusValues.COMPLETED);
+        expect(prismaMock.paymentAccount.upsert).toHaveBeenCalled();
       });
 
       it('marks refund as FAILED when Stripe throws', async () => {
