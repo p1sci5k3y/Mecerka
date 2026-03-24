@@ -1592,4 +1592,122 @@ describe('PaymentsService', () => {
       }),
     );
   });
+
+  it('delegates payment account lookups to the repository', async () => {
+    paymentAccountRepoMock.findActive.mockResolvedValue({
+      id: 'pa-1',
+      externalAccountId: 'acct_provider_1',
+      isActive: true,
+    });
+
+    const result = await service.getActivePaymentAccount(
+      PaymentAccountOwnerType.PROVIDER,
+      'provider-1',
+      PaymentAccountProvider.STRIPE,
+    );
+
+    expect(paymentAccountRepoMock.findActive).toHaveBeenCalledWith(
+      PaymentAccountOwnerType.PROVIDER,
+      'provider-1',
+      PaymentAccountProvider.STRIPE,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        externalAccountId: 'acct_provider_1',
+      }),
+    );
+  });
+
+  it('hydrates a missing Stripe payment account from the user profile', async () => {
+    prismaMock.paymentAccount.findFirst.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: 'acct_provider_fallback',
+    });
+    paymentAccountRepoMock.upsert.mockResolvedValue({
+      id: 'pa-fallback',
+      externalAccountId: 'acct_provider_fallback',
+      isActive: true,
+    });
+
+    const result = await (
+      service as any
+    ).resolveActiveStripePaymentAccountWithinClient(
+      {
+        paymentAccount: prismaMock.paymentAccount,
+        user: prismaMock.user,
+      },
+      PaymentAccountOwnerType.PROVIDER,
+      'provider-1',
+    );
+
+    expect(paymentAccountRepoMock.upsert).toHaveBeenCalledWith(
+      PaymentAccountOwnerType.PROVIDER,
+      'provider-1',
+      PaymentAccountProvider.STRIPE,
+      'acct_provider_fallback',
+    );
+    expect(result.externalAccountId).toBe('acct_provider_fallback');
+  });
+
+  it('returns null when no active Stripe account can be resolved', async () => {
+    prismaMock.paymentAccount.findFirst.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      (service as any).resolveActiveStripePaymentAccountWithinClient(
+        {
+          paymentAccount: prismaMock.paymentAccount,
+          user: prismaMock.user,
+        },
+        PaymentAccountOwnerType.PROVIDER,
+        'provider-1',
+      ),
+    ).resolves.toBeNull();
+  });
+
+  it('rejects tripartite intents when the order is not pending or missing', async () => {
+    prismaMock.order.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.createTripartitePaymentIntent('missing-order', 'client-1'),
+    ).rejects.toThrow('Order not found or not in PENDING state');
+  });
+
+  it('rejects malformed single-provider orders without provider items', async () => {
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: DeliveryStatus.PENDING,
+      providerOrders: [undefined],
+    });
+
+    await expect(
+      service.createTripartitePaymentIntent('order-1', 'client-1'),
+    ).rejects.toThrow('Order has no provider items');
+  });
+
+  it('throws during construction when STRIPE_SECRET_KEY is missing', async () => {
+    const missingSecretConfig = {
+      get: jest.fn(() => undefined),
+    };
+
+    await expect(
+      Test.createTestingModule({
+        providers: [
+          PaymentsService,
+          StripeWebhookService,
+          PaymentWebhookEventService,
+          ProviderPaymentConfirmationService,
+          { provide: PrismaService, useValue: prismaMock },
+          { provide: EventEmitter2, useValue: eventEmitterMock },
+          { provide: ConfigService, useValue: missingSecretConfig },
+          {
+            provide: IPaymentAccountRepository,
+            useValue: paymentAccountRepoMock,
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow(
+      'STRIPE_SECRET_KEY is missing or empty in the environment configuration.',
+    );
+  });
 });

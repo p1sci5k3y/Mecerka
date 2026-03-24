@@ -713,5 +713,117 @@ describe('StripeWebhookService', () => {
       // order.update should NOT be called for status change
       expect(txMock.order.update).not.toHaveBeenCalled();
     });
+
+    it('marca el webhook como IGNORED cuando la confirmación no trae eventos de dominio', async () => {
+      const paymentWebhookEventService = (
+        service as unknown as {
+          paymentWebhookEventService: PaymentWebhookEventService;
+        }
+      ).paymentWebhookEventService;
+      const providerPaymentConfirmationService = (
+        service as unknown as {
+          providerPaymentConfirmationService: ProviderPaymentConfirmationService;
+        }
+      ).providerPaymentConfirmationService;
+      const markStatus = jest.fn().mockResolvedValue(undefined);
+
+      paymentWebhookEventService.claim = jest.fn().mockResolvedValue(true);
+      paymentWebhookEventService.markStatus = markStatus;
+      providerPaymentConfirmationService.confirmProviderOrderPayment = jest
+        .fn()
+        .mockResolvedValue({
+          message: 'already paid',
+        });
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_ignored`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toEqual({ message: 'already paid' });
+      expect(markStatus).toHaveBeenCalledWith(
+        `${EVENT_ID}_ignored`,
+        'IGNORED',
+        expect.any(Date),
+      );
+    });
+
+    it('emite partialCancelled cuando la confirmación devuelve ese evento', async () => {
+      const paymentWebhookEventService = (
+        service as unknown as {
+          paymentWebhookEventService: PaymentWebhookEventService;
+        }
+      ).paymentWebhookEventService;
+      const providerPaymentConfirmationService = (
+        service as unknown as {
+          providerPaymentConfirmationService: ProviderPaymentConfirmationService;
+        }
+      ).providerPaymentConfirmationService;
+      const markStatus = jest.fn().mockResolvedValue(undefined);
+
+      paymentWebhookEventService.claim = jest.fn().mockResolvedValue(true);
+      paymentWebhookEventService.markStatus = markStatus;
+      providerPaymentConfirmationService.confirmProviderOrderPayment = jest
+        .fn()
+        .mockResolvedValue({
+          success: true,
+          providerOrderId: PROVIDER_ORDER_ID,
+          _events: {
+            stateChanged: { orderId: ORDER_ID },
+            partialCancelled: {
+              orderId: ORDER_ID,
+              providerOrderId: PROVIDER_ORDER_ID,
+            },
+          },
+        });
+
+      const result = await service.confirmProviderOrderPayment(
+        SESSION_ID,
+        `${EVENT_ID}_partial_cancelled`,
+        EVENT_TYPE,
+        buildConfirmation(),
+      );
+
+      expect(result).toEqual({
+        success: true,
+        providerOrderId: PROVIDER_ORDER_ID,
+      });
+      expect(eventEmitterMock.emit).toHaveBeenCalledWith(
+        'order.partialCancelled',
+        expect.objectContaining({ orderId: ORDER_ID }),
+      );
+      expect(markStatus).toHaveBeenCalledWith(
+        `${EVENT_ID}_partial_cancelled`,
+        'PROCESSED',
+        expect.any(Date),
+      );
+    });
+
+    it('lanza NotFoundException en el wrapper legacy si la orden no existe', async () => {
+      prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaMock.order.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.confirmPayment(
+          'missing-order',
+          SESSION_ID,
+          `${EVENT_ID}_missing`,
+        ),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('lanza ConflictException en el wrapper legacy si la orden tiene varios providerOrders', async () => {
+      prismaMock.paymentWebhookEvent.findUnique.mockResolvedValue(null);
+      prismaMock.order.findUnique.mockResolvedValue({
+        id: ORDER_ID,
+        providerOrders: [{ id: 'po-1' }, { id: 'po-2' }],
+      });
+
+      await expect(
+        service.confirmPayment(ORDER_ID, SESSION_ID, `${EVENT_ID}_multiple`),
+      ).rejects.toThrow(ConflictException);
+    });
   });
 });

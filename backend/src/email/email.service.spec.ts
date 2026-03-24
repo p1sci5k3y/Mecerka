@@ -134,5 +134,69 @@ describe('EmailService', () => {
       );
       expect(info).toBeDefined();
     });
+
+    it('handles email with missing domain after @', async () => {
+      const info = await service.sendEmail('local@', 'Subject', '<p>x</p>');
+      expect(info).toBeDefined();
+    });
+  });
+
+  describe('constructor non-test transport', () => {
+    const originalEnv = { ...process.env };
+
+    afterEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    it('configures secure authenticated SMTP in production when credentials exist', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+      process.env.MAIL_HOST = 'smtp.example.com';
+      process.env.MAIL_PORT = '465';
+      process.env.MAIL_USER = 'mailer';
+      process.env.MAIL_PASS = 'secret';
+      process.env.MAIL_FROM = '"Prod" <prod@example.com>';
+
+      const prodService = new EmailService();
+      const transporterOptions = (prodService as any).transporter.options;
+
+      expect(transporterOptions).toEqual({
+        host: 'smtp.example.com',
+        port: 465,
+        secure: true,
+        auth: { user: 'mailer', pass: 'secret' },
+        tls: { rejectUnauthorized: true },
+      });
+    });
+
+    it('configures unauthenticated non-secure SMTP outside production', () => {
+      process.env.NODE_ENV = 'development';
+      delete process.env.E2E;
+      delete process.env.MAIL_HOST;
+      process.env.MAIL_PORT = '1025';
+      delete process.env.MAIL_USER;
+      delete process.env.MAIL_PASS;
+
+      const devService = new EmailService();
+      const transporterOptions = (devService as any).transporter.options;
+
+      expect(transporterOptions).toEqual({
+        host: 'mailpit',
+        port: 1025,
+        secure: false,
+        auth: undefined,
+        tls: { rejectUnauthorized: false },
+      });
+    });
+
+    it('uses test transport when E2E mode is enabled', () => {
+      process.env.NODE_ENV = 'development';
+      process.env.E2E = 'true';
+
+      const e2eService = new EmailService();
+      const transporterOptions = (e2eService as any).transporter.options;
+
+      expect(transporterOptions).toEqual({ jsonTransport: true });
+    });
   });
 });

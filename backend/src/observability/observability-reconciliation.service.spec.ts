@@ -72,4 +72,62 @@ describe('ObservabilityReconciliationService', () => {
     );
     expect(result.checks[3]?.sampleIds).toEqual(refundIds.map((row) => row.id));
   });
+
+  it('returns OK checks with empty samples when reconciliation finds no issues', async () => {
+    prismaMock.providerOrder.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    prismaMock.providerOrder.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prismaMock.deliveryOrder.count.mockResolvedValueOnce(0);
+    prismaMock.deliveryOrder.findMany.mockResolvedValueOnce([]);
+    prismaMock.refundRequest.count.mockResolvedValueOnce(0);
+    prismaMock.refundRequest.findMany.mockResolvedValueOnce([]);
+
+    const result = await service.getReconciliation(
+      '24h',
+      new Date('2099-01-30T00:00:00.000Z'),
+      new Date('2099-01-31T00:00:00.000Z'),
+    );
+
+    expect(result.checks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: 'OK',
+          affectedCount: 0,
+          sampleIds: [],
+        }),
+      ]),
+    );
+  });
+
+  it('defaults affected checks to ERROR when no override status is provided', () => {
+    const checkedAt = new Date('2099-01-31T00:00:00.000Z');
+
+    const result = (
+      service as unknown as {
+        buildCheck: (
+          checkName: string,
+          affectedCount: number,
+          sampleIds: string[],
+          checkedAt: Date,
+        ) => {
+          checkName: string;
+          status: string;
+          affectedCount: number;
+          sampleIds: string[];
+          checkedAt: Date;
+        };
+      }
+    ).buildCheck('default error branch', 2, ['id-1', 'id-2'], checkedAt);
+
+    expect(result).toEqual({
+      checkName: 'default error branch',
+      status: 'ERROR',
+      affectedCount: 2,
+      sampleIds: ['id-1', 'id-2'],
+      checkedAt,
+    });
+  });
 });

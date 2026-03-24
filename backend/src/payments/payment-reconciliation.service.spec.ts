@@ -91,4 +91,25 @@ describe('PaymentReconciliationService', () => {
       },
     });
   });
+
+  it('defaults the reconciliation clock to now and omits provider orders with a single open session', async () => {
+    const beforeCall = new Date();
+    prismaMock.providerOrder.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    prismaMock.paymentWebhookEvent.findMany.mockResolvedValue([]);
+    prismaMock.providerPaymentSession.findMany.mockResolvedValue([
+      { providerOrderId: 'po-1' },
+    ]);
+
+    const result = await service.findPaymentReconciliationIssues();
+
+    const findManyArgs =
+      prismaMock.paymentWebhookEvent.findMany.mock.calls[0]?.[0];
+    expect(findManyArgs.where.receivedAt.lt).toBeInstanceOf(Date);
+    expect(findManyArgs.where.receivedAt.lt.getTime()).toBeGreaterThanOrEqual(
+      beforeCall.getTime() - 5 * 60 * 1000,
+    );
+    expect(result.multipleOpenSessions).toEqual([]);
+  });
 });

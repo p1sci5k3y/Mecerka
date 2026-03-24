@@ -240,4 +240,175 @@ describe('ProviderPaymentPreparationService', () => {
       service.prepareProviderOrderPayment('po-1', 'client-1'),
     ).rejects.toThrow(ConflictException);
   });
+
+  it('rejects payment preparation when the provider order belongs to another client', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            status: ProviderOrderStatus.PENDING,
+            paymentStatus: ProviderPaymentStatus.PENDING,
+            paymentReadyAt: null,
+            order: {
+              id: 'order-1',
+              clientId: 'client-2',
+            },
+            reservations: [{ expiresAt: new Date('2099-01-01T00:00:00.000Z') }],
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareProviderOrderPayment('po-1', 'client-1'),
+    ).rejects.toThrow('ProviderOrder not found');
+  });
+
+  it('rejects provider orders in an ineligible status', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            status: ProviderOrderStatus.CANCELLED,
+            paymentStatus: ProviderPaymentStatus.PENDING,
+            paymentReadyAt: null,
+            order: {
+              id: 'order-1',
+              clientId: 'client-1',
+            },
+            reservations: [{ expiresAt: new Date('2099-01-01T00:00:00.000Z') }],
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareProviderOrderPayment('po-1', 'client-1'),
+    ).rejects.toThrow('ProviderOrder is not eligible for payment preparation');
+  });
+
+  it('rejects payment preparation when the provider Stripe account is inactive', async () => {
+    resolveActiveStripePaymentAccountWithinClient.mockResolvedValue(null);
+
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            status: ProviderOrderStatus.PENDING,
+            paymentStatus: ProviderPaymentStatus.PENDING,
+            paymentReadyAt: null,
+            order: {
+              id: 'order-1',
+              clientId: 'client-1',
+            },
+            reservations: [{ expiresAt: new Date('2099-01-01T00:00:00.000Z') }],
+            paymentSessions: [],
+          }),
+        },
+        providerPaymentSession: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          create: jest.fn(),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareProviderOrderPayment('po-1', 'client-1'),
+    ).rejects.toThrow(
+      'Provider payment account is not active for this provider order',
+    );
+  });
+
+  it('expires stale sessions and reuses the freshest active Stripe intent', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const update = jest.fn().mockResolvedValue({});
+
+    resolveActiveStripePaymentAccountWithinClient.mockResolvedValue({
+      id: 'pa-1',
+      ownerType: PaymentAccountOwnerType.PROVIDER,
+      ownerId: 'provider-1',
+      provider: PaymentAccountProvider.STRIPE,
+      externalAccountId: 'acct_provider_1',
+      isActive: true,
+    });
+
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        providerOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'po-1',
+            providerId: 'provider-1',
+            subtotalAmount: 25,
+            status: ProviderOrderStatus.PAYMENT_PENDING,
+            paymentStatus: ProviderPaymentStatus.PENDING,
+            paymentReadyAt: null,
+            order: {
+              id: 'order-1',
+              clientId: 'client-1',
+            },
+            reservations: [{ expiresAt: new Date('2099-01-01T01:00:00.000Z') }],
+            paymentSessions: [
+              {
+                id: 'session-ready',
+                externalSessionId: 'pi_existing_123',
+                status: PaymentSessionStatus.READY,
+                expiresAt: new Date('2099-01-01T00:30:00.000Z'),
+              },
+              {
+                id: 'session-created',
+                externalSessionId: null,
+                status: PaymentSessionStatus.CREATED,
+                expiresAt: new Date('2099-01-01T00:20:00.000Z'),
+              },
+              {
+                id: 'session-expired',
+                externalSessionId: null,
+                status: PaymentSessionStatus.CREATED,
+                expiresAt: new Date('2000-01-01T00:00:00.000Z'),
+              },
+            ],
+          }),
+          update,
+        },
+        providerPaymentSession: {
+          updateMany,
+          create: jest.fn(),
+        },
+      }),
+    );
+
+    const result = await service.prepareProviderOrderPayment(
+      'po-1',
+      'client-1',
+    );
+
+    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(stripePaymentIntentsRetrieve).toHaveBeenCalledWith(
+      'pi_existing_123',
+      { stripeAccount: 'acct_provider_1' },
+    );
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: ProviderOrderStatus.PAYMENT_PENDING,
+        }),
+      }),
+    );
+    expect(result.paymentSessionId).toBe('session-ready');
+  });
 });

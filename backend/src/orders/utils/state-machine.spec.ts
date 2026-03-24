@@ -1,5 +1,8 @@
 import { DeliveryStatus } from '@prisma/client';
-import { canTransitionOrder } from './state-machine';
+import {
+  canTransitionOrder,
+  canTransitionProviderOrder,
+} from './state-machine';
 
 describe('State Machine Pure Guard', () => {
   it('Should allow PENDING to CONFIRMED', () => {
@@ -57,5 +60,32 @@ describe('State Machine Pure Guard', () => {
     expect(
       canTransitionOrder(DeliveryStatus.ASSIGNED, DeliveryStatus.DELIVERED),
     ).toBe(false);
+  });
+
+  it('Should reject idempotent order transitions', () => {
+    expect(
+      canTransitionOrder(DeliveryStatus.PENDING, DeliveryStatus.PENDING),
+    ).toBe(false);
+  });
+
+  it('Should allow valid provider-order transitions for the proper role', () => {
+    expect(canTransitionProviderOrder('PENDING', 'ACCEPTED', 'PROVIDER')).toBe(
+      true,
+    );
+    expect(
+      canTransitionProviderOrder('READY_FOR_PICKUP', 'PICKED_UP', 'RUNNER'),
+    ).toBe(true);
+  });
+
+  it('Should reject invalid provider-order transitions and idempotent changes', () => {
+    expect(canTransitionProviderOrder('PENDING', 'ACCEPTED', 'CLIENT')).toBe(
+      false,
+    );
+    expect(canTransitionProviderOrder('PENDING', 'PENDING', 'PROVIDER')).toBe(
+      false,
+    );
+    expect(canTransitionProviderOrder('UNKNOWN', 'ACCEPTED', 'PROVIDER')).toBe(
+      false,
+    );
   });
 });

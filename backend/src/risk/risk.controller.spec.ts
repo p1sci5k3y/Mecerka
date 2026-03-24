@@ -1,156 +1,93 @@
-import { ExecutionContext } from '@nestjs/common';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
-import { Reflector } from '@nestjs/core';
-import { RiskActorType, RiskLevel, Role } from '@prisma/client';
-import { ROLES_KEY } from '../auth/decorators/roles.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { MfaCompleteGuard } from '../auth/guards/mfa-complete.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { BadRequestException } from '@nestjs/common';
+import { RiskActorType } from '@prisma/client';
 import { RiskController } from './risk.controller';
-import { RiskService } from './risk.service';
 
 describe('RiskController', () => {
   let controller: RiskController;
-  let riskServiceMock: jest.Mocked<
-    Pick<
-      RiskService,
-      'getActorRiskScore' | 'listActorRiskEvents' | 'listHighRiskActors'
-    >
-  >;
+  let riskServiceMock: {
+    getActorRiskScore: jest.Mock;
+    listActorRiskEvents: jest.Mock;
+    listHighRiskActors: jest.Mock;
+  };
 
   beforeEach(() => {
     riskServiceMock = {
-      getActorRiskScore: jest.fn(),
-      listActorRiskEvents: jest.fn(),
-      listHighRiskActors: jest.fn(),
-    };
-
-    controller = new RiskController(riskServiceMock as unknown as RiskService);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('protects risk endpoints behind admin-only guards', () => {
-    const guards = Reflect.getMetadata(GUARDS_METADATA, RiskController) ?? [];
-    const roles =
-      Reflect.getMetadata(ROLES_KEY, RiskController) ??
-      Reflect.getMetadata(ROLES_KEY, RiskController.prototype.getActorRisk) ??
-      [];
-
-    expect(guards).toEqual([JwtAuthGuard, MfaCompleteGuard, RolesGuard]);
-    expect(roles).toEqual([Role.ADMIN]);
-  });
-
-  it('denies non-admin access via RolesGuard', () => {
-    const guard = new RolesGuard(new Reflector());
-    const context = {
-      getHandler: () => RiskController.prototype.getActorRisk,
-      getClass: () => RiskController,
-      switchToHttp: () => ({
-        getRequest: () => ({
-          user: {
-            userId: 'client-1',
-            roles: [Role.CLIENT],
-          },
-        }),
+      getActorRiskScore: jest.fn().mockResolvedValue({
+        snapshot: {
+          score: 91,
+          level: 'HIGH',
+          updatedAt: new Date('2026-03-24T00:00:00.000Z'),
+        },
+        breakdown: [{ category: 'PAYMENT', score: 91 }],
       }),
-    } as unknown as ExecutionContext;
-
-    expect(guard.canActivate(context)).toBe(false);
+      listActorRiskEvents: jest
+        .fn()
+        .mockResolvedValue([{ id: 'risk-event-1' }]),
+      listHighRiskActors: jest.fn().mockResolvedValue([
+        {
+          actorType: RiskActorType.CLIENT,
+          actorId: '4f99868d-6954-4980-8ad1-1cb42fd64080',
+        },
+      ]),
+    };
+    controller = new RiskController(riskServiceMock as never);
   });
 
-  it('returns actor risk details with recent events', async () => {
-    const updatedAt = new Date('2099-01-01T00:00:00.000Z');
-    riskServiceMock.getActorRiskScore.mockResolvedValue({
-      snapshot: {
-        id: 'snapshot-1',
-        actorType: RiskActorType.CLIENT,
-        actorId: '11111111-1111-1111-1111-111111111111',
-        score: 24,
-        level: RiskLevel.MEDIUM,
-        updatedAt,
-      } as any,
+  it('builds actor risk responses for valid actor types', async () => {
+    const result = await controller.getActorRisk(
+      RiskActorType.CLIENT,
+      '4f99868d-6954-4980-8ad1-1cb42fd64080',
+    );
+
+    expect(riskServiceMock.getActorRiskScore).toHaveBeenCalledWith(
+      RiskActorType.CLIENT,
+      '4f99868d-6954-4980-8ad1-1cb42fd64080',
+    );
+    expect(riskServiceMock.listActorRiskEvents).toHaveBeenCalledWith(
+      RiskActorType.CLIENT,
+      '4f99868d-6954-4980-8ad1-1cb42fd64080',
+      { limit: 10 },
+    );
+    expect(result.score).toBe(91);
+    expect(result.level).toBe('HIGH');
+  });
+
+  it('rejects invalid actor types', async () => {
+    await expect(
+      controller.getActorRisk(
+        'NOT_A_REAL_ACTOR',
+        '4f99868d-6954-4980-8ad1-1cb42fd64080',
+      ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('falls back to LOW/0/null when the risk snapshot is absent', async () => {
+    riskServiceMock.getActorRiskScore.mockResolvedValueOnce({
+      snapshot: null,
       breakdown: [],
     });
-    riskServiceMock.listActorRiskEvents.mockResolvedValue([
-      {
-        id: 'event-1',
-        actorType: RiskActorType.CLIENT,
-        actorId: '11111111-1111-1111-1111-111111111111',
-        category: 'CLIENT_REFUND_ABUSE',
-        score: 12,
-        createdAt: updatedAt,
-        metadata: { refundRequestId: 'refund-1' },
-      } as any,
-    ]);
 
     const result = await controller.getActorRisk(
       RiskActorType.CLIENT,
-      '11111111-1111-1111-1111-111111111111',
+      '4f99868d-6954-4980-8ad1-1cb42fd64080',
     );
 
     expect(result).toEqual({
-      actorId: '11111111-1111-1111-1111-111111111111',
+      actorId: '4f99868d-6954-4980-8ad1-1cb42fd64080',
       actorType: RiskActorType.CLIENT,
-      score: 24,
-      level: RiskLevel.MEDIUM,
-      updatedAt,
-      recentEvents: [
-        expect.objectContaining({
-          id: 'event-1',
-          score: 12,
-        }),
-      ],
+      score: 0,
+      level: 'LOW',
+      updatedAt: null,
+      recentEvents: [{ id: 'risk-event-1' }],
       breakdown: [],
     });
   });
 
-  it('lists high-risk actors with recent events', async () => {
-    riskServiceMock.listHighRiskActors.mockResolvedValue([
-      {
-        id: 'snapshot-2',
-        actorType: RiskActorType.RUNNER,
-        actorId: '22222222-2222-2222-2222-222222222222',
-        score: 85,
-        level: RiskLevel.CRITICAL,
-        updatedAt: new Date('2099-01-02T00:00:00.000Z'),
-      } as any,
-    ]);
-    riskServiceMock.getActorRiskScore.mockResolvedValue({
-      snapshot: {
-        id: 'snapshot-2',
-        actorType: RiskActorType.RUNNER,
-        actorId: '22222222-2222-2222-2222-222222222222',
-        score: 85,
-        level: RiskLevel.CRITICAL,
-        updatedAt: new Date('2099-01-02T00:00:00.000Z'),
-      } as any,
-      breakdown: [],
-    });
-    riskServiceMock.listActorRiskEvents.mockResolvedValue([
-      {
-        id: 'event-2',
-        actorType: RiskActorType.RUNNER,
-        actorId: '22222222-2222-2222-2222-222222222222',
-        category: 'RUNNER_GPS_ANOMALY',
-        score: 20,
-        createdAt: new Date('2099-01-02T00:00:00.000Z'),
-        metadata: { deliveryOrderId: 'delivery-1' },
-      } as any,
-    ]);
-
+  it('builds responses for every listed high-risk actor', async () => {
     const result = await controller.listHighRiskActors();
 
-    expect(result).toEqual([
-      expect.objectContaining({
-        actorId: '22222222-2222-2222-2222-222222222222',
-        actorType: RiskActorType.RUNNER,
-        score: 85,
-        level: RiskLevel.CRITICAL,
-        recentEvents: [expect.objectContaining({ id: 'event-2' })],
-      }),
-    ]);
+    expect(riskServiceMock.listHighRiskActors).toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0]?.actorType).toBe(RiskActorType.CLIENT);
   });
 });

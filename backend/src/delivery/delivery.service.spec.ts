@@ -463,6 +463,29 @@ describe('DeliveryService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('returns not found when the delivery order does not exist', async () => {
+    prismaMock.deliveryOrder.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.getDeliveryOrder('missing-delivery', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('allows the assigned runner to read the delivery order', async () => {
+    prismaMock.deliveryOrder.findUnique.mockResolvedValue({
+      id: 'delivery-1',
+      runnerId: 'runner-1',
+      order: { clientId: 'client-1' },
+      paymentSessions: [],
+    });
+
+    const result = await service.getDeliveryOrder('delivery-1', 'runner-1', [
+      Role.RUNNER,
+    ]);
+
+    expect(result.id).toBe('delivery-1');
+  });
+
   it('lists only open, non-expired jobs with minimal data', async () => {
     prismaMock.deliveryJob.findMany.mockResolvedValue([
       {
@@ -1720,5 +1743,152 @@ describe('DeliveryService', () => {
       Role.CLIENT,
     ]);
     expect(result.id).toBe('incident-1');
+  });
+
+  it('emits a runner GPS risk event when location jump exceeds the threshold', async () => {
+    const gpsError = new ConflictException(
+      'Runner location jump exceeds allowed threshold',
+    );
+    const updateRunnerLocation = jest
+      .spyOn((service as any).trackingService, 'updateRunnerLocation')
+      .mockRejectedValue(gpsError);
+
+    await expect(
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4,
+        longitude: -3.7,
+      }),
+    ).rejects.toThrow(gpsError);
+
+    expect(updateRunnerLocation).toHaveBeenCalled();
+    expect(riskServiceMock.recordRiskEvent).toHaveBeenCalledWith({
+      actorType: 'RUNNER',
+      actorId: 'runner-1',
+      category: 'RUNNER_GPS_ANOMALY',
+      score: 20,
+      dedupKey: 'gps-anomaly:delivery-1',
+      metadata: {
+        deliveryOrderId: 'delivery-1',
+      },
+    });
+    expect(riskServiceMock.recalculateRiskScore).toHaveBeenCalledWith(
+      'RUNNER',
+      'runner-1',
+    );
+  });
+
+  it('rethrows non-GPS tracking conflicts without emitting risk events', async () => {
+    jest
+      .spyOn((service as any).trackingService, 'updateRunnerLocation')
+      .mockRejectedValue(new ConflictException('Different tracking error'));
+
+    await expect(
+      service.updateRunnerLocation('delivery-1', 'runner-1', [Role.RUNNER], {
+        latitude: 40.4,
+        longitude: -3.7,
+      }),
+    ).rejects.toThrow('Different tracking error');
+
+    expect(riskServiceMock.recordRiskEvent).not.toHaveBeenCalled();
+  });
+
+  it('swallows risk integration failures when emitting delivery risk events', async () => {
+    riskServiceMock.recordRiskEvent.mockRejectedValue(
+      new Error('risk backend unavailable'),
+    );
+    const warnSpy = jest.spyOn((service as any).logger, 'warn');
+
+    await expect(
+      (service as any).emitRiskEvent(
+        'RUNNER',
+        'runner-1',
+        'RUNNER_GPS_ANOMALY',
+        20,
+        'gps-anomaly:delivery-1',
+        { deliveryOrderId: 'delivery-1' },
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('risk.delivery.integration_failed'),
+    );
+  });
+
+  it('returns early when risk integration is not wired', async () => {
+    const serviceWithoutRisk = new DeliveryService(
+      prismaMock as PrismaService,
+      configServiceMock as unknown as ConfigService,
+      undefined,
+    );
+
+    await expect(
+      (serviceWithoutRisk as any).emitRiskEvent(
+        'RUNNER',
+        'runner-1',
+        'RUNNER_GPS_ANOMALY',
+        20,
+        'gps-anomaly:delivery-1',
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('falls back to the default dispatch window when config is invalid', () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'DELIVERY_JOB_WINDOW_MINUTES') return '-2';
+      return undefined;
+    });
+    const date = new Date('2099-01-01T00:10:00.000Z');
+
+    expect((service as any).getDispatchWindowMs()).toBe(5 * 60 * 1000);
+    expect((service as any).buildWindowKey(date, 60_000)).toBe(
+      Math.floor(date.getTime() / 60_000).toString(),
+    );
+  });
+
+  it('resolves the active runner Stripe account from user fallback when repository entry is missing', async () => {
+    prismaMock.paymentAccount.findFirst.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: 'acct_runner_fallback',
+    });
+    prismaMock.paymentAccount.upsert.mockResolvedValue({
+      id: 'payacc-fallback',
+      externalAccountId: 'acct_runner_fallback',
+      isActive: true,
+    });
+
+    const result = await (
+      service as any
+    ).resolveActiveRunnerStripePaymentAccount('runner-1');
+
+    expect(prismaMock.paymentAccount.upsert).toHaveBeenCalledWith({
+      where: {
+        ownerType_ownerId_provider: {
+          ownerType: 'RUNNER',
+          ownerId: 'runner-1',
+          provider: 'STRIPE',
+        },
+      },
+      update: {
+        externalAccountId: 'acct_runner_fallback',
+        isActive: true,
+      },
+      create: {
+        ownerType: 'RUNNER',
+        ownerId: 'runner-1',
+        provider: 'STRIPE',
+        externalAccountId: 'acct_runner_fallback',
+        isActive: true,
+      },
+    });
+    expect(result.externalAccountId).toBe('acct_runner_fallback');
+  });
+
+  it('returns null when the runner has no Stripe account to hydrate', async () => {
+    prismaMock.paymentAccount.findFirst.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      (service as any).resolveActiveRunnerStripePaymentAccount('runner-1'),
+    ).resolves.toBeNull();
   });
 });

@@ -111,6 +111,25 @@ describe('AuthController', () => {
         UnauthorizedException,
       );
     });
+
+    it('sets a strict secure cookie in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const dto = { email: 'user@test.com', password: 'Pass1234!' };
+      const loginResponse = { access_token: 'jwt-token', user: { id: 'u1' } };
+      (authServiceMock.login as jest.Mock).mockResolvedValue(loginResponse);
+      const res = mockResponse();
+
+      await controller.login(dto as any, res);
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'access_token',
+        'jwt-token',
+        expect.objectContaining({ sameSite: 'strict', secure: true }),
+      );
+
+      process.env.NODE_ENV = originalNodeEnv;
+    });
   });
 
   // ─── me ──────────────────────────────────────────────────────────────────
@@ -170,6 +189,24 @@ describe('AuthController', () => {
       );
       expect(authServiceMock.logout).toHaveBeenCalledWith('u1');
       expect(result).toEqual(logoutResult);
+    });
+
+    it('clears a strict secure cookie in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      const logoutResult = { message: 'Logged out successfully' };
+      (authServiceMock.logout as jest.Mock).mockResolvedValue(logoutResult);
+      const req: any = { user: { userId: 'u1' } };
+      const res = mockResponse();
+
+      await controller.logout(req, res);
+
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'access_token',
+        expect.objectContaining({ sameSite: 'strict', secure: true }),
+      );
+
+      process.env.NODE_ENV = originalNodeEnv;
     });
   });
 
@@ -419,6 +456,27 @@ describe('AuthController', () => {
         expect.objectContaining({ httpOnly: true }),
       );
       expect(result).toEqual({ access_token: 'mfa-jwt' });
+    });
+
+    it('sets a strict secure MFA cookie in production', async () => {
+      const originalNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      (mfaServiceMock.verifyMfaToken as jest.Mock).mockResolvedValue(true);
+      (authServiceMock.generateMfaCompleteToken as jest.Mock).mockResolvedValue(
+        { access_token: 'mfa-jwt' },
+      );
+      const req: any = { user: { userId: 'u1' } };
+      const res = mockResponse();
+
+      await controller.verifyMfa(req, { token: 'good-token' } as any, res);
+
+      expect(res.cookie).toHaveBeenCalledWith(
+        'access_token',
+        'mfa-jwt',
+        expect.objectContaining({ sameSite: 'strict', secure: true }),
+      );
+
+      process.env.NODE_ENV = originalNodeEnv;
     });
   });
 

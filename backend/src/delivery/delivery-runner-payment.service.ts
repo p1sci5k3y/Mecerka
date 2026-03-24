@@ -167,18 +167,17 @@ export class DeliveryRunnerPaymentService {
         }
 
         const activeSession = deliveryOrder.paymentSessions.find(
-          (session) =>
+          (
+            session,
+          ): session is typeof session & {
+            externalSessionId: string;
+          } =>
             session.status === PaymentSessionStatus.READY &&
-            session.externalSessionId &&
+            Boolean(session.externalSessionId) &&
             (!session.expiresAt || session.expiresAt.getTime() > now.getTime()),
         );
 
         if (activeSession) {
-          if (!activeSession.externalSessionId) {
-            throw new ConflictException(
-              'Runner payment session is missing its external Stripe payment intent',
-            );
-          }
           const existingIntent = await stripe.paymentIntents.retrieve(
             activeSession.externalSessionId,
             {

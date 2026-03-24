@@ -47,6 +47,44 @@ describe('WebhooksController', () => {
     jest.clearAllMocks();
   });
 
+  it('fails fast when Stripe configuration secrets are missing', async () => {
+    await expect(
+      Test.createTestingModule({
+        controllers: [WebhooksController],
+        providers: [
+          { provide: PaymentsService, useValue: paymentsServiceMock },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn((key: string) =>
+                key === 'STRIPE_SECRET_KEY' ? undefined : 'dummy_secret',
+              ),
+            },
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow('Missing Stripe configuration secrets');
+  });
+
+  it('fails fast when the webhook secret is missing', async () => {
+    await expect(
+      Test.createTestingModule({
+        controllers: [WebhooksController],
+        providers: [
+          { provide: PaymentsService, useValue: paymentsServiceMock },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: jest.fn((key: string) =>
+                key === 'STRIPE_WEBHOOK_SECRET' ? undefined : 'dummy_secret',
+              ),
+            },
+          },
+        ],
+      }).compile(),
+    ).rejects.toThrow('Missing Stripe configuration secrets');
+  });
+
   it('1. Rejects missing signature with 400', async () => {
     const req = { rawBody: Buffer.from('') } as unknown as any;
     const res = {
@@ -141,6 +179,55 @@ describe('WebhooksController', () => {
     expect(res.json).toHaveBeenCalledWith({ received: true });
   });
 
+  it('4d. Normalizes malformed payment confirmation payload fields to null', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
+    const logSpy = jest.spyOn((controller as any).logger, 'log');
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_malformed_payload',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_malformed',
+          amount: '2500',
+          amount_received: '2500',
+          currency: 978,
+          metadata: 'invalid-metadata',
+        },
+      },
+      account: 12345,
+    });
+    (
+      paymentsServiceMock.confirmProviderOrderPayment as jest.Mock
+    ).mockResolvedValueOnce({});
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).toHaveBeenCalledWith(
+      'pi_malformed',
+      'evt_malformed_payload',
+      'payment_intent.succeeded',
+      {
+        amount: null,
+        amountReceived: null,
+        currency: null,
+        accountId: null,
+        metadata: null,
+      },
+    );
+    expect(logSpy).toHaveBeenCalledWith(
+      'Provider payment confirmed via Webhook. Session: pi_malformed. Status: unknown',
+    );
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
   it('4b. Short-circuits replayed events without reprocessing payment', async () => {
     const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
     const res = {
@@ -167,6 +254,35 @@ describe('WebhooksController', () => {
       account: 'acct_provider_1',
     });
     (paymentsServiceMock.isProcessed as jest.Mock).mockResolvedValueOnce(true);
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(
+      paymentsServiceMock.confirmProviderOrderPayment,
+    ).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('4c. Returns 200 when payment_intent.succeeded is missing the payment intent id', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_missing_id',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: null,
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+        },
+      },
+    });
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 
@@ -283,6 +399,74 @@ describe('WebhooksController', () => {
         'ProviderOrder has no active reservations to consume',
       ),
     );
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+    expect(res.send).toHaveBeenCalledWith(
+      'Error processing payment confirmation',
+    );
+  });
+
+  it('6c. Returns 200 for concurrent stock update conflicts to avoid duplicate retries', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as any;
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_concurrent',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_concurrent',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {
+            orderId: 'order-1',
+            providerOrderId: 'po-1',
+            providerPaymentSessionId: 'session-1',
+          },
+        },
+      },
+      account: 'acct_provider_1',
+    });
+    (
+      paymentsServiceMock.confirmProviderOrderPayment as jest.Mock
+    ).mockRejectedValueOnce(new Error('Concurrent stock update detected'));
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('6d. Serializes non-Error webhook failures before returning 500', async () => {
+    const req = { rawBody: Buffer.from('valid_payload') } as unknown as any;
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    } as unknown as any;
+
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_non_error',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_non_error',
+          amount: 2500,
+          amount_received: 2500,
+          currency: 'eur',
+          metadata: {},
+        },
+      },
+      account: 'acct_provider_1',
+    });
+    (
+      paymentsServiceMock.confirmProviderOrderPayment as jest.Mock
+    ).mockRejectedValueOnce('plain-string-error');
 
     await controller.handleStripeWebhook(req, res, 'valid-sig');
 

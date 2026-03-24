@@ -4,6 +4,7 @@ import { JwtStrategy } from './jwt.strategy';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtPayload } from '../interfaces/auth.interfaces';
 import { Role } from '@prisma/client';
+import * as jwt from 'jsonwebtoken';
 
 describe('JwtStrategy.validate', () => {
   let strategy: JwtStrategy;
@@ -32,6 +33,24 @@ describe('JwtStrategy.validate', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
+
+  const getSecretProvider = () =>
+    (
+      strategy as unknown as {
+        _secretOrKeyProvider: (
+          request: unknown,
+          rawJwtToken: string,
+          done: (err: unknown, secret?: string) => void,
+        ) => void;
+      }
+    )._secretOrKeyProvider;
+
+  const getJwtExtractor = () =>
+    (
+      strategy as unknown as {
+        _jwtFromRequest: (request: unknown) => string | null;
+      }
+    )._jwtFromRequest;
 
   const baseUser = {
     active: true,
@@ -176,5 +195,63 @@ describe('JwtStrategy.validate', () => {
     const result = await strategy.validate(payloadWithout as JwtPayload);
     // mfaAuthenticated = payload.mfaAuthenticated ?? !user.mfaEnabled = undefined ?? false = false
     expect(result.mfaAuthenticated).toBe(false);
+  });
+
+  it('extracts JWTs from cookies and falls back to bearer tokens', () => {
+    const extractor = getJwtExtractor();
+
+    expect(
+      extractor({
+        cookies: { access_token: 'cookie-token' },
+        headers: {},
+      }),
+    ).toBe('cookie-token');
+    expect(
+      extractor({
+        headers: { authorization: 'Bearer header-token' },
+      }),
+    ).toBe('header-token');
+    expect(extractor({ headers: {} })).toBeNull();
+  });
+
+  it('fails fast when no JWT secret configuration exists', () => {
+    delete process.env.JWT_SECRET_CURRENT;
+    delete process.env.JWT_SECRET;
+    delete process.env.JWT_SECRET_PREVIOUS;
+
+    const secretProvider = getSecretProvider();
+    const done = jest.fn();
+
+    secretProvider(null, 'raw-token', done);
+
+    expect(done).toHaveBeenCalledWith(
+      new Error('JWT_SECRET configuration is missing'),
+      undefined,
+    );
+  });
+
+  it('falls back to the previous secret when the current one fails verification', () => {
+    process.env.JWT_SECRET_CURRENT = 'current-secret';
+    process.env.JWT_SECRET_PREVIOUS = 'previous-secret';
+    const token = jwt.sign({ sub: 'user-1' }, 'previous-secret');
+    const secretProvider = getSecretProvider();
+    const done = jest.fn();
+
+    secretProvider(null, token, done);
+
+    expect(done).toHaveBeenCalledWith(null, 'previous-secret');
+  });
+
+  it('returns the verification error when both current and previous secrets fail', () => {
+    process.env.JWT_SECRET_CURRENT = 'current-secret';
+    process.env.JWT_SECRET_PREVIOUS = 'previous-secret';
+    const token = jwt.sign({ sub: 'user-1' }, 'totally-different-secret');
+    const secretProvider = getSecretProvider();
+    const done = jest.fn();
+
+    secretProvider(null, token, done);
+
+    expect(done.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect(done.mock.calls[0]?.[1]).toBeUndefined();
   });
 });

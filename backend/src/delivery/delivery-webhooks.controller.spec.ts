@@ -59,6 +59,45 @@ describe('DeliveryWebhooksController', () => {
     jest.clearAllMocks();
   });
 
+  it('returns 503 when delivery webhook support is disabled', async () => {
+    const req = { rawBody: Buffer.from('valid') } as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+
+    const disabledController = new DeliveryWebhooksController(
+      deliveryServiceMock as unknown as DeliveryService,
+      {
+        get: jest.fn(() => undefined),
+      } as unknown as ConfigService,
+    );
+
+    await disabledController.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.SERVICE_UNAVAILABLE);
+    expect(res.send).toHaveBeenCalledWith(
+      'Delivery webhook support is disabled',
+    );
+  });
+
+  it('rejects missing signatures', async () => {
+    const req = { rawBody: Buffer.from('valid') } as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+
+    await controller.handleStripeWebhook(req, res, '');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(res.send).toHaveBeenCalledWith('Missing signature');
+  });
+
+  it('rejects missing raw bodies', async () => {
+    const req = {} as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    expect(res.send).toHaveBeenCalledWith('Missing raw body');
+  });
+
   it('rejects invalid signatures', async () => {
     const req = { rawBody: Buffer.from('invalid') } as any;
     const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
@@ -127,5 +166,75 @@ describe('DeliveryWebhooksController', () => {
     );
     expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
     expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('returns 200 for ignored delivery events', async () => {
+    const req = { rawBody: Buffer.from('valid') } as any;
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as any;
+
+    constructEventMock.mockReturnValue({
+      id: 'evt_ignored',
+      type: 'payment_intent.created',
+      data: {
+        object: {
+          id: 'pi_ignored',
+        },
+      },
+    });
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(deliveryServiceMock.confirmRunnerPayment).not.toHaveBeenCalled();
+    expect(deliveryServiceMock.failRunnerPayment).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('logs IGNORED when succeeded result does not expose paymentStatus', async () => {
+    const req = { rawBody: Buffer.from('valid') } as any;
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() } as any;
+    const logSpy = jest.spyOn((controller as any).logger, 'log');
+
+    deliveryServiceMock.confirmRunnerPayment.mockResolvedValueOnce({});
+    constructEventMock.mockReturnValue({
+      id: 'evt_runner_paid_ignored',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_runner_paid_ignored',
+        },
+      },
+    });
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(logSpy).toHaveBeenCalledWith(
+      'Delivery webhook processed: event=evt_runner_paid_ignored session=pi_runner_paid_ignored status=IGNORED',
+    );
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.OK);
+    expect(res.json).toHaveBeenCalledWith({ received: true });
+  });
+
+  it('returns 500 when delivery service processing fails', async () => {
+    const req = { rawBody: Buffer.from('valid') } as any;
+    const res = { status: jest.fn().mockReturnThis(), send: jest.fn() } as any;
+
+    deliveryServiceMock.confirmRunnerPayment.mockRejectedValueOnce(
+      new Error('processing failed'),
+    );
+    constructEventMock.mockReturnValue({
+      id: 'evt_runner_paid_error',
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_runner_paid_error',
+        },
+      },
+    });
+
+    await controller.handleStripeWebhook(req, res, 'valid-sig');
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+    expect(res.send).toHaveBeenCalledWith('Error processing delivery webhook');
   });
 });

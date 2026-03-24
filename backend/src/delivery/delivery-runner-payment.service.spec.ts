@@ -125,6 +125,246 @@ describe('DeliveryRunnerPaymentService', () => {
     expect(stripePaymentIntentsRetrieve).toHaveBeenCalled();
   });
 
+  it('creates a new payment intent after expiring stale runner payment sessions', async () => {
+    const tx = {
+      $executeRaw: jest.fn(),
+      deliveryOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'delivery-1',
+          runnerId: 'runner-1',
+          deliveryFee: 6.5,
+          currency: 'EUR',
+          status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+          paymentStatus: RunnerPaymentStatus.PENDING,
+          order: {
+            id: 'order-1',
+            clientId: 'client-1',
+          },
+          paymentSessions: [
+            {
+              id: 'expired-session',
+              externalSessionId: 'pi_expired',
+              status: PaymentSessionStatus.READY,
+              expiresAt: new Date('2000-01-01T00:00:00.000Z'),
+            },
+          ],
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      runnerPaymentSession: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        create: jest.fn().mockResolvedValue({
+          id: 'session-new',
+        }),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback(tx),
+    );
+
+    const result = await service.prepareRunnerPayment(
+      'delivery-1',
+      'client-1',
+      [Role.CLIENT],
+    );
+
+    expect(tx.runnerPaymentSession.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['expired-session'] },
+        status: {
+          in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+        },
+      },
+      data: {
+        status: PaymentSessionStatus.EXPIRED,
+      },
+    });
+    expect(stripePaymentIntentsCreate).toHaveBeenCalled();
+    expect(result.runnerPaymentSessionId).toBe('session-new');
+  });
+
+  it('fails when the delivery order does not exist', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue(null),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow(NotFoundException);
+  });
+
+  it('fails when the delivery order has no assigned runner', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: null,
+            status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+            paymentStatus: RunnerPaymentStatus.PENDING,
+            order: { id: 'order-1', clientId: 'client-1' },
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow('DeliveryOrder does not have an assigned runner');
+  });
+
+  it('fails when the delivery order status is not eligible for payment preparation', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: 'runner-1',
+            status: DeliveryOrderStatus.CANCELLED,
+            paymentStatus: RunnerPaymentStatus.PENDING,
+            order: { id: 'order-1', clientId: 'client-1' },
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow('DeliveryOrder is not eligible for payment preparation');
+  });
+
+  it('fails when the delivery order is already paid', async () => {
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: 'runner-1',
+            status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+            paymentStatus: RunnerPaymentStatus.PAID,
+            order: { id: 'order-1', clientId: 'client-1' },
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow('DeliveryOrder is already paid');
+  });
+
+  it('fails when the runner payment account is inactive', async () => {
+    resolveActiveRunnerStripePaymentAccount.mockResolvedValueOnce({
+      isActive: false,
+      externalAccountId: 'acct_runner_1',
+    });
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: 'runner-1',
+            status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+            paymentStatus: RunnerPaymentStatus.PENDING,
+            order: { id: 'order-1', clientId: 'client-1' },
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow(
+      'Runner payment account is not active for this delivery order',
+    );
+  });
+
+  it('fails when the runner payment account is missing its Stripe account id', async () => {
+    resolveActiveRunnerStripePaymentAccount.mockResolvedValueOnce({
+      isActive: true,
+      externalAccountId: null,
+    });
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback({
+        $executeRaw: jest.fn(),
+        deliveryOrder: {
+          findUnique: jest.fn().mockResolvedValue({
+            id: 'delivery-1',
+            runnerId: 'runner-1',
+            status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+            paymentStatus: RunnerPaymentStatus.PENDING,
+            order: { id: 'order-1', clientId: 'client-1' },
+            paymentSessions: [],
+          }),
+        },
+      }),
+    );
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow(
+      'Runner payment account is missing a connected Stripe account identifier',
+    );
+  });
+
+  it('creates a new intent when a ready session is present but has no usable external intent id', async () => {
+    const tx = {
+      $executeRaw: jest.fn(),
+      deliveryOrder: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'delivery-1',
+          runnerId: 'runner-1',
+          deliveryFee: 6.5,
+          currency: 'EUR',
+          status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+          paymentStatus: RunnerPaymentStatus.PENDING,
+          order: { id: 'order-1', clientId: 'client-1' },
+          paymentSessions: [
+            {
+              id: 'session-1',
+              externalSessionId: '',
+              status: PaymentSessionStatus.READY,
+              expiresAt: new Date('2099-01-01T00:15:00.000Z'),
+            },
+          ],
+        }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      runnerPaymentSession: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn().mockResolvedValue({
+          id: 'session-new',
+        }),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback(tx),
+    );
+
+    const result = await service.prepareRunnerPayment(
+      'delivery-1',
+      'client-1',
+      [Role.CLIENT],
+    );
+
+    expect(stripePaymentIntentsCreate).toHaveBeenCalled();
+    expect(stripePaymentIntentsRetrieve).not.toHaveBeenCalled();
+    expect(result.runnerPaymentSessionId).toBe('session-new');
+  });
+
   it('marks a confirmed runner payment as paid and opens pickup when needed', async () => {
     prismaMock.runnerWebhookEvent.create.mockResolvedValue({
       id: 'evt_1',
@@ -209,6 +449,18 @@ describe('DeliveryRunnerPaymentService', () => {
     await expect(
       service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
     ).rejects.toThrow(ConflictException);
+  });
+
+  it('fails cleanly when Stripe is not configured outside demo mode', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'STRIPE_SECRET_KEY') return '';
+      if (key === 'DEMO_MODE') return 'false';
+      return undefined;
+    });
+
+    await expect(
+      service.prepareRunnerPayment('delivery-1', 'client-1', [Role.CLIENT]),
+    ).rejects.toThrow('Stripe is not configured for delivery payments');
   });
 
   it('fails when the runner payment session does not exist', async () => {

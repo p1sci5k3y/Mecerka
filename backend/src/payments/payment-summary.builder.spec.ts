@@ -29,6 +29,40 @@ describe('PaymentSummaryBuilder', () => {
     });
   });
 
+  it('returns PAID when there are no payable provider orders', () => {
+    const summary = builder.buildAggregateProviderPaymentStatus([
+      {
+        status: ProviderOrderStatus.CANCELLED,
+        paymentStatus: ProviderPaymentStatus.PENDING,
+      },
+      {
+        status: ProviderOrderStatus.DELIVERED,
+        paymentStatus: ProviderPaymentStatus.PAID,
+      },
+    ]);
+
+    expect(summary).toEqual({
+      status: 'PAID',
+      paidProviderOrders: 0,
+      totalProviderOrders: 0,
+    });
+  });
+
+  it('returns UNPAID when payable provider orders exist but none are paid', () => {
+    const summary = builder.buildAggregateProviderPaymentStatus([
+      {
+        status: ProviderOrderStatus.PAYMENT_READY,
+        paymentStatus: ProviderPaymentStatus.PENDING,
+      },
+    ]);
+
+    expect(summary).toEqual({
+      status: 'UNPAID',
+      paidProviderOrders: 0,
+      totalProviderOrders: 1,
+    });
+  });
+
   it('builds runner pricing summary from the persisted order snapshot', () => {
     const summary = builder.buildRunnerPaymentSummary({
       providerOrders: [{}, {}],
@@ -57,6 +91,103 @@ describe('PaymentSummaryBuilder', () => {
       baseFee: 3.5,
       perKmFee: 0.9,
       extraPickupFee: 1.5,
+    });
+  });
+
+  it('builds a NOT_CREATED runner payment summary when no delivery order exists', () => {
+    const summary = builder.buildRunnerPaymentSummary({
+      providerOrders: [{}],
+      deliveryDistanceKm: null,
+      runnerBaseFee: null,
+      runnerPerKmFee: null,
+      runnerExtraPickupFee: null,
+      deliveryFee: null,
+      deliveryOrder: null,
+    });
+
+    expect(summary).toMatchObject({
+      deliveryOrderId: null,
+      runnerId: null,
+      deliveryStatus: null,
+      paymentStatus: 'NOT_CREATED',
+      paymentRequired: false,
+      sessionPrepared: false,
+      amount: 0,
+      currency: 'EUR',
+    });
+  });
+
+  it('marks runner payments as not required when already paid or no runner is assigned', () => {
+    const paidSummary = builder.buildRunnerPaymentSummary({
+      providerOrders: [{}, {}],
+      deliveryDistanceKm: 1,
+      runnerBaseFee: 2,
+      runnerPerKmFee: 1,
+      runnerExtraPickupFee: 0.5,
+      deliveryFee: 3,
+      deliveryOrder: {
+        id: 'delivery-1',
+        runnerId: 'runner-1',
+        currency: null,
+        paymentStatus: RunnerPaymentStatus.PAID,
+        status: DeliveryOrderStatus.IN_TRANSIT,
+        paymentSessions: [{ status: PaymentSessionStatus.FAILED }],
+      },
+    });
+    const unassignedSummary = builder.buildRunnerPaymentSummary({
+      providerOrders: [{}],
+      deliveryDistanceKm: 1,
+      runnerBaseFee: 2,
+      runnerPerKmFee: 1,
+      runnerExtraPickupFee: 0.5,
+      deliveryFee: 3,
+      deliveryOrder: {
+        id: 'delivery-2',
+        runnerId: null,
+        currency: 'EUR',
+        paymentStatus: RunnerPaymentStatus.PENDING,
+        status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+        paymentSessions: [],
+      },
+    });
+
+    expect(paidSummary.paymentRequired).toBe(false);
+    expect(paidSummary.sessionPrepared).toBe(false);
+    expect(paidSummary.currency).toBe('EUR');
+    expect(unassignedSummary.paymentRequired).toBe(false);
+  });
+
+  it('builds provider order discount summaries using fallback prices and zero floors', () => {
+    expect(
+      builder.buildProviderOrderDiscountSummary({
+        subtotalAmount: 8,
+        items: [
+          {
+            quantity: 2,
+            priceAtPurchase: 5,
+            unitBasePriceSnapshot: null,
+          },
+        ],
+      }),
+    ).toEqual({
+      originalSubtotalAmount: 10,
+      discountAmount: 2,
+    });
+
+    expect(
+      builder.buildProviderOrderDiscountSummary({
+        subtotalAmount: 12,
+        items: [
+          {
+            quantity: 2,
+            priceAtPurchase: 5,
+            unitBasePriceSnapshot: 5,
+          },
+        ],
+      }),
+    ).toEqual({
+      originalSubtotalAmount: 10,
+      discountAmount: 0,
     });
   });
 });

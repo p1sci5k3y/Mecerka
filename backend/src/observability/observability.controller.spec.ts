@@ -116,6 +116,22 @@ describe('ObservabilityController', () => {
     expect(observabilityServiceMock.getMetrics).toHaveBeenCalledWith('7d');
   });
 
+  it('uses default parameter objects when metrics, SLA, and reconciliation are called without query', async () => {
+    observabilityServiceMock.getMetrics.mockResolvedValue({} as any);
+    observabilityServiceMock.getSlaMetrics.mockResolvedValue({} as any);
+    observabilityServiceMock.getReconciliation.mockResolvedValue({} as any);
+
+    await controller.getMetrics();
+    await controller.getSlaMetrics();
+    await controller.getReconciliation();
+
+    expect(observabilityServiceMock.getMetrics).toHaveBeenCalledWith('24h');
+    expect(observabilityServiceMock.getSlaMetrics).toHaveBeenCalledWith('24h');
+    expect(observabilityServiceMock.getReconciliation).toHaveBeenCalledWith(
+      '24h',
+    );
+  });
+
   describe('RolesGuard branch coverage', () => {
     it('allows access when no roles are required (no metadata)', () => {
       const guard = new RolesGuard(new Reflector());

@@ -1,5 +1,10 @@
 import * as argon2 from 'argon2';
-import { ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DeliveryStatus } from '@prisma/client';
@@ -48,6 +53,93 @@ describe('LegacyCashPaymentService', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it('rejects legacy cash payments when the feature flag is disabled', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'ENABLE_LEGACY_CASH_PAYMENTS') return 'false';
+      return undefined;
+    });
+
+    await expect(
+      service.processCashPayment('order-1', 'client-1', '1234'),
+    ).rejects.toThrow(
+      'Legacy cash payments are disabled. Use provider payment sessions instead.',
+    );
+  });
+
+  it('rejects empty cash payment pins', async () => {
+    await expect(
+      service.processCashPayment('order-1', 'client-1', ''),
+    ).rejects.toThrow(
+      new BadRequestException('El PIN es requerido para pagos en efectivo'),
+    );
+  });
+
+  it('rejects clients without a configured transactional pin', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'client-1',
+      pin: null,
+    });
+
+    await expect(
+      service.processCashPayment('order-1', 'client-1', '1234'),
+    ).rejects.toThrow(
+      new BadRequestException('Debes configurar un PIN transaccional.'),
+    );
+  });
+
+  it('rejects incorrect transactional pins', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'client-1',
+      pin: 'hash',
+    });
+    (argon2.verify as jest.Mock).mockResolvedValue(false);
+
+    await expect(
+      service.processCashPayment('order-1', 'client-1', '9999'),
+    ).rejects.toThrow(new UnauthorizedException('PIN de compra incorrecto.'));
+  });
+
+  it('rejects orders that are missing or not pending', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'client-1',
+      pin: 'hash',
+    });
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: DeliveryStatus.CONFIRMED,
+      providerOrders: [],
+    });
+    (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.processCashPayment('order-1', 'client-1', '1234'),
+    ).rejects.toThrow(
+      new NotFoundException('Order not found or not in PENDING state'),
+    );
+  });
+
+  it('rejects orders with multiple provider orders in the legacy cash flow', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'client-1',
+      pin: 'hash',
+    });
+    prismaMock.order.findUnique.mockResolvedValue({
+      id: 'order-1',
+      status: DeliveryStatus.PENDING,
+      providerOrders: [
+        { id: 'po-1', items: [] },
+        { id: 'po-2', items: [] },
+      ],
+    });
+    (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      service.processCashPayment('order-1', 'client-1', '1234'),
+    ).rejects.toThrow(
+      'El flujo de pago actual solo admite pedidos de un único proveedor.',
+    );
   });
 
   it('confirms the legacy cash payment and emits the state change event', async () => {

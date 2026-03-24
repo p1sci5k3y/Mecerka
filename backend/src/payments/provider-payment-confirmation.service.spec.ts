@@ -210,4 +210,347 @@ describe('ProviderPaymentConfirmationService', () => {
       ),
     ).rejects.toThrow(ConflictException);
   });
+
+  it('rejects confirmation when the payment session does not exist', async () => {
+    const txMock = {
+      providerPaymentSession: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_missing_session',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('Payment session not found');
+  });
+
+  it('rejects inactive failed payment sessions', async () => {
+    const txMock = {
+      providerPaymentSession: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            buildPaymentSession({ status: PaymentSessionStatus.FAILED }),
+          ),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_failed_session',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('Inactive payment session cannot be confirmed');
+  });
+
+  it('rejects inactive expired payment sessions', async () => {
+    const txMock = {
+      providerPaymentSession: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            buildPaymentSession({ status: PaymentSessionStatus.EXPIRED }),
+          ),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_expired_session',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('Inactive payment session cannot be confirmed');
+  });
+
+  it('rejects superseded payment references', async () => {
+    const txMock = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      providerPaymentSession: {
+        findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+      },
+      providerOrder: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            buildProviderOrder({ paymentRef: 'pi_other_superseding' }),
+          ),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_superseded',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('Superseded payment session cannot be confirmed');
+  });
+
+  it('returns early when the provider order is already paid', async () => {
+    const txMock = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      providerPaymentSession: {
+        findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+      },
+      providerOrder: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(
+            buildProviderOrder({ paymentStatus: ProviderPaymentStatus.PAID }),
+          ),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_already_paid',
+        buildConfirmation(),
+      ),
+    ).resolves.toMatchObject({
+      message: 'ProviderOrder already paid',
+    });
+  });
+
+  it('rejects when the provider order cannot be found after locking', async () => {
+    const txMock = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      providerPaymentSession: {
+        findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+      },
+      providerOrder: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_missing_provider_order',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('ProviderOrder not found');
+  });
+
+  it('rejects when the provider order has no active reservations', async () => {
+    const txMock = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      providerPaymentSession: {
+        findUnique: jest.fn().mockResolvedValue(buildPaymentSession()),
+      },
+      providerOrder: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue(buildProviderOrder({ reservations: [] })),
+      },
+    };
+    prismaMock.$transaction.mockImplementation(
+      async <T>(cb: (tx: typeof txMock) => Promise<T> | T) => cb(txMock),
+    );
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_no_reservations',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow('ProviderOrder has no active reservations to consume');
+  });
+
+  it('rejects missing confirmation payloads', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(SESSION_ID, 'evt_missing_payload'),
+    ).rejects.toThrow(
+      'Payment confirmation payload is required for provider payment verification',
+    );
+  });
+
+  it('falls back to user stripeAccountId and upserts the active payment account', async () => {
+    const txMock = setupSuccessfulTransaction();
+    txMock.paymentAccount.findFirst.mockResolvedValue(null);
+    txMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: STRIPE_ACCOUNT_ID,
+    });
+    prismaMock.paymentAccount.upsert.mockResolvedValue({
+      externalAccountId: STRIPE_ACCOUNT_ID,
+      isActive: true,
+    });
+
+    const result = await service.confirmProviderOrderPayment(
+      SESSION_ID,
+      'evt_upsert_account',
+      buildConfirmation(),
+    );
+
+    expect(prismaMock.paymentAccount.upsert).toHaveBeenCalledWith({
+      where: {
+        ownerType_ownerId_provider: {
+          ownerType: 'PROVIDER',
+          ownerId: PROVIDER_ID,
+          provider: 'STRIPE',
+        },
+      },
+      update: {
+        externalAccountId: STRIPE_ACCOUNT_ID,
+        isActive: true,
+      },
+      create: {
+        ownerType: 'PROVIDER',
+        ownerId: PROVIDER_ID,
+        provider: 'STRIPE',
+        externalAccountId: STRIPE_ACCOUNT_ID,
+        isActive: true,
+      },
+    });
+    expect(result).toMatchObject({
+      success: true,
+      providerOrderId: PROVIDER_ORDER_ID,
+    });
+  });
+
+  it('rejects when no active payment account can be resolved', async () => {
+    const txMock = setupSuccessfulTransaction();
+    txMock.paymentAccount.findFirst.mockResolvedValue(null);
+    txMock.user.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_missing_account',
+        buildConfirmation(),
+      ),
+    ).rejects.toThrow(
+      'Provider payment account is not active for this provider order',
+    );
+  });
+
+  it('accepts confirmations that only provide amount as fallback', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_amount_fallback',
+        buildConfirmation({ amountReceived: undefined, amount: 1000 }),
+      ),
+    ).resolves.toMatchObject({
+      success: true,
+      providerOrderId: PROVIDER_ORDER_ID,
+    });
+  });
+
+  it('rejects confirmations without amountReceived or amount', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_missing_amounts',
+        buildConfirmation({
+          amountReceived: undefined,
+          amount: undefined,
+        }),
+      ),
+    ).rejects.toThrow(
+      'Payment amount does not match the expected provider order subtotal',
+    );
+  });
+
+  it('rejects incomplete provider payment metadata', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_missing_metadata',
+        buildConfirmation({
+          metadata: {
+            orderId: ORDER_ID,
+            providerOrderId: PROVIDER_ORDER_ID,
+          },
+        } as Partial<PaymentConfirmationPayload>),
+      ),
+    ).rejects.toThrow(
+      'Payment metadata is incomplete for provider payment verification',
+    );
+  });
+
+  it('rejects mismatched metadata order ids', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_order_id_mismatch',
+        buildConfirmation({
+          metadata: {
+            orderId: 'wrong-order',
+            providerOrderId: PROVIDER_ORDER_ID,
+            providerPaymentSessionId: PAYMENT_SESSION_ID,
+          },
+        }),
+      ),
+    ).rejects.toThrow('Payment metadata orderId mismatch');
+  });
+
+  it('rejects mismatched metadata provider order ids', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_provider_order_id_mismatch',
+        buildConfirmation({
+          metadata: {
+            orderId: ORDER_ID,
+            providerOrderId: 'wrong-provider-order',
+            providerPaymentSessionId: PAYMENT_SESSION_ID,
+          },
+        }),
+      ),
+    ).rejects.toThrow('Payment metadata providerOrderId mismatch');
+  });
+
+  it('rejects mismatched metadata payment session ids', async () => {
+    setupSuccessfulTransaction();
+
+    await expect(
+      service.confirmProviderOrderPayment(
+        SESSION_ID,
+        'evt_session_id_mismatch',
+        buildConfirmation({
+          metadata: {
+            orderId: ORDER_ID,
+            providerOrderId: PROVIDER_ORDER_ID,
+            providerPaymentSessionId: 'wrong-session',
+          },
+        }),
+      ),
+    ).rejects.toThrow('Payment metadata providerPaymentSessionId mismatch');
+  });
 });

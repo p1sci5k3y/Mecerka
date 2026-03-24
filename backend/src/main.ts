@@ -7,7 +7,7 @@ import cookieParser from 'cookie-parser';
 import { AppLoggerService } from './common/logging/app-logger.service';
 import type { AbstractHttpAdapter } from '@nestjs/core';
 
-async function bootstrap() {
+export async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
   app.useLogger(app.get(AppLoggerService));
   app.getHttpAdapter().getInstance().disable('x-powered-by');
@@ -91,4 +91,7 @@ async function bootstrap() {
   });
   await app.listen(process.env.PORT ?? 3000);
 }
-void bootstrap();
+
+if (require.main === module) {
+  void bootstrap();
+}

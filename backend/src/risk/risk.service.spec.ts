@@ -514,5 +514,106 @@ describe('RiskService', () => {
       // NaN values are filtered out — count key should not appear or be undefined
       expect(meta?.count).toBeUndefined();
     });
+
+    it('normalizes scores into the valid 0-100 range', async () => {
+      prismaMock.riskEvent.create
+        .mockImplementationOnce(({ data }: any) => ({
+          id: 'event-hi',
+          createdAt: new Date(),
+          ...data,
+        }))
+        .mockImplementationOnce(({ data }: any) => ({
+          id: 'event-lo',
+          createdAt: new Date(),
+          ...data,
+        }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.CLIENT,
+        actorId: 'actor-high',
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        score: 999,
+      });
+      await service.recordRiskEvent({
+        actorType: RiskActorType.CLIENT,
+        actorId: 'actor-low',
+        category: RiskCategory.CLIENT_REFUND_ABUSE,
+        score: -25,
+      });
+
+      expect(prismaMock.riskEvent.create.mock.calls[0][0].data.score).toBe(100);
+      expect(prismaMock.riskEvent.create.mock.calls[1][0].data.score).toBe(0);
+    });
+
+    it('falls back to the category default score when score is not finite', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-default',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.RUNNER,
+        actorId: 'runner-default',
+        category: RiskCategory.RUNNER_GPS_ANOMALY,
+        score: Number.NaN,
+      });
+
+      expect(prismaMock.riskEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            score: expect.any(Number),
+          }),
+        }),
+      );
+      expect(
+        prismaMock.riskEvent.create.mock.calls[0][0].data.score,
+      ).toBeGreaterThan(0);
+    });
+
+    it('sanitizes metadata arrays, booleans and truncates long strings', async () => {
+      prismaMock.riskEvent.create.mockImplementation(({ data }: any) => ({
+        id: 'event-array',
+        createdAt: new Date(),
+        ...data,
+      }));
+
+      await service.recordRiskEvent({
+        actorType: RiskActorType.RUNNER,
+        actorId: 'runner-1',
+        category: RiskCategory.RUNNER_GPS_ANOMALY,
+        score: 20,
+        metadata: {
+          eventType: 'x'.repeat(200),
+          attemptCount: 3,
+          status: true,
+          reason: ['jump', null, Number.NaN, false, 'ok'],
+        } as any,
+      });
+
+      const meta = prismaMock.riskEvent.create.mock.calls[0][0].data
+        .metadata as Record<string, unknown>;
+      expect((meta.eventType as string).length).toBe(128);
+      expect(meta.attemptCount).toBe(3);
+      expect(meta.status).toBe(true);
+      expect(meta.reason).toEqual(['jump', false, 'ok']);
+    });
+
+    it('normalizes list limits to the allowed range', async () => {
+      prismaMock.riskScoreSnapshot.findMany.mockResolvedValue([]);
+      prismaMock.riskEvent.findMany.mockResolvedValue([]);
+
+      await service.listHighRiskActors({ limit: 999 });
+      await service.listActorRiskEvents(RiskActorType.CLIENT, 'actor-1', {
+        limit: 0,
+      });
+
+      expect(prismaMock.riskScoreSnapshot.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 100 }),
+      );
+      expect(prismaMock.riskEvent.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 1 }),
+      );
+    });
   });
 });

@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role, RoleRequestStatus } from '@prisma/client';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 import { RequestableRole } from './dto/request-role.dto';
@@ -8,6 +9,7 @@ import { RoleAssignmentService } from './role-assignment.service';
 
 describe('UsersService.requestRole', () => {
   let service: UsersService;
+  const originalFiscalPepper = process.env.FISCAL_PEPPER;
   let prismaMock: {
     user: {
       update: jest.Mock;
@@ -19,6 +21,7 @@ describe('UsersService.requestRole', () => {
   };
 
   beforeEach(async () => {
+    process.env.FISCAL_PEPPER = 'test-fiscal-pepper';
     prismaMock = {
       user: {
         update: jest.fn(),
@@ -163,5 +166,89 @@ describe('UsersService.requestRole', () => {
       requestedAt: new Date('2026-03-17T00:00:00.000Z'),
       roles: [Role.CLIENT, Role.PROVIDER],
     });
+  });
+
+  it('stores a hashed transaction pin', async () => {
+    const result = await service.setTransactionPin('user-1', '1234');
+
+    expect(prismaMock.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        pin: expect.any(String),
+      },
+    });
+    const storedHash = prismaMock.user.update.mock.calls[0]?.[0]?.data
+      ?.pin as string;
+    expect(storedHash).not.toBe('1234');
+    await expect(argon2.verify(storedHash, '1234')).resolves.toBe(true);
+    expect(result).toEqual({
+      message: 'PIN transaccional configurado correctamente',
+    });
+  });
+
+  it('throws when FISCAL_PEPPER is missing or empty', () => {
+    process.env.FISCAL_PEPPER = '   ';
+
+    expect(
+      () =>
+        new UsersService(
+          prismaMock as unknown as PrismaService,
+          roleAssignmentServiceMock as unknown as RoleAssignmentService,
+        ),
+    ).toThrow('FISCAL_PEPPER is missing or empty');
+  });
+
+  it('rejects users that already have the requested role', async () => {
+    roleAssignmentServiceMock.withLockedUser.mockImplementation(
+      async (_userId, callback) =>
+        callback(
+          {},
+          {
+            id: 'user-1',
+            roles: [Role.CLIENT, Role.RUNNER],
+            requestedRole: null,
+            roleStatus: null,
+            requestedAt: null,
+          },
+        ),
+    );
+
+    await expect(
+      service.requestRole('user-1', {
+        role: RequestableRole.RUNNER,
+        country: 'ES',
+        fiscalId: '12345678Z',
+      }),
+    ).rejects.toThrow(ConflictException);
+  });
+
+  it('rejects when the locked user cannot be found', async () => {
+    roleAssignmentServiceMock.withLockedUser.mockImplementation(
+      async (_userId, callback) => callback({}, null),
+    );
+
+    await expect(
+      service.requestRole('user-1', {
+        role: RequestableRole.PROVIDER,
+        country: 'ES',
+        fiscalId: '12345678Z',
+      }),
+    ).rejects.toThrow('User not found');
+  });
+
+  it('rejects when the role assignment callback returns no updated user', async () => {
+    roleAssignmentServiceMock.withLockedUser.mockResolvedValue(null);
+
+    await expect(
+      service.requestRole('user-1', {
+        role: RequestableRole.PROVIDER,
+        country: 'ES',
+        fiscalId: '12345678Z',
+      }),
+    ).rejects.toThrow('User not found');
+  });
+
+  afterAll(() => {
+    process.env.FISCAL_PEPPER = originalFiscalPepper;
   });
 });
