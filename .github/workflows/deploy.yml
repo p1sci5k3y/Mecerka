@@ -272,6 +272,8 @@ jobs:
               echo "[deploy] nginx inactive, starting service"
               sudo systemctl restart nginx
             fi
+            echo "[deploy] waiting for nginx warmup"
+            sleep 10
 
             echo "[deploy] running smoke checks"
             ./scripts/smoke-check-stack.sh "${PROD_ENV_FILE}"

@@ -34,6 +34,7 @@ retry() {
     if "$@"; then
       return 0
     fi
+    echo "[smoke] attempt ${i}/${attempts} failed: $*" >&2
     if [ "$i" -eq "$attempts" ]; then
       break
     fi
@@ -45,11 +46,11 @@ retry() {
 }
 
 http_ok() {
-  curl -fsS "$1" >/dev/null
+  curl -fsS --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1" >/dev/null
 }
 
 http_head_ok() {
-  curl -fsSI "$1" >/dev/null
+  curl -fsSI --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1" >/dev/null
 }
 
 retry 10 3 http_ok "http://127.0.0.1:${BACKEND_HOST_PORT}/health"
