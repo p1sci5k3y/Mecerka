@@ -85,7 +85,7 @@ export function Navbar() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
                 <Languages className="h-4 w-4" />
-                <span className="sr-only">Switch Language</span>
+                <span className="sr-only">{t("switchLanguage")}</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -120,7 +120,7 @@ export function Navbar() {
                   <Button variant="ghost" size="sm" className="gap-2">
                     <User className="h-4 w-4" />
                     <span className="max-w-[120px] truncate text-sm">
-                      {user?.name || "Usuario"}
+                      {user?.name || t("userFallback")}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -143,7 +143,7 @@ export function Navbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/runner" className="flex items-center gap-2">
                         <Truck className="h-4 w-4" />
-                        Repartos
+                        {t("deliveries")}
                       </Link>
                     </DropdownMenuItem>
                   )}
@@ -183,7 +183,7 @@ export function Navbar() {
           type="button"
           className="md:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label="Toggle menu"
+          aria-label={t("toggleMenu")}
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -254,7 +254,7 @@ export function Navbar() {
                     onClick={() => setMobileOpen(false)}
                   >
                     <Truck className="h-4 w-4" />
-                    Repartos
+                    {t("deliveries")}
                   </Link>
                 )}
                 <Link

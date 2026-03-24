@@ -2,14 +2,18 @@
 
 import { useEffect, useState } from "react"
 import { Search, SlidersHorizontal, Loader2, PackageX } from "lucide-react"
+import { useLocale } from "next-intl"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProductCard } from "@/components/product-card"
 import { productsService } from "@/lib/services/products-service"
 import { Input } from "@/components/ui/input"
 import type { Product } from "@/lib/types"
+import { getPublicCopy } from "@/lib/public-copy"
 
 export default function ProductsPage() {
+  const locale = useLocale()
+  const copy = getPublicCopy(locale).products
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -25,10 +29,10 @@ export default function ProductsPage() {
         setLoading(false)
       })
       .catch(() => {
-        setError("No se pudieron cargar los productos")
+        setError(copy.loadError)
         setLoading(false)
       })
-  }, [])
+  }, [copy.loadError])
 
   const cities = [...new Set(products.map((p) => p.city))].sort()
   const categories = [...new Set(products.map((p) => p.category))].sort()
@@ -49,10 +53,10 @@ export default function ProductsPage() {
         <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
           <div className="mb-8">
             <h1 className="font-display text-3xl font-bold text-foreground">
-              Catálogo de productos
+              {copy.title}
             </h1>
             <p className="mt-1 text-muted-foreground">
-              Explora todos los productos disponibles en tu ciudad
+              {copy.subtitle}
             </p>
           </div>
 
@@ -60,7 +64,7 @@ export default function ProductsPage() {
             <div className="relative max-w-2xl">
               <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground/70" />
               <Input
-                placeholder="Busca por pieza, taller o técnica..."
+                placeholder={copy.searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-14 pl-12 rounded-full border-2 border-border/60 bg-card text-base shadow-sm focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary transition-all"
@@ -70,7 +74,7 @@ export default function ProductsPage() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mr-2">
                 <SlidersHorizontal className="h-4 w-4" />
-                Filtrar por:
+                {copy.filterBy}
               </div>
 
               <div className="relative group">
@@ -79,7 +83,7 @@ export default function ProductsPage() {
                   onChange={(e) => setSelectedCity(e.target.value)}
                   className="appearance-none h-10 rounded-full border border-border/80 bg-background/50 pl-5 pr-10 text-sm font-medium text-foreground outline-none hover:border-primary/50 focus:border-primary transition-colors cursor-pointer shadow-sm"
                 >
-                  <option value="">Cualquier ciudad</option>
+                  <option value="">{copy.anyCity}</option>
                   {cities.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -97,7 +101,7 @@ export default function ProductsPage() {
                   onChange={(e) => setSelectedCategory(e.target.value)}
                   className="appearance-none h-10 rounded-full border border-border/80 bg-background/50 pl-5 pr-10 text-sm font-medium text-foreground outline-none hover:border-primary/50 focus:border-primary transition-colors cursor-pointer shadow-sm"
                 >
-                  <option value="">Cualquier técnica/categoría</option>
+                  <option value="">{copy.anyCategory}</option>
                   {categories.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -116,7 +120,7 @@ export default function ProductsPage() {
             <div className="flex flex-col items-center justify-center py-20">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="mt-3 text-sm text-muted-foreground">
-                Cargando productos...
+                {copy.loading}
               </p>
             </div>
           ) : error ? (
@@ -128,7 +132,7 @@ export default function ProductsPage() {
             <div className="flex flex-col items-center justify-center py-20">
               <PackageX className="h-12 w-12 text-muted-foreground/50" />
               <p className="mt-3 text-sm text-muted-foreground">
-                No se encontraron productos con estos filtros
+                {copy.empty}
               </p>
             </div>
           ) : (

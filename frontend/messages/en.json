@@ -7,7 +7,11 @@
         "profile": "Profile",
         "logout": "Logout",
         "cart": "Cart",
-        "inventory": "Inventory"
+        "inventory": "Inventory",
+        "deliveries": "Deliveries",
+        "switchLanguage": "Switch language",
+        "toggleMenu": "Toggle menu",
+        "userFallback": "User"
     },
     "Landing": {
         "heroTitle": "Your local market, now digital",

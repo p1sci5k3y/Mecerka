@@ -5,9 +5,17 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { SectionHeader } from "@/components/ui/section-header"
 import { SealBadge } from "@/components/ui/seal-badge"
-import { Link } from '@/lib/navigation';
+import { Link } from "@/lib/navigation"
+import { getPublicCopy } from "@/lib/public-copy"
 
-export default function Home() {
+export default async function Home({
+  params,
+}: {
+  params: Promise<{ locale: string }>
+}) {
+  const { locale } = await params
+  const copy = getPublicCopy(locale).home
+
   return (
     <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20">
       <Navbar />
@@ -24,26 +32,26 @@ export default function Home() {
         >
           <div className="container relative z-10 px-4 md:px-6 flex justify-end">
             <div className="flex w-full md:w-[55%] flex-col items-start gap-6 text-left">
-              <SealBadge className="mb-2">Auténtico & Local</SealBadge>
+              <SealBadge className="mb-2">{copy.badge}</SealBadge>
 
               <h1 className="font-display text-5xl font-extrabold tracking-tight sm:text-6xl lg:text-7xl text-foreground mix-blend-multiply">
-                Apoya a los talleres de tu ciudad
+                {copy.title}
               </h1>
 
               <p className="max-w-[32rem] leading-relaxed text-foreground/85 sm:text-xl font-medium mix-blend-multiply">
-                Descubre productos únicos hechos a mano cerca de ti. Directamente de los creadores visuales e independientes a tu puerta.
+                {copy.subtitle}
               </p>
 
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
                 <Link href="/products">
                   <Button size="lg" className="h-14 px-8 text-base shadow-sm font-semibold">
-                    Explorar el mercado
+                    {copy.primaryCta}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
                 <Link href="/register">
                   <Button size="lg" variant="outline" className="h-14 px-8 text-base border-primary/30 bg-background/50 hover:bg-background/80 backdrop-blur-sm font-semibold">
-                    Crear cuenta
+                    {copy.secondaryCta}
                   </Button>
                 </Link>
               </div>
@@ -53,8 +61,8 @@ export default function Home() {
 
         <section className="container px-4 py-20 md:px-6">
           <SectionHeader
-            title="Lo que ya puedes hacer"
-            subtitle="Superficie pública real del MVP, sin dependencias ocultas ni recorridos simulados."
+            title={copy.capabilitiesTitle}
+            subtitle={copy.capabilitiesSubtitle}
             className="mb-12"
           />
           <div className="grid gap-8 md:grid-cols-3">
@@ -62,14 +70,14 @@ export default function Home() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <Hammer className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-display text-xl font-bold">Explorar catálogo real</h3>
+              <h3 className="font-display text-xl font-bold">{copy.catalogTitle}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                El catálogo público consume productos reales del backend. Desde ahí puedes añadir piezas al carrito y preparar tu compra.
+                {copy.catalogBody}
               </p>
               <div className="mt-5">
                 <Link href="/products">
                   <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
-                    Ver catálogo
+                    {copy.catalogCta}
                   </Button>
                 </Link>
               </div>
@@ -79,14 +87,14 @@ export default function Home() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-display text-xl font-bold">Crear cuenta cliente</h3>
+              <h3 className="font-display text-xl font-bold">{copy.accountTitle}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                El alta pública crea cuentas cliente. Si después quieres vender o repartir, la solicitud de rol se hace desde tu perfil autenticado.
+                {copy.accountBody}
               </p>
               <div className="mt-5">
                 <Link href="/register">
                   <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
-                    Crear cuenta
+                    {copy.accountCta}
                   </Button>
                 </Link>
               </div>
@@ -96,9 +104,9 @@ export default function Home() {
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                 <MapPin className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-display text-xl font-bold">Comprar de forma local</h3>
+              <h3 className="font-display text-xl font-bold">{copy.localCommerceTitle}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                Puedes preparar tu cesta sin sesión y autenticarte justo antes del checkout. El flujo online actual ya soporta pedidos multiproveedor dentro de una misma ciudad.
+                {copy.localCommerceBody}
               </p>
             </article>
           </div>

@@ -12,6 +12,35 @@ declare global {
 
 let runtimeConfigPromise: Promise<PublicRuntimeConfig> | null = null
 
+function isLocalhost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1"
+}
+
+function getSameOriginApiBaseUrl() {
+  return `${globalThis.location.origin}/api`
+}
+
+function normalizeBrowserApiBaseUrl(apiBaseUrl?: string) {
+  if (!apiBaseUrl) {
+    return getSameOriginApiBaseUrl()
+  }
+
+  if (isLocalhost(globalThis.location.hostname)) {
+    return apiBaseUrl
+  }
+
+  try {
+    const resolved = new URL(apiBaseUrl, globalThis.location.origin)
+    if (resolved.origin !== globalThis.location.origin) {
+      return getSameOriginApiBaseUrl()
+    }
+
+    return resolved.toString().replace(/\/$/, "")
+  } catch {
+    return getSameOriginApiBaseUrl()
+  }
+}
+
 export function getApiBaseUrl() {
   if (typeof window === "undefined") {
     return (
@@ -24,17 +53,14 @@ export function getApiBaseUrl() {
 
   const runtimeApiBaseUrl = window.__MECERKA_RUNTIME_CONFIG__?.apiBaseUrl
   if (runtimeApiBaseUrl) {
-    return runtimeApiBaseUrl
+    return normalizeBrowserApiBaseUrl(runtimeApiBaseUrl)
   }
 
-  if (
-    globalThis.location.hostname === "localhost" ||
-    globalThis.location.hostname === "127.0.0.1"
-  ) {
+  if (isLocalhost(globalThis.location.hostname)) {
     return process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
   }
 
-  return `${globalThis.location.origin}/api`
+  return getSameOriginApiBaseUrl()
 }
 
 export async function getPublicRuntimeConfig() {
@@ -60,8 +86,12 @@ export async function getPublicRuntimeConfig() {
           throw new Error("No pudimos cargar la configuración pública.")
         }
         const data = (await response.json()) as PublicRuntimeConfig
-        window.__MECERKA_RUNTIME_CONFIG__ = data
-        return data
+        const normalized = {
+          ...data,
+          apiBaseUrl: normalizeBrowserApiBaseUrl(data.apiBaseUrl),
+        } satisfies PublicRuntimeConfig
+        window.__MECERKA_RUNTIME_CONFIG__ = normalized
+        return normalized
       })
       .catch(() => ({
         apiBaseUrl: getApiBaseUrl(),

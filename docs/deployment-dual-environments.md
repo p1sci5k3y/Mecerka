@@ -37,6 +37,7 @@ Isolation is enforced by:
 - runtime-only frontend configuration:
   - `API_BASE_URL=/api`
   - `STRIPE_PUBLISHABLE_KEY` provided per environment
+  - browser requests must stay same-origin under `/{host}/api`; demo must never call `mecerka.me/api` from `demo.mecerka.me`
 
 ## Required GitHub secrets / variables
 

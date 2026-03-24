@@ -855,5 +855,43 @@ describe('OrderStatusService – State Machine', () => {
         [{ productId: 'prod-1', quantity: 2 }],
       );
     });
+
+    it('CLIENT cancelling a partially rejected CONFIRMED order only restores active sub-order inventory', async () => {
+      repositoryMock.findWithProviderOrdersAndItems.mockResolvedValue(
+        makeOrder(DeliveryStatus.CONFIRMED, 'client-1', [
+          {
+            id: 'po-1',
+            status: ProviderOrderStatus.PREPARING,
+            items: [{ productId: 'prod-1', quantity: 2 }],
+          },
+          {
+            id: 'po-2',
+            status: ProviderOrderStatus.REJECTED_BY_STORE,
+            items: [{ productId: 'prod-2', quantity: 1 }],
+          },
+          {
+            id: 'po-3',
+            status: ProviderOrderStatus.CANCELLED,
+            items: [{ productId: 'prod-3', quantity: 4 }],
+          },
+        ]),
+      );
+      repositoryMock.cancelWithInventoryRestore.mockResolvedValue({
+        id: 'ord-1',
+        status: DeliveryStatus.CANCELLED,
+        providerOrders: [],
+      });
+
+      const result = await service.cancelOrder('ord-1', 'client-1', [
+        Role.CLIENT,
+      ]);
+
+      expect(result.status).toBe(DeliveryStatus.CANCELLED);
+      expect(repositoryMock.cancelWithInventoryRestore).toHaveBeenCalledWith(
+        'ord-1',
+        ['po-1'],
+        [{ productId: 'prod-1', quantity: 2 }],
+      );
+    });
   });
 });

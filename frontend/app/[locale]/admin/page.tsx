@@ -7,10 +7,29 @@ import {
   DollarSign,
   
 } from "lucide-react"
+import { Navbar } from "@/components/navbar"
+import { Footer } from "@/components/footer"
+import { ProtectedRoute } from "@/components/protected-route"
 import { adminService } from "@/lib/services/admin-service"
 import { AdminMetrics } from "@/lib/types"
 
 export default function AdminDashboard() {
+  return (
+    <ProtectedRoute allowedRoles={["ADMIN"]}>
+      <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20">
+        <Navbar />
+        <main className="flex-1 px-6 py-8 md:px-10 lg:px-16">
+          <div className="mx-auto max-w-7xl">
+            <AdminDashboardContent />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    </ProtectedRoute>
+  )
+}
+
+function AdminDashboardContent() {
   const [metrics, setMetrics] = useState<AdminMetrics | null>(null)
   const [loading, setLoading] = useState(true)
 

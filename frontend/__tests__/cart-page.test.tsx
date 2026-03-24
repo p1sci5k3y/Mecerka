@@ -3,6 +3,9 @@ import { render, screen, fireEvent } from "@testing-library/react"
 
 // ── External module mocks ────────────────────────────────────────────────────
 
+const pushMock = vi.fn()
+const checkoutMock = vi.fn()
+
 vi.mock("next-intl", () => ({
   useLocale: () => "es",
 }))
@@ -12,7 +15,7 @@ vi.mock("sonner", () => ({
 }))
 
 vi.mock("@/lib/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: pushMock }),
   Link: ({ href, children, ...rest }: any) => <a href={href} {...rest}>{children}</a>,
 }))
 
@@ -26,7 +29,7 @@ vi.mock("@/components/footer", () => ({
 
 vi.mock("@/lib/services/cart-service", () => ({
   cartService: {
-    checkout: vi.fn(),
+    checkout: checkoutMock,
     getMyCart: vi.fn(),
   },
 }))
@@ -132,6 +135,8 @@ function cartWithItem() {
 // Dynamic import so vi.mock() hoisting fires first in the test file scope.
 beforeEach(async () => {
   vi.resetModules()
+  pushMock.mockReset()
+  checkoutMock.mockReset()
   // Re-import is handled per describe block below; here we just reset state
 })
 
@@ -181,6 +186,15 @@ describe("CartPage – cart with items (guest)", () => {
     expect(screen.getByText("Iniciar sesión y continuar")).toBeInTheDocument()
     expect(screen.getByText("Crear cuenta cliente")).toBeInTheDocument()
   })
+
+  it("redirects guests to login preserving the cart return path", async () => {
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión y continuar" }))
+
+    expect(pushMock).toHaveBeenCalledWith("/login?returnTo=%2Fcart")
+  })
 })
 
 describe("CartPage – authenticated user with server cart", () => {
@@ -219,5 +233,111 @@ describe("CartPage – authenticated user with server cart", () => {
     fireEvent.click(checkoutBtn)
 
     expect(toast.error).toHaveBeenCalledWith("La dirección de entrega es obligatoria.")
+  })
+
+  it("blocks checkout for authenticated users without CLIENT role", async () => {
+    const { toast } = await import("sonner")
+    mockUseAuth.mockReturnValue({
+      user: { id: "u2", roles: ["PROVIDER"], email: "maker@test.com" },
+      isAuthenticated: true,
+      isLoading: false,
+    })
+
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.change(screen.getByLabelText("Código postal"), {
+      target: { value: "41003" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "El checkout oficial está disponible para cuentas cliente.",
+    )
+  })
+
+  it("requires a valid positive discovery radius before checkout", async () => {
+    const { toast } = await import("sonner")
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.change(screen.getByLabelText("Código postal"), {
+      target: { value: "41003" },
+    })
+    fireEvent.change(screen.getByLabelText("Radio de compra"), {
+      target: { value: "0" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Indica un radio de compra válido en kilómetros.",
+    )
+  })
+
+  it("creates the official order, refreshes the cart and redirects to split payments", async () => {
+    const refreshCartMock = vi.fn().mockResolvedValue(undefined)
+    mockUseCart.mockReturnValue({
+      ...mockUseCart.mock.results.at(-1)?.value,
+      ...{
+        ...cartWithItem(),
+        source: "server",
+        cart: {
+          ...cartWithItem().cart,
+          source: "server",
+          cityId: "city-1",
+        },
+        refreshCart: refreshCartMock,
+      },
+    })
+
+    const assignMock = vi.fn()
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { assign: assignMock },
+    })
+    checkoutMock.mockResolvedValueOnce({ id: "order-99" })
+
+    const { toast } = await import("sonner")
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.change(screen.getByLabelText("Código postal"), {
+      target: { value: "41003" },
+    })
+    fireEvent.change(screen.getByLabelText("Referencia adicional"), {
+      target: { value: "Puerta 2B" },
+    })
+    fireEvent.change(screen.getByLabelText("Radio de compra"), {
+      target: { value: "7" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(checkoutMock).toHaveBeenCalledWith(
+      {
+        cityId: "city-1",
+        deliveryAddress: "Calle Feria 12",
+        postalCode: "41003",
+        addressReference: "Puerta 2B",
+        discoveryRadiusKm: 7,
+      },
+      expect.any(String),
+    )
+    expect(refreshCartMock).toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith(
+      "Pedido oficial creado. Ahora debes revisar los pagos separados por comercio.",
+    )
+    expect(assignMock).toHaveBeenCalledWith("/es/orders/order-99/payments")
   })
 })

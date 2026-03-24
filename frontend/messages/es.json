@@ -7,7 +7,11 @@
         "profile": "Perfil",
         "logout": "Cerrar sesión",
         "cart": "Carrito",
-        "inventory": "Inventario"
+        "inventory": "Inventario",
+        "deliveries": "Repartos",
+        "switchLanguage": "Cambiar idioma",
+        "toggleMenu": "Abrir menú",
+        "userFallback": "Usuario"
     },
     "Landing": {
         "heroTitle": "Tu mercado local, ahora digital",

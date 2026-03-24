@@ -98,7 +98,11 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/coverage/**"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/coverage/"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {

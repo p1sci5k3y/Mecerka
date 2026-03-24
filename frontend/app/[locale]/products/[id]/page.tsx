@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "@/lib/navigation"
 import { useParams } from "next/navigation"
+import { useLocale } from "next-intl"
 import {
   ArrowLeft,
   MapPin,
@@ -21,10 +22,13 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import type { Product } from "@/lib/types"
+import { getPublicCopy } from "@/lib/public-copy"
 
 export default function ProductDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const locale = useLocale()
+  const copy = getPublicCopy(locale).productDetail
   const { addItem } = useCart()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -51,7 +55,7 @@ export default function ProductDetailPage() {
       return
     }
 
-    toast.success(`${product.name} (x${quantity}) añadido al carrito`)
+    toast.success(copy.addedToCart(product.name, quantity))
   }
 
   return (
@@ -65,7 +69,7 @@ export default function ProductDetailPage() {
             className="mb-6 flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Volver al catálogo
+            {copy.backToCatalog}
           </button>
 
           {loading ? (
@@ -75,7 +79,7 @@ export default function ProductDetailPage() {
           ) : !product ? (
             <div className="flex flex-col items-center justify-center py-20">
               <Package className="h-12 w-12 text-muted-foreground/50" />
-              <p className="mt-3 text-muted-foreground">Producto no encontrado</p>
+              <p className="mt-3 text-muted-foreground">{copy.notFound}</p>
             </div>
           ) : (
             <div className="grid gap-8 lg:grid-cols-2">
@@ -83,7 +87,7 @@ export default function ProductDetailPage() {
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="object-cover w-full h-full" />
                 ) : (
-                  <img src="/placeholder.svg" alt="Producto sin imagen" className="object-cover w-full h-full opacity-80" />
+                  <img src="/placeholder.svg" alt={copy.noImageAlt} className="object-cover w-full h-full opacity-80" />
                 )}
               </div>
 
@@ -123,14 +127,14 @@ export default function ProductDetailPage() {
 
                 <p className="mt-2 text-sm text-muted-foreground">
                   {product.stock > 0
-                    ? `${product.stock} unidades disponibles`
-                    : "Sin stock"}
+                    ? copy.unitsAvailable(product.stock)
+                    : copy.outOfStock}
                 </p>
 
                 {product.stock > 0 && (
                   <div className="mt-6 flex flex-col gap-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-foreground">Cantidad</span>
+                      <span className="text-sm font-medium text-foreground">{copy.quantity}</span>
                       <div className="flex items-center gap-1 rounded-lg border border-border">
                         <button
                           type="button"
@@ -156,22 +160,21 @@ export default function ProductDetailPage() {
 
                     <Button size="lg" className="gap-2" onClick={handleAddToCart}>
                       <ShoppingCart className="h-4 w-4" />
-                      Añadir al carrito
+                      {copy.addToCart}
                     </Button>
                   </div>
                 )}
 
                 {/* Mock recommendations */}
                 <div className="mt-10 rounded-xl border border-dashed border-border bg-secondary/50 p-5">
-                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Productos similares - Coming soon
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Recomendaciones basadas en categoría y ciudad (ML-ready).
-                    Integración de backend pendiente.
-                  </p>
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  {copy.recommendationsTitle}
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {copy.recommendationsBody}
+                </p>
+              </div>
               </div>
             </div>
           )}
