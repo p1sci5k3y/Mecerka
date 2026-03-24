@@ -160,6 +160,42 @@ jobs:
               fi
             }
 
+            show_port_owners() {
+              port="$1"
+              echo "[deploy] listeners on port ${port}"
+              sudo ss -ltnp "( sport = :${port} )" || true
+              echo "[deploy] docker publishers on port ${port}"
+              sudo docker ps --format '{{.ID}}\t{{.Names}}\t{{.Ports}}' | awk -F '\t' -v port="$port" 'index($3, ":" port "->") { print }' || true
+            }
+
+            free_host_port() {
+              port="$1"
+              docker_ids="$(sudo docker ps --format '{{.ID}}\t{{.Ports}}' | awk -F '\t' -v port="$port" 'index($2, ":" port "->") { print $1 }' | paste -sd ' ' -)"
+              host_pids=""
+
+              show_port_owners "$port"
+
+              if [ -n "$docker_ids" ]; then
+                echo "[deploy] removing docker containers on port ${port}: ${docker_ids}"
+                sudo docker rm -f $docker_ids
+              fi
+
+              host_pids="$(sudo lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null | paste -sd ' ' -)"
+              if [ -n "$host_pids" ]; then
+                echo "[deploy] stopping host listeners on port ${port}: ${host_pids}"
+                sudo kill $host_pids || true
+                sleep 2
+                host_pids="$(sudo lsof -tiTCP:${port} -sTCP:LISTEN 2>/dev/null | paste -sd ' ' -)"
+              fi
+
+              if [ -n "$host_pids" ]; then
+                echo "[deploy] force stopping host listeners on port ${port}: ${host_pids}"
+                sudo kill -9 $host_pids || true
+              fi
+
+              show_port_owners "$port"
+            }
+
             require_env DEPLOY_GIT_REF
             require_env GHCR_USERNAME
             require_env GHCR_TOKEN
@@ -200,6 +236,12 @@ jobs:
 
             echo "[deploy] resetting prod stack"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml down --remove-orphans || true
+
+            echo "[deploy] freeing bound host ports"
+            free_host_port "${PROD_BACKEND_HOST_PORT}"
+            free_host_port "${PROD_FRONTEND_HOST_PORT}"
+            free_host_port "${DEMO_BACKEND_HOST_PORT}"
+            free_host_port "${DEMO_FRONTEND_HOST_PORT}"
 
             echo "[deploy] pulling images"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml pull
