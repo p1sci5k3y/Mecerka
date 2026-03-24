@@ -9,6 +9,7 @@ backend/dist
 .vscode
 *.log
 coverage
+.claude/
 
 
 # Terraform
