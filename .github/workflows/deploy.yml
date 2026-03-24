@@ -76,6 +76,44 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Validate deploy secrets
+        run: |
+          set -eu
+          require_secret() {
+            name="$1"
+            value="$2"
+            if [ -z "$value" ]; then
+              echo "missing required deploy secret: ${name}" >&2
+              exit 1
+            fi
+          }
+
+          require_secret GHCR_TOKEN "${{ secrets.GHCR_TOKEN }}"
+          require_secret LETSENCRYPT_EMAIL "${{ secrets.LETSENCRYPT_EMAIL }}"
+          require_secret PROD_POSTGRES_PASSWORD "${{ secrets.PROD_POSTGRES_PASSWORD }}"
+          require_secret PROD_JWT_SECRET "${{ secrets.PROD_JWT_SECRET }}"
+          require_secret PROD_JWT_SECRET_CURRENT "${{ secrets.PROD_JWT_SECRET_CURRENT }}"
+          require_secret PROD_FISCAL_PEPPER "${{ secrets.PROD_FISCAL_PEPPER }}"
+          require_secret PROD_STRIPE_SECRET_KEY "${{ secrets.PROD_STRIPE_SECRET_KEY }}"
+          require_secret PROD_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_MAIL_HOST "${{ secrets.PROD_MAIL_HOST }}"
+          require_secret PROD_MAIL_PORT "${{ secrets.PROD_MAIL_PORT }}"
+          require_secret PROD_MAIL_FROM "${{ secrets.PROD_MAIL_FROM }}"
+          require_secret DEMO_POSTGRES_PASSWORD "${{ secrets.DEMO_POSTGRES_PASSWORD }}"
+          require_secret DEMO_JWT_SECRET "${{ secrets.DEMO_JWT_SECRET }}"
+          require_secret DEMO_JWT_SECRET_CURRENT "${{ secrets.DEMO_JWT_SECRET_CURRENT }}"
+          require_secret DEMO_FISCAL_PEPPER "${{ secrets.DEMO_FISCAL_PEPPER }}"
+          require_secret DEMO_STRIPE_SECRET_KEY "${{ secrets.DEMO_STRIPE_SECRET_KEY }}"
+          require_secret DEMO_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_MAIL_HOST "${{ secrets.DEMO_MAIL_HOST }}"
+          require_secret DEMO_MAIL_PORT "${{ secrets.DEMO_MAIL_PORT }}"
+          require_secret DEMO_MAIL_FROM "${{ secrets.DEMO_MAIL_FROM }}"
+          require_secret DEMO_DEMO_PASSWORD "${{ secrets.DEMO_DEMO_PASSWORD }}"
+
       - name: Get Public IP
         id: ip
         run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
@@ -125,12 +163,16 @@ jobs:
             require_env GHCR_TOKEN
             require_env LETSENCRYPT_EMAIL
 
+            echo "[deploy] env preflight ok"
+
             if [ ! -d "${APP_DIR}/.git" ]; then
+              echo "[deploy] cloning repository"
               sudo mkdir -p "${APP_DIR}"
               sudo chown -R "$USER:$USER" "${APP_DIR}"
               git clone "${REPO_URL}" "${APP_DIR}"
             fi
 
+            echo "[deploy] syncing git checkout"
             cd "${APP_DIR}"
             git fetch origin main --prune
             git reset --hard
@@ -140,22 +182,29 @@ jobs:
             mkdir -p "${APP_DIR}/deploy"
             chmod +x scripts/render-deploy-env.sh scripts/smoke-check-stack.sh scripts/ensure-certbot.sh scripts/ensure-dual-tls.sh scripts/smoke-check-public-urls.sh
 
+            echo "[deploy] logging into ghcr"
             printf '%s' "${GHCR_TOKEN}" | sudo docker login ghcr.io --username "${GHCR_USERNAME}" --password-stdin
 
+            echo "[deploy] rendering env files"
             ./scripts/render-deploy-env.sh PROD "${PROD_ENV_FILE}"
             ./scripts/render-deploy-env.sh DEMO "${DEMO_ENV_FILE}"
 
+            echo "[deploy] validating docker compose config"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml config >/dev/null
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml config >/dev/null
 
+            echo "[deploy] resetting demo stack"
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml down -v --remove-orphans || true
 
+            echo "[deploy] pulling images"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml pull
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml pull
 
+            echo "[deploy] starting stacks"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
+            echo "[deploy] ensuring certbot and dual tls"
             ./scripts/ensure-certbot.sh
 
             PRIMARY_DOMAIN="mecerka.me" \
@@ -164,16 +213,19 @@ jobs:
             LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL}" \
             ./scripts/ensure-dual-tls.sh
 
+            echo "[deploy] reloading nginx"
             sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
             sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
             sudo rm -f /etc/nginx/sites-enabled/default
             sudo nginx -t
             sudo systemctl reload nginx
 
+            echo "[deploy] running smoke checks"
             ./scripts/smoke-check-stack.sh "${PROD_ENV_FILE}"
             ./scripts/smoke-check-stack.sh "${DEMO_ENV_FILE}"
             PRIMARY_DOMAIN="mecerka.me" DEMO_DOMAIN="demo.mecerka.me" ./scripts/smoke-check-public-urls.sh
 
+            echo "[deploy] pruning dangling images"
             sudo docker image prune -f >/dev/null
         env:
           DEPLOY_GIT_REF: ${{ needs.build-images.outputs.git_ref }}
