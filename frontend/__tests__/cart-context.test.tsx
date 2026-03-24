@@ -197,6 +197,8 @@ describe("CartProvider", () => {
       expect(getMyCartMock).toHaveBeenCalled()
     })
 
-    expect(window.localStorage.getItem("mecerka-guest-cart-v1")).toBeNull()
+    await waitFor(() => {
+      expect(window.localStorage.getItem("mecerka-guest-cart-v1")).toBeNull()
+    })
   })
 })
