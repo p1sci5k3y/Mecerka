@@ -265,7 +265,13 @@ jobs:
             sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
             sudo rm -f /etc/nginx/sites-enabled/default
             sudo nginx -t
-            sudo systemctl reload nginx
+            sudo systemctl enable nginx >/dev/null 2>&1 || true
+            if sudo systemctl is-active --quiet nginx; then
+              sudo systemctl reload nginx
+            else
+              echo "[deploy] nginx inactive, starting service"
+              sudo systemctl restart nginx
+            fi
 
             echo "[deploy] running smoke checks"
             ./scripts/smoke-check-stack.sh "${PROD_ENV_FILE}"
