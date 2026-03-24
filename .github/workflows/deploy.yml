@@ -75,6 +75,7 @@ jobs:
     needs: build-images
     permissions:
       contents: read
+      packages: read
     steps:
       - name: Validate deploy secrets
         run: |
@@ -88,7 +89,6 @@ jobs:
             fi
           }
 
-          require_secret GHCR_TOKEN "${{ secrets.GHCR_TOKEN }}"
           require_secret LETSENCRYPT_EMAIL "${{ secrets.LETSENCRYPT_EMAIL }}"
           require_secret PROD_POSTGRES_PASSWORD "${{ secrets.PROD_POSTGRES_PASSWORD }}"
           require_secret PROD_JWT_SECRET "${{ secrets.PROD_JWT_SECRET }}"
@@ -119,6 +119,7 @@ jobs:
         run: echo "ipv4=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_OUTPUT
 
       - name: Configure AWS Credentials
+        id: awscreds
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -131,6 +132,7 @@ jobs:
             --group-id sg-0124b199fb9cb1b59 \
             --protocol tcp \
             --port 22 \
+            --region eu-west-1 \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
 
       - name: Deploy prod and demo from the same image tag
@@ -230,7 +232,7 @@ jobs:
         env:
           DEPLOY_GIT_REF: ${{ needs.build-images.outputs.git_ref }}
           GHCR_USERNAME: ${{ github.repository_owner }}
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || github.token }}
           LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
 
           PROD_POSTGRES_USER: ${{ vars.PROD_POSTGRES_USER || 'postgres' }}
@@ -290,10 +292,11 @@ jobs:
           DEMO_FRONTEND_HOST_PORT: "3011"
 
       - name: Revoke GitHub Runner IP
-        if: always()
+        if: ${{ always() && steps.ip.outputs.ipv4 != '' && steps.awscreds.outcome == 'success' }}
         run: |
           aws ec2 revoke-security-group-ingress \
             --group-id sg-0124b199fb9cb1b59 \
             --protocol tcp \
             --port 22 \
+            --region eu-west-1 \
             --cidr ${{ steps.ip.outputs.ipv4 }}/32
