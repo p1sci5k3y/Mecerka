@@ -37,14 +37,14 @@ check_head() {
   label="$1"
   url="$2"
   echo "[smoke] checking ${label}: ${url}" >&2
-  retry 12 5 curl_head_ok "$url"
+  retry 18 5 curl_head_ok "$url"
 }
 
 check_body() {
   label="$1"
   url="$2"
   echo "[smoke] checking ${label}: ${url}" >&2
-  retry 12 5 curl_body "$url"
+  retry 18 5 curl_body "$url"
 }
 
 check_head "prod-home" "https://${PRIMARY_DOMAIN}/"

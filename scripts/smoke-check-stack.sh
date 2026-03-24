@@ -53,8 +53,15 @@ http_head_ok() {
   curl -fsSI --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1" >/dev/null
 }
 
+http_body() {
+  curl -fsS --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1"
+}
+
 retry 10 3 http_ok "http://127.0.0.1:${BACKEND_HOST_PORT}/health"
 retry 10 3 http_head_ok "http://127.0.0.1:${FRONTEND_HOST_PORT}"
+
+runtime_config="$(retry 10 3 http_body "http://127.0.0.1:${FRONTEND_HOST_PORT}/runtime-config")"
+printf '%s' "$runtime_config" | grep '"apiBaseUrl":"\/api"' >/dev/null
 
 if [ "$DEMO_MODE" = "true" ]; then
   python3 - <<'PY' "http://127.0.0.1:${BACKEND_HOST_PORT}/products"
