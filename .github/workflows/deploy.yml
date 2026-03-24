@@ -90,29 +90,29 @@ jobs:
           }
 
           require_secret LETSENCRYPT_EMAIL "${{ secrets.LETSENCRYPT_EMAIL }}"
-          require_secret PROD_POSTGRES_PASSWORD "${{ secrets.PROD_POSTGRES_PASSWORD }}"
-          require_secret PROD_JWT_SECRET "${{ secrets.PROD_JWT_SECRET }}"
-          require_secret PROD_JWT_SECRET_CURRENT "${{ secrets.PROD_JWT_SECRET_CURRENT }}"
-          require_secret PROD_FISCAL_PEPPER "${{ secrets.PROD_FISCAL_PEPPER }}"
-          require_secret PROD_STRIPE_SECRET_KEY "${{ secrets.PROD_STRIPE_SECRET_KEY }}"
-          require_secret PROD_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}"
-          require_secret PROD_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET }}"
-          require_secret PROD_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET }}"
-          require_secret PROD_MAIL_HOST "${{ secrets.PROD_MAIL_HOST }}"
-          require_secret PROD_MAIL_PORT "${{ secrets.PROD_MAIL_PORT }}"
-          require_secret PROD_MAIL_FROM "${{ secrets.PROD_MAIL_FROM }}"
-          require_secret DEMO_POSTGRES_PASSWORD "${{ secrets.DEMO_POSTGRES_PASSWORD }}"
-          require_secret DEMO_JWT_SECRET "${{ secrets.DEMO_JWT_SECRET }}"
-          require_secret DEMO_JWT_SECRET_CURRENT "${{ secrets.DEMO_JWT_SECRET_CURRENT }}"
-          require_secret DEMO_FISCAL_PEPPER "${{ secrets.DEMO_FISCAL_PEPPER }}"
-          require_secret DEMO_STRIPE_SECRET_KEY "${{ secrets.DEMO_STRIPE_SECRET_KEY }}"
-          require_secret DEMO_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET }}"
-          require_secret DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET }}"
-          require_secret DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET }}"
-          require_secret DEMO_MAIL_HOST "${{ secrets.DEMO_MAIL_HOST }}"
-          require_secret DEMO_MAIL_PORT "${{ secrets.DEMO_MAIL_PORT }}"
-          require_secret DEMO_MAIL_FROM "${{ secrets.DEMO_MAIL_FROM }}"
-          require_secret DEMO_DEMO_PASSWORD "${{ secrets.DEMO_DEMO_PASSWORD }}"
+          require_secret PROD_POSTGRES_PASSWORD "${{ secrets.PROD_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}"
+          require_secret PROD_JWT_SECRET "${{ secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}"
+          require_secret PROD_JWT_SECRET_CURRENT "${{ secrets.PROD_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}"
+          require_secret PROD_FISCAL_PEPPER "${{ secrets.PROD_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}"
+          require_secret PROD_STRIPE_SECRET_KEY "${{ secrets.PROD_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}"
+          require_secret PROD_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET || secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET || secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}"
+          require_secret PROD_MAIL_HOST "${{ secrets.PROD_MAIL_HOST || secrets.MAIL_HOST }}"
+          require_secret PROD_MAIL_PORT "${{ secrets.PROD_MAIL_PORT || secrets.MAIL_PORT }}"
+          require_secret PROD_MAIL_FROM "${{ secrets.PROD_MAIL_FROM || secrets.MAIL_FROM }}"
+          require_secret DEMO_POSTGRES_PASSWORD "${{ secrets.DEMO_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}"
+          require_secret DEMO_JWT_SECRET "${{ secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}"
+          require_secret DEMO_JWT_SECRET_CURRENT "${{ secrets.DEMO_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}"
+          require_secret DEMO_FISCAL_PEPPER "${{ secrets.DEMO_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}"
+          require_secret DEMO_STRIPE_SECRET_KEY "${{ secrets.DEMO_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}"
+          require_secret DEMO_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET || secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET || secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}"
+          require_secret DEMO_MAIL_HOST "${{ secrets.DEMO_MAIL_HOST || secrets.MAIL_HOST }}"
+          require_secret DEMO_MAIL_PORT "${{ secrets.DEMO_MAIL_PORT || secrets.MAIL_PORT }}"
+          require_secret DEMO_MAIL_FROM "${{ secrets.DEMO_MAIL_FROM || secrets.MAIL_FROM }}"
+          require_secret DEMO_DEMO_PASSWORD "${{ secrets.DEMO_DEMO_PASSWORD || secrets.DEMO_PASSWORD }}"
 
       - name: Get Public IP
         id: ip
@@ -236,26 +236,26 @@ jobs:
           LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
 
           PROD_POSTGRES_USER: ${{ vars.PROD_POSTGRES_USER || 'postgres' }}
-          PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD }}
+          PROD_POSTGRES_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}
           PROD_POSTGRES_DB: ${{ vars.PROD_POSTGRES_DB || 'marketplace_prod' }}
-          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET }}
-          PROD_JWT_SECRET_CURRENT: ${{ secrets.PROD_JWT_SECRET_CURRENT }}
-          PROD_FISCAL_PEPPER: ${{ secrets.PROD_FISCAL_PEPPER }}
+          PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}
+          PROD_JWT_SECRET_CURRENT: ${{ secrets.PROD_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}
+          PROD_FISCAL_PEPPER: ${{ secrets.PROD_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}
           PROD_NEXT_PUBLIC_API_URL: ${{ vars.PROD_NEXT_PUBLIC_API_URL || 'https://mecerka.me/api' }}
-          PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           PROD_NEXT_PUBLIC_REQUIRE_MFA: ${{ vars.PROD_NEXT_PUBLIC_REQUIRE_MFA || 'false' }}
           PROD_CORS_ORIGIN: ${{ vars.PROD_CORS_ORIGIN || 'https://mecerka.me' }}
           PROD_FRONTEND_URL: ${{ vars.PROD_FRONTEND_URL || 'https://mecerka.me' }}
           PROD_BACKEND_URL: ${{ vars.PROD_BACKEND_URL || 'https://mecerka.me/api' }}
-          PROD_STRIPE_SECRET_KEY: ${{ secrets.PROD_STRIPE_SECRET_KEY }}
-          PROD_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_STRIPE_WEBHOOK_SECRET }}
-          PROD_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET }}
-          PROD_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET }}
-          PROD_MAIL_HOST: ${{ secrets.PROD_MAIL_HOST }}
-          PROD_MAIL_PORT: ${{ secrets.PROD_MAIL_PORT }}
-          PROD_MAIL_USER: ${{ secrets.PROD_MAIL_USER }}
-          PROD_MAIL_PASS: ${{ secrets.PROD_MAIL_PASS }}
-          PROD_MAIL_FROM: ${{ secrets.PROD_MAIL_FROM }}
+          PROD_STRIPE_SECRET_KEY: ${{ secrets.PROD_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}
+          PROD_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}
+          PROD_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DELIVERY_STRIPE_WEBHOOK_SECRET || secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}
+          PROD_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.PROD_DONATIONS_STRIPE_WEBHOOK_SECRET || secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}
+          PROD_MAIL_HOST: ${{ secrets.PROD_MAIL_HOST || secrets.MAIL_HOST }}
+          PROD_MAIL_PORT: ${{ secrets.PROD_MAIL_PORT || secrets.MAIL_PORT }}
+          PROD_MAIL_USER: ${{ secrets.PROD_MAIL_USER || secrets.MAIL_USER }}
+          PROD_MAIL_PASS: ${{ secrets.PROD_MAIL_PASS || secrets.MAIL_PASS }}
+          PROD_MAIL_FROM: ${{ secrets.PROD_MAIL_FROM || secrets.MAIL_FROM }}
           PROD_DEMO_MODE: "false"
           PROD_DEMO_PASSWORD: ""
           PROD_BACKEND_IMAGE: ${{ needs.build-images.outputs.backend_image }}
@@ -264,28 +264,28 @@ jobs:
           PROD_FRONTEND_HOST_PORT: "3001"
 
           DEMO_POSTGRES_USER: ${{ vars.DEMO_POSTGRES_USER || 'postgres' }}
-          DEMO_POSTGRES_PASSWORD: ${{ secrets.DEMO_POSTGRES_PASSWORD }}
+          DEMO_POSTGRES_PASSWORD: ${{ secrets.DEMO_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}
           DEMO_POSTGRES_DB: ${{ vars.DEMO_POSTGRES_DB || 'marketplace_demo' }}
-          DEMO_JWT_SECRET: ${{ secrets.DEMO_JWT_SECRET }}
-          DEMO_JWT_SECRET_CURRENT: ${{ secrets.DEMO_JWT_SECRET_CURRENT }}
-          DEMO_FISCAL_PEPPER: ${{ secrets.DEMO_FISCAL_PEPPER }}
+          DEMO_JWT_SECRET: ${{ secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}
+          DEMO_JWT_SECRET_CURRENT: ${{ secrets.DEMO_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}
+          DEMO_FISCAL_PEPPER: ${{ secrets.DEMO_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}
           DEMO_NEXT_PUBLIC_API_URL: ${{ vars.DEMO_NEXT_PUBLIC_API_URL || 'https://demo.mecerka.me/api' }}
-          DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+          DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
           DEMO_NEXT_PUBLIC_REQUIRE_MFA: ${{ vars.DEMO_NEXT_PUBLIC_REQUIRE_MFA || 'false' }}
           DEMO_CORS_ORIGIN: ${{ vars.DEMO_CORS_ORIGIN || 'https://demo.mecerka.me' }}
           DEMO_FRONTEND_URL: ${{ vars.DEMO_FRONTEND_URL || 'https://demo.mecerka.me' }}
           DEMO_BACKEND_URL: ${{ vars.DEMO_BACKEND_URL || 'https://demo.mecerka.me/api' }}
-          DEMO_STRIPE_SECRET_KEY: ${{ secrets.DEMO_STRIPE_SECRET_KEY }}
-          DEMO_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET }}
-          DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET }}
-          DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET }}
-          DEMO_MAIL_HOST: ${{ secrets.DEMO_MAIL_HOST }}
-          DEMO_MAIL_PORT: ${{ secrets.DEMO_MAIL_PORT }}
-          DEMO_MAIL_USER: ${{ secrets.DEMO_MAIL_USER }}
-          DEMO_MAIL_PASS: ${{ secrets.DEMO_MAIL_PASS }}
-          DEMO_MAIL_FROM: ${{ secrets.DEMO_MAIL_FROM }}
+          DEMO_STRIPE_SECRET_KEY: ${{ secrets.DEMO_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}
+          DEMO_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}
+          DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DELIVERY_STRIPE_WEBHOOK_SECRET || secrets.DELIVERY_STRIPE_WEBHOOK_SECRET }}
+          DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET: ${{ secrets.DEMO_DONATIONS_STRIPE_WEBHOOK_SECRET || secrets.DONATIONS_STRIPE_WEBHOOK_SECRET }}
+          DEMO_MAIL_HOST: ${{ secrets.DEMO_MAIL_HOST || secrets.MAIL_HOST }}
+          DEMO_MAIL_PORT: ${{ secrets.DEMO_MAIL_PORT || secrets.MAIL_PORT }}
+          DEMO_MAIL_USER: ${{ secrets.DEMO_MAIL_USER || secrets.MAIL_USER }}
+          DEMO_MAIL_PASS: ${{ secrets.DEMO_MAIL_PASS || secrets.MAIL_PASS }}
+          DEMO_MAIL_FROM: ${{ secrets.DEMO_MAIL_FROM || secrets.MAIL_FROM }}
           DEMO_DEMO_MODE: "true"
-          DEMO_DEMO_PASSWORD: ${{ secrets.DEMO_DEMO_PASSWORD }}
+          DEMO_DEMO_PASSWORD: ${{ secrets.DEMO_DEMO_PASSWORD || secrets.DEMO_PASSWORD }}
           DEMO_BACKEND_IMAGE: ${{ needs.build-images.outputs.backend_image }}
           DEMO_FRONTEND_IMAGE: ${{ needs.build-images.outputs.frontend_image }}
           DEMO_BACKEND_HOST_PORT: "3010"
