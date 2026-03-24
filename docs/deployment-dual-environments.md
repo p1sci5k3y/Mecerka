@@ -79,15 +79,14 @@ The workflow also needs:
 
 Each host proxies to its own frontend/backend localhost ports.
 
-TLS is managed during deploy with Certbot and the Nginx plugin:
+TLS is managed during deploy with Certbot:
 
-- the deploy ensures `certbot` and its Nginx plugin are present on the host;
-- it checks that `demo.mecerka.me` resolves publicly before attempting certificate changes;
-- it keeps the existing certificate named `mecerka.me` and expands it to cover:
-  - `mecerka.me`
-  - `www.mecerka.me`
-  - `demo.mecerka.me`
-- after certificate issuance or renewal, the workflow runs `nginx -t` and reloads Nginx safely.
+- the deploy ensures `certbot` and DNS tooling are present on the host;
+- it checks that `mecerka.me`, `www.mecerka.me` and `demo.mecerka.me` resolve publicly to the same host before attempting certificate changes;
+- it issues or renews two certificates with Certbot standalone mode:
+  - `mecerka.me` covering `mecerka.me` and `www.mecerka.me`
+  - `demo.mecerka.me` covering `demo.mecerka.me`
+- after certificate issuance or renewal, the workflow installs the final Nginx config, runs `nginx -t` and reloads Nginx safely.
 
 ## Demo reset policy
 
@@ -102,3 +101,4 @@ The repository leaves these points prepared but cannot provision them by itself:
 - DNS records for `mecerka.me`, `www.mecerka.me` and `demo.mecerka.me`
 - GitHub secrets and variables with real environment values
 - GHCR credentials with permission to pull images on the server
+- optional `GHCR_USERNAME` secret if the pull token belongs to a different GitHub account than the repository owner

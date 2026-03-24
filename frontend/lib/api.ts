@@ -1,5 +1,15 @@
 import { getApiBaseUrl } from "@/lib/runtime-config"
 
+class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly statusCode: number,
+  ) {
+    super(message)
+    this.name = "ApiError"
+  }
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -17,10 +27,7 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
-    const error = new Error(body.message || "Ha ocurrido un error")
-    // @ts-ignore
-    error.statusCode = res.status
-    throw error
+    throw new ApiError(body.message || "Ha ocurrido un error", res.status)
   }
 
   if (res.status === 204) return {} as T

@@ -111,6 +111,20 @@ jobs:
             PROD_ENV_FILE="${APP_DIR}/deploy/prod.env"
             DEMO_ENV_FILE="${APP_DIR}/deploy/demo.env"
 
+            require_env() {
+              name="$1"
+              value="$(printenv "$name" || true)"
+              if [ -z "$value" ]; then
+                echo "missing required deploy env: ${name}" >&2
+                exit 1
+              fi
+            }
+
+            require_env DEPLOY_GIT_REF
+            require_env GHCR_USERNAME
+            require_env GHCR_TOKEN
+            require_env LETSENCRYPT_EMAIL
+
             if [ ! -d "${APP_DIR}/.git" ]; then
               sudo mkdir -p "${APP_DIR}"
               sudo chown -R "$USER:$USER" "${APP_DIR}"
@@ -119,12 +133,14 @@ jobs:
 
             cd "${APP_DIR}"
             git fetch origin main --prune
-            git checkout --detach "${DEPLOY_GIT_REF}"
+            git reset --hard
+            git clean -fdx -e deploy/
+            git checkout --force --detach "${DEPLOY_GIT_REF}"
 
             mkdir -p "${APP_DIR}/deploy"
             chmod +x scripts/render-deploy-env.sh scripts/smoke-check-stack.sh scripts/ensure-certbot.sh scripts/ensure-dual-tls.sh scripts/smoke-check-public-urls.sh
 
-            echo "${GHCR_TOKEN}" | sudo docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+            printf '%s' "${GHCR_TOKEN}" | sudo docker login ghcr.io --username "${GHCR_USERNAME}" --password-stdin
 
             ./scripts/render-deploy-env.sh PROD "${PROD_ENV_FILE}"
             ./scripts/render-deploy-env.sh DEMO "${DEMO_ENV_FILE}"
@@ -140,12 +156,7 @@ jobs:
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
-            sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
-            sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
-            sudo rm -f /etc/nginx/sites-enabled/default
             ./scripts/ensure-certbot.sh
-            sudo nginx -t
-            sudo systemctl reload nginx
 
             PRIMARY_DOMAIN="mecerka.me" \
             WWW_DOMAIN="www.mecerka.me" \
@@ -153,6 +164,9 @@ jobs:
             LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL}" \
             ./scripts/ensure-dual-tls.sh
 
+            sudo cp infrastructure/nginx.conf /etc/nginx/sites-available/mecerka
+            sudo ln -sf /etc/nginx/sites-available/mecerka /etc/nginx/sites-enabled/mecerka
+            sudo rm -f /etc/nginx/sites-enabled/default
             sudo nginx -t
             sudo systemctl reload nginx
 

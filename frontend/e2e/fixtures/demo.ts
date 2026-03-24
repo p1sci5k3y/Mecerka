@@ -1,4 +1,9 @@
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import {
+  expect,
+  type APIRequestContext,
+  type APIResponse,
+  type Page,
+} from '@playwright/test';
 import {
   accounts,
   BOOTSTRAP_ADMIN_EMAIL,
@@ -19,6 +24,25 @@ type LoginAccount = {
   label?: string;
 };
 
+type DemoProduct = {
+  id: string;
+  name: string;
+  providerId: string;
+};
+
+type DemoOrder = {
+  id: string;
+  deliveryFee?: number | string | null;
+};
+
+type RunnerProfile = {
+  userId: string;
+};
+
+type DeliveryOrderResponse = {
+  id: string;
+};
+
 function getExpectedLandingPath(account: LoginAccount) {
   switch (account.label) {
     case 'ADMIN':
@@ -32,9 +56,9 @@ function getExpectedLandingPath(account: LoginAccount) {
   }
 }
 
-async function parseJson(response: any) {
+async function parseJson<T>(response: APIResponse): Promise<T> {
   const text = await response.text();
-  return text ? JSON.parse(text) : {};
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 export async function apiLogin(
@@ -49,7 +73,7 @@ export async function apiLogin(
   });
 
   expect(response.ok()).toBeTruthy();
-  const body = await parseJson(response);
+  const body = await parseJson<{ access_token: string }>(response);
   return body.access_token as string;
 }
 
@@ -143,17 +167,20 @@ export async function apiPatchJson<T>(
 }
 
 export async function getDemoProducts(request: APIRequestContext) {
-  const products = await apiGetJson<any[]>(request, '/products');
+  const products = await apiGetJson<DemoProduct[]>(request, '/products');
   return products;
 }
 
 export async function findProductByName(
   request: APIRequestContext,
   productName: string,
-) {
+): Promise<DemoProduct> {
   const products = await getDemoProducts(request);
   const product = products.find((item) => item.name === productName);
   expect(product).toBeTruthy();
+  if (!product) {
+    throw new Error(`Demo product not found: ${productName}`);
+  }
   return product;
 }
 
@@ -165,7 +192,7 @@ export async function createPendingOrderForUser(
 ) {
   const authToken = token ?? (await apiLogin(request, account));
   const product = await findProductByName(request, productName);
-  const order = await apiPostJson<any>(
+  const order = await apiPostJson<DemoOrder>(
     request,
     '/orders',
     {
@@ -198,13 +225,13 @@ export async function createAssignedDeliveryForRunner(
   );
   const activeRunnerToken =
     runnerTokenOverride ?? (await apiLogin(request, runnerAccount));
-  const runnerProfile = await apiGetJson<any>(
+  const runnerProfile = await apiGetJson<RunnerProfile>(
     request,
     '/auth/me',
     activeRunnerToken,
   );
 
-  const deliveryOrder = await apiPostJson<any>(
+  const deliveryOrder = await apiPostJson<DeliveryOrderResponse>(
     request,
     '/delivery/orders',
     {
@@ -215,7 +242,7 @@ export async function createAssignedDeliveryForRunner(
     clientToken,
   );
 
-  const assigned = await apiPostJson<any>(
+  const assigned = await apiPostJson<DeliveryOrderResponse>(
     request,
     `/delivery/orders/${deliveryOrder.id}/assign-runner`,
     {
@@ -238,7 +265,11 @@ export async function getKnownOrderIdForAdmin(
   userToken?: string,
 ) {
   const activeUserToken = userToken ?? (await apiLogin(request, accounts.user));
-  const orders = await apiGetJson<any[]>(request, '/orders', activeUserToken);
+  const orders = await apiGetJson<Array<{ id: string }>>(
+    request,
+    '/orders',
+    activeUserToken,
+  );
   expect(orders.length).toBeGreaterThan(0);
   return orders[0].id as string;
 }

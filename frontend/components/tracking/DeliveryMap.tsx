@@ -73,7 +73,6 @@ export interface DeliveryMapProps {
 }
 
 export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng = -3.7038, isRunner }: DeliveryMapProps) {
-    const [mounted, setMounted] = useState(false);
     const [position, setPosition] = useState<{ lat: number; lng: number }>({ lat: initialLat, lng: initialLng });
     const [origin, setOrigin] = useState<{ lat: number; lng: number, label: string } | null>(null);
     const [destination, setDestination] = useState<{ lat: number; lng: number, label: string } | null>(null);
@@ -87,7 +86,6 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
 
     // Initial Load & Socket Setup
     useEffect(() => {
-        setMounted(true);
         let isSubscribed = true;
 
         const initMapData = async () => {
@@ -109,11 +107,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                 if (isSubscribed) {
                     setOrigin({ ...originCoords, label: `Origen (Taller de ${order.items[0]?.product?.providerId})` });
                     setDestination({ ...destCoords, label: `Destino (${destAddress})` });
-
-                    // Center map initially around origin if no runner position
-                    if (routeHistory.length === 0) {
-                        setPosition(originCoords);
-                    }
+                    setPosition(originCoords);
                 }
 
             } catch (err) {
@@ -155,8 +149,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                 navigator.geolocation.clearWatch(watchIdRef.current);
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orderId]);
+    }, [initialLat, initialLng, orderId]);
 
     const toggleTracking = () => {
         if (isTracking) {
@@ -192,8 +185,6 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
             setIsTracking(true);
         }
     };
-
-    if (!mounted) return null;
 
     if (destination) {
         // We might want to connect runner to dest visually to show remaining path
