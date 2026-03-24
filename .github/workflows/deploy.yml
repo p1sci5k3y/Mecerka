@@ -198,6 +198,9 @@ jobs:
             echo "[deploy] resetting demo stack"
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml down -v --remove-orphans || true
 
+            echo "[deploy] resetting prod stack"
+            sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml down --remove-orphans || true
+
             echo "[deploy] pulling images"
             sudo docker compose --project-name mecerka-prod --env-file "${PROD_ENV_FILE}" -f docker-compose.prod.yml pull
             sudo docker compose --project-name mecerka-demo --env-file "${DEMO_ENV_FILE}" -f docker-compose.prod.yml pull
