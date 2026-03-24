@@ -67,8 +67,13 @@ jobs:
         run: npx prisma db push --accept-data-loss
         env:
           DEBUG: "prisma*"
-      - name: Run backend tests
-        run: npm test -- --runInBand
+      - name: Run backend coverage
+        run: npm run test:cov -- --runInBand
+      - name: Upload backend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage
       - run: npm audit --audit-level=high
         continue-on-error: true
 
@@ -123,7 +128,7 @@ jobs:
       
       - name: Test Frontend
         run: cd frontend && npm run test
-      - run: npm audit --audit-level=high
+      - run: cd frontend && npm audit --audit-level=high
         continue-on-error: true
 
   security-scans:
