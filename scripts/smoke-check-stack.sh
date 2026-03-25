@@ -61,7 +61,21 @@ retry 10 3 http_ok "http://127.0.0.1:${BACKEND_HOST_PORT}/health"
 retry 10 3 http_head_ok "http://127.0.0.1:${FRONTEND_HOST_PORT}"
 
 runtime_config="$(retry 10 3 http_body "http://127.0.0.1:${FRONTEND_HOST_PORT}/runtime-config")"
-printf '%s' "$runtime_config" | grep '"apiBaseUrl":"\/api"' >/dev/null
+printf '%s' "$runtime_config" | python3 -c '
+import json
+import sys
+
+payload = sys.stdin.read()
+
+try:
+    data = json.loads(payload)
+except Exception as exc:
+    raise SystemExit(f"invalid runtime-config payload: {exc}; body={payload!r}")
+
+api_base_url = data.get("apiBaseUrl")
+if api_base_url != "/api":
+    raise SystemExit(f"unexpected runtime-config apiBaseUrl: {api_base_url!r}; body={payload!r}")
+'
 
 if [ "$DEMO_MODE" = "true" ]; then
   python3 - <<'PY' "http://127.0.0.1:${BACKEND_HOST_PORT}/products"

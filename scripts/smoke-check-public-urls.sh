@@ -54,8 +54,30 @@ check_head "demo-home-es" "https://${DEMO_DOMAIN}/es"
 prod_runtime="$(check_body "prod-runtime-config" "https://${PRIMARY_DOMAIN}/runtime-config")"
 demo_runtime="$(check_body "demo-runtime-config" "https://${DEMO_DOMAIN}/runtime-config")"
 
-printf '%s' "$prod_runtime" | grep '"apiBaseUrl":"\/api"' >/dev/null
-printf '%s' "$demo_runtime" | grep '"apiBaseUrl":"\/api"' >/dev/null
+assert_runtime_config() {
+  label="$1"
+  payload="$2"
+
+  printf '%s' "$payload" | python3 -c '
+import json
+import sys
+
+label = sys.argv[1]
+payload = sys.stdin.read()
+
+try:
+    data = json.loads(payload)
+except Exception as exc:
+    raise SystemExit(f"{label}: invalid runtime-config payload: {exc}; body={payload!r}")
+
+api_base_url = data.get("apiBaseUrl")
+if api_base_url != "/api":
+    raise SystemExit(f"{label}: unexpected runtime-config apiBaseUrl: {api_base_url!r}; body={payload!r}")
+' "$label"
+}
+
+assert_runtime_config "prod-runtime-config" "$prod_runtime"
+assert_runtime_config "demo-runtime-config" "$demo_runtime"
 
 check_head "prod-privacy" "https://${PRIMARY_DOMAIN}/es/privacy"
 check_head "prod-faq" "https://${PRIMARY_DOMAIN}/es/faq"
