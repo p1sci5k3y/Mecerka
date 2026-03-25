@@ -103,7 +103,7 @@ function ProviderKanbanContent() {
     let revToday = 0
     let prepToday = 0
 
-    const todayStr = new Date().toISOString().split('T')[0]
+    const todayStr = now.toISOString().split('T')[0]
 
     orders.forEach(o => {
       const po = o.providerOrders?.find(p => p.providerId === String(user.userId))
@@ -122,7 +122,7 @@ function ProviderKanbanContent() {
     })
 
     return { today: totalToday, revenue: revToday, prep: prepToday }
-  }, [orders, user])
+  }, [now, orders, user])
 
   if (loading) {
     return (
