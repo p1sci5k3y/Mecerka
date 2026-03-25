@@ -54,7 +54,7 @@ http_head_ok() {
 }
 
 http_body() {
-  curl -fsS --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1"
+  curl -fsSL --http1.1 --retry 2 --retry-delay 1 --retry-all-errors "$1"
 }
 
 retry 10 3 http_ok "http://127.0.0.1:${BACKEND_HOST_PORT}/health"

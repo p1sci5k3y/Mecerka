@@ -30,7 +30,7 @@ curl_head_ok() {
 }
 
 curl_body() {
-  curl -fsS --http1.1 --retry 2 --retry-delay 1 --retry-all-errors --max-time 20 "$1"
+  curl -fsSL --http1.1 --retry 2 --retry-delay 1 --retry-all-errors --max-time 20 "$1"
 }
 
 check_head() {
