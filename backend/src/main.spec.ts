@@ -19,6 +19,32 @@ const createMockApp = () => {
   };
 };
 
+function expectCorsConfig(value: unknown): {
+  origin: (origin: string | undefined, cb: jest.Mock) => void;
+} {
+  expect(value).toBeDefined();
+  expect(value).toEqual(
+    expect.objectContaining({
+      origin: expect.any(Function),
+    }),
+  );
+
+  return value as {
+    origin: (origin: string | undefined, cb: jest.Mock) => void;
+  };
+}
+
+function expectMiddleware(
+  value: unknown,
+): (req: unknown, res: { setHeader: jest.Mock }, next: jest.Mock) => void {
+  expect(value).toEqual(expect.any(Function));
+  return value as (
+    req: unknown,
+    res: { setHeader: jest.Mock },
+    next: jest.Mock,
+  ) => void;
+}
+
 describe('main bootstrap', () => {
   const env = process.env;
 
@@ -76,7 +102,7 @@ describe('main bootstrap', () => {
     expect(helmetCsp).toHaveBeenCalled();
     expect(mockApp.listen).toHaveBeenCalledWith(3000);
 
-    const corsConfig = mockApp.enableCors.mock.calls[0]?.[0];
+    const corsConfig = expectCorsConfig(mockApp.enableCors.mock.calls[0]?.[0]);
     const allow = jest.fn();
     const deny = jest.fn();
     corsConfig.origin(undefined, allow);
@@ -90,7 +116,9 @@ describe('main bootstrap', () => {
       false,
     );
 
-    const permissionsMiddleware = mockApp.use.mock.calls[3]?.[0];
+    const permissionsMiddleware = expectMiddleware(
+      mockApp.use.mock.calls[3]?.[0],
+    );
     const res = { setHeader: jest.fn() };
     const next = jest.fn();
     permissionsMiddleware({}, res, next);
@@ -138,7 +166,7 @@ describe('main bootstrap', () => {
 
     expect(mockApp.listen).toHaveBeenCalledWith('4010');
 
-    const corsConfig = mockApp.enableCors.mock.calls[0]?.[0];
+    const corsConfig = expectCorsConfig(mockApp.enableCors.mock.calls[0]?.[0]);
     const allow = jest.fn();
     corsConfig.origin('https://mecerka.example', allow);
     expect(allow).toHaveBeenCalledWith(null, true);
