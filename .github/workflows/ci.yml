@@ -54,9 +54,9 @@ jobs:
           timeout 30s bash -c "until nc -z 127.0.0.1 5432; do sleep 1; done"
           echo "PostgreSQL is up!"
       - name: Validate Prisma schema
-        run: npx prisma validate
+        run: npm exec -- prisma validate
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: npm exec -- prisma generate
       - name: Type-check backend
         run: npm run type-check
       - name: Lint backend
@@ -64,7 +64,7 @@ jobs:
       - name: Build backend
         run: npm run build
       - name: Sync Database Schema
-        run: npx prisma db push --accept-data-loss
+        run: npm exec -- prisma db push --accept-data-loss
         env:
           DEBUG: "prisma*"
       - name: Run backend coverage
