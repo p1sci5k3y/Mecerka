@@ -6,8 +6,11 @@
 - Credenciales demo:
 ****    admin.demo@local.test / DemoPass123! ****
 ****    provider.demo@local.test / DemoPass123! ****
+****    provider2.demo@local.test / DemoPass123! ****
 ****    runner.demo@local.test / DemoPass123! ****
+****    runner2.demo@local.test / DemoPass123! ****
 ****    user.demo@local.test / DemoPass123! ****
+****    user2.demo@local.test / DemoPass123! ****
 - Slides: [Pendiente: URL de trabajo o edición de las slides]
 
 
@@ -64,7 +67,7 @@ flowchart LR
 | Persistencia | PostgreSQL 15 + Prisma ORM | [`backend/prisma/schema.prisma`](backend/prisma/schema.prisma), [`docker-compose.yml`](docker-compose.yml) |
 | Infraestructura local | Docker Compose, Dockerfiles separados para frontend y backend, Mailpit | [`docker-compose.yml`](docker-compose.yml), [`frontend/Dockerfile`](frontend/Dockerfile) |
 | Testing backend | Jest, Supertest, Testcontainers, Prisma migrations en entorno efímero | [`backend/package.json`](backend/package.json), [`docs/testing.md`](docs/testing.md) |
-| Testing frontend | Playwright | [`frontend/package.json`](frontend/package.json), [`frontend/e2e`](frontend/e2e) |
+| Testing frontend | Vitest, Testing Library, coverage V8, Playwright | [`frontend/package.json`](frontend/package.json), [`frontend/__tests__`](frontend/__tests__), [`frontend/e2e`](frontend/e2e) |
 | Calidad y automatización | ESLint, Prettier, Husky, lint-staged | [`package.json`](package.json), [`backend/.prettierrc`](backend/.prettierrc), [`.husky`](.husky) |
 | CI/CD y seguridad | GitHub Actions, CodeQL, Trivy, Gitleaks, OWASP Dependency Check, despliegue automatizado a AWS EC2 | [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`.github/workflows/codeql.yml`](.github/workflows/codeql.yml), [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) |
 
@@ -225,6 +228,8 @@ En frontend:
 cd frontend
 npm run lint
 npm run type-check
+npm run test
+npm run test:cov
 npm run build
 npm run test:e2e
 npm run test:e2e:full
@@ -232,9 +237,27 @@ npm run test:e2e:full
 
 Observaciones fieles al estado actual del repositorio:
 
-- la validación automatizada fuerte está concentrada en backend;
-- existen pruebas E2E Playwright en frontend, pero el script `npm run test` del frontend no ejecuta pruebas unitarias;
+- la validación automatizada fuerte sigue concentrada en backend;
+- el frontend ya cuenta con suite unitaria en Vitest y cobertura real en [`frontend/coverage`](frontend/coverage);
 - la suite backend usa Testcontainers y PostgreSQL efímero, tal como documenta [`docs/testing.md`](docs/testing.md).
+
+## Estado Verificable Actual
+
+Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha **27 de marzo de 2026**:
+
+| Área | Resultado actual | Evidencia |
+| --- | --- | --- |
+| Frontend unitario | `37 files`, `132 tests`, OK | `cd frontend && npm run test:cov` |
+| Frontend coverage | `37.98%` lines, `37.99%` statements, `44.32%` branches, `39.71%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
+| Backend unit/integration | `112 suites`, `1206 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
+| Backend coverage | `92.03%` lines, `91.68%` statements, `84.64%` branches, `90.69%` functions | [`backend/coverage/coverage-summary.json`](backend/coverage/coverage-summary.json) |
+| Demo pública | `runtime-config` correcto, login demo operativo y Stripe dummy activo | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
+
+Lectura honesta:
+
+- el backend está muy por encima del umbral global del proyecto;
+- el frontend ya tiene una base razonable de cobertura en flujos críticos, pero sigue acumulando deuda en `login`, `register`, `reset-password`, `admin/*` y gran parte de `components/ui`;
+- la demo pública ya usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend.
 
 ## Estructuración
 
@@ -288,12 +311,13 @@ TFM/
 │   │       ├── register/
 │   │       ├── runner/
 │   │       └── verify/
+│   ├── __tests__/
 │   ├── components/
 │   ├── contexts/
+│   ├── coverage/
 │   ├── e2e/
 │   ├── lib/
-│   ├── messages/
-│   └── tests/
+│   └── messages/
 ├── docs/
 ├── doc/adr/
 ├── infrastructure/
@@ -343,7 +367,9 @@ El frontend usa App Router de Next.js y está organizado alrededor de rutas loca
 - [`contexts`](frontend/contexts): estado compartido de autenticación y carrito;
 - [`lib`](frontend/lib): adaptadores HTTP, tipos y servicios cliente;
 - [`messages`](frontend/messages): internacionalización;
-- [`e2e`](frontend/e2e) y [`tests`](frontend/tests): automatización de navegador y tests asociados.
+- [`__tests__`](frontend/__tests__): tests unitarios y de experiencia con Vitest;
+- [`e2e`](frontend/e2e): automatización browser con Playwright;
+- [`coverage`](frontend/coverage): artefactos de cobertura HTML y resumen JSON.
 
 El frontend actual está alineado con los contratos oficiales del backend en puntos clave del MVP:
 
@@ -426,6 +452,9 @@ La estructura actual permite afirmar, sin exagerar, varias buenas prácticas obs
 - pedido raíz con varios `ProviderOrder[]` dentro de una misma ciudad;
 - resumen de pagos por comercio tras el checkout;
 - visualización separada del pago del runner;
+- centro de `Mis pedidos` con separación entre pedidos pendientes e histórico;
+- seguimiento accesible desde dashboard, listado de pedidos y pantalla de pagos;
+- centro de `Pagos y tarjetas` en perfil para aclarar el flujo actual y localizar pedidos con cobro pendiente;
 - configuración de PIN transaccional;
 - solicitud de rol `PROVIDER` o `RUNNER` desde perfil, con validación fiscal y MFA.
 
@@ -436,6 +465,7 @@ La estructura actual permite afirmar, sin exagerar, varias buenas prácticas obs
 - páginas específicas de gestión de catálogo en frontend;
 - importación y exportación de catálogo CSV en backend;
 - vista operativa de ventas;
+- centro de `Cobros y devoluciones` con visibilidad de Stripe Connect, cobros y refunds ligados a `ProviderOrder`;
 - asignación de descuentos proveedor→cliente a nivel de producto:
   - activables/desactivables,
   - acotados a un cliente concreto,
@@ -449,6 +479,7 @@ La estructura actual permite afirmar, sin exagerar, varias buenas prácticas obs
 - cambio de estado del reparto (`pickup`, `in transit`, `delivered`);
 - actualización de ubicación;
 - tracking del pedido y del reparto;
+- centro financiero para runner con cobros confirmados y cobros pendientes;
 - pago del runner modelado como flujo separado.
 
 #### Flujo de administración
@@ -466,6 +497,7 @@ La estructura actual permite afirmar, sin exagerar, varias buenas prácticas obs
 - endpoint agregado de pagos del pedido raíz;
 - sesión de pago por proveedor;
 - bloque separado de pago del runner;
+- modo demo de pago fake para comercio y runner cuando la demo publica Stripe dummy;
 - descuentos de proveedor a cliente integrados en:
   - carrito backend,
   - checkout oficial,
@@ -476,7 +508,9 @@ La estructura actual permite afirmar, sin exagerar, varias buenas prácticas obs
 
 - **Escaparate público por proveedor**: existe ruta en frontend, pero actualmente se presenta como no disponible y no forma parte del flujo oficial público.
 - **Descuentos**: el MVP real soporta descuentos proveedor→cliente por producto. No existe un sistema completo de promociones globales, cupones de plataforma o campañas transversales.
-- **Frontend E2E**: el repositorio contiene pruebas Playwright y fixtures reales, pero la fortaleza principal de validación automatizada está hoy en backend. La cobertura browser depende del entorno de demo y del stack operativo.
+- **Wallet del cliente**: existe pantalla de `Pagos y tarjetas`, pero hoy no hay almacenamiento persistente de tarjetas en perfil; el método de pago sigue introduciéndose por pedido.
+- **Refunds visibles en frontend**: provider ya puede ver devoluciones relacionadas con sus pedidos, pero la ejecución y decisión económica siguen descansando en backoffice/admin.
+- **Frontend E2E**: el repositorio contiene pruebas Playwright y Vitest, pero la fortaleza principal de validación automatizada sigue hoy en backend. La cobertura browser depende del entorno de demo y del stack operativo.
 - **Flujos backend no centrales al MVP visible**: `support`, `refunds`, `risk` y parte de `observability` están implementados en backend, pero no todos cuentan con la misma profundidad de superficie operativa en frontend.
 
 ### Funcionalidades legacy o no oficiales
