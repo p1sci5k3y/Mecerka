@@ -5,6 +5,7 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as argon2 from 'argon2';
 import { AdminService } from '../admin/admin.service';
 import { AuthService } from '../auth/auth.service';
 import { CartService } from '../cart/cart.service';
@@ -27,6 +28,7 @@ import { DemoDatasetService } from './demo-dataset.service';
 import { DemoCatalogService } from './demo-catalog.service';
 import {
   DEMO_EMAIL_DOMAIN,
+  DEMO_SHARED_PASSWORD,
   DEMO_USERS,
   type DemoDatasetStatus,
 } from './demo.seed-data';
@@ -87,6 +89,13 @@ export class DemoService implements OnApplicationBootstrap {
       const admin = await this.ensureDemoAdmin();
 
       if (this.isDemoDatasetComplete(status)) {
+        if (await this.areDemoCredentialsCurrent()) {
+          return;
+        }
+
+        await this.cleanupDemoData(admin.id);
+        await this.seedDemoData(admin.id);
+        this.logger.log(`demo.autoseed.credentials_reset actor=${admin.id}`);
         return;
       }
 
@@ -183,6 +192,41 @@ export class DemoService implements OnApplicationBootstrap {
 
   private getDemoPassword() {
     return this.demoUserBootstrapService.getDemoPassword();
+  }
+
+  private async areDemoCredentialsCurrent() {
+    const demoUsers = await this.prisma.user.findMany({
+      where: {
+        email: {
+          in: DEMO_USERS.map((user) => user.email),
+        },
+      },
+      select: {
+        email: true,
+        password: true,
+        emailVerified: true,
+      },
+    });
+
+    if (demoUsers.length !== DEMO_USERS.length) {
+      return false;
+    }
+
+    for (const user of demoUsers) {
+      if (!user.emailVerified) {
+        return false;
+      }
+
+      const passwordMatches = await argon2.verify(
+        user.password,
+        DEMO_SHARED_PASSWORD,
+      );
+      if (!passwordMatches) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private async registerAndVerifyUser(seed: DemoUserSeed) {

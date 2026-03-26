@@ -8,6 +8,7 @@ import { Role } from '@prisma/client';
 import { AdminService } from '../admin/admin.service';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEMO_SHARED_PASSWORD } from './demo.seed-data';
 
 export type DemoUserSeed = {
   email: string;
@@ -58,17 +59,7 @@ export class DemoUserBootstrapService {
   }
 
   getDemoPassword() {
-    const configuredPassword = this.configService
-      .get<string>('DEMO_PASSWORD')
-      ?.trim();
-
-    if (configuredPassword) {
-      return configuredPassword;
-    }
-
-    throw new ConflictException(
-      'DEMO_PASSWORD must be set when DEMO_MODE is enabled',
-    );
+    return DEMO_SHARED_PASSWORD;
   }
 
   async registerAndVerifyUser(seed: DemoUserSeed) {

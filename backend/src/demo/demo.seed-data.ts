@@ -18,6 +18,7 @@ export type DemoDatasetStatus = {
 };
 
 export const DEMO_EMAIL_DOMAIN = '@local.test';
+export const DEMO_SHARED_PASSWORD = 'DemoPass123!';
 
 export const DEMO_CITY = {
   name: 'Toledo',

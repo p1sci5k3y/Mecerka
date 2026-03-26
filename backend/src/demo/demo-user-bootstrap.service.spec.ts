@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Role } from '@prisma/client';
@@ -74,20 +74,13 @@ describe('DemoUserBootstrapService', () => {
     expect(authService.register).not.toHaveBeenCalled();
   });
 
-  it('throws when demo password is missing', () => {
+  it('returns the fixed shared demo password', () => {
     configService.get.mockReturnValue(undefined);
 
-    expect(() => service.getDemoPassword()).toThrow(ConflictException);
+    expect(service.getDemoPassword()).toBe('DemoPass123!');
   });
 
   it('registers and verifies a demo user', async () => {
-    configService.get.mockImplementation((key: string) => {
-      if (key === 'DEMO_PASSWORD') {
-        return 'DemoPass123!';
-      }
-
-      return undefined;
-    });
     prismaMock.user.findUnique
       .mockResolvedValueOnce({
         id: 'user-1',

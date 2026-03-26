@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DemoService } from './demo.service';
@@ -16,7 +16,7 @@ describe('DemoService', () => {
   let service: DemoService;
   let configService: { get: jest.Mock };
   let prismaMock: {
-    user: { count: jest.Mock; findUnique: jest.Mock };
+    user: { count: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock };
     product: { count: jest.Mock };
     order: { count: jest.Mock };
     deliveryOrder: { count: jest.Mock };
@@ -34,6 +34,7 @@ describe('DemoService', () => {
       user: {
         count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       product: {
         count: jest.fn().mockResolvedValue(0),
@@ -153,6 +154,9 @@ describe('DemoService', () => {
     prismaMock.order.count.mockResolvedValue(5);
     prismaMock.deliveryOrder.count.mockResolvedValue(3);
     prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+    jest
+      .spyOn<any, any>(service as any, 'areDemoCredentialsCurrent')
+      .mockResolvedValue(true);
 
     const cleanupSpy = jest
       .spyOn<any, any>(service as any, 'cleanupDemoData')
@@ -165,6 +169,33 @@ describe('DemoService', () => {
 
     expect(cleanupSpy).not.toHaveBeenCalled();
     expect(seedSpy).not.toHaveBeenCalled();
+  });
+
+  it('reseeds on bootstrap when dataset is complete but demo credentials are stale', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.user.count.mockResolvedValue(10);
+    prismaMock.product.count.mockResolvedValue(10);
+    prismaMock.order.count.mockResolvedValue(5);
+    prismaMock.deliveryOrder.count.mockResolvedValue(3);
+    prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
+    jest
+      .spyOn<any, any>(service as any, 'areDemoCredentialsCurrent')
+      .mockResolvedValue(false);
+
+    const cleanupSpy = jest
+      .spyOn<any, any>(service as any, 'cleanupDemoData')
+      .mockResolvedValue(undefined);
+    const seedSpy = jest
+      .spyOn<any, any>(service as any, 'seedDemoData')
+      .mockResolvedValue({ status: 'ok' });
+
+    await service.onApplicationBootstrap();
+
+    expect(cleanupSpy).toHaveBeenCalledWith('admin-1');
+    expect(seedSpy).toHaveBeenCalledWith('admin-1');
   });
 
   it('skips cleanup but runs seed when no existing demo data on bootstrap', async () => {
@@ -376,33 +407,9 @@ describe('DemoService', () => {
   });
 
   describe('getDemoPassword', () => {
-    it('returns the configured password when DEMO_PASSWORD is set', () => {
-      configService.get.mockImplementation((key: string) => {
-        if (key === 'DEMO_PASSWORD') return 'MyPassword123!';
-        return undefined;
-      });
-
+    it('returns the fixed shared demo password', () => {
       const result = (service as any).getDemoPassword();
-      expect(result).toBe('MyPassword123!');
-    });
-
-    it('throws ConflictException when DEMO_PASSWORD is not set', () => {
-      configService.get.mockImplementation(() => undefined);
-
-      expect(() => (service as any).getDemoPassword()).toThrow(
-        ConflictException,
-      );
-    });
-
-    it('throws ConflictException when DEMO_PASSWORD is empty string', () => {
-      configService.get.mockImplementation((key: string) => {
-        if (key === 'DEMO_PASSWORD') return '   ';
-        return undefined;
-      });
-
-      expect(() => (service as any).getDemoPassword()).toThrow(
-        ConflictException,
-      );
+      expect(result).toBe('DemoPass123!');
     });
   });
 
