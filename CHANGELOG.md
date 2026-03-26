@@ -1,142 +1,86 @@
 # Changelog
 
-Todos los cambios notables de este proyecto se documentarán en este archivo.
+Todos los cambios notables de este proyecto se documentan en este archivo.
 
-El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/),
-y este proyecto se adhiere a [Semantic Versioning](https://semver.org/lang/es/).
+El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
+y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Fase 5: Bastionado de Seguridad & Dominio Zero-Trust (Nivel 5)
+### Added
 
-#### Añadido
+- centro de `Mis pedidos` para cliente con separación entre pedidos pendientes e histórico
+- centro de `Pagos y tarjetas` en perfil, dejando explícito el estado actual de métodos de pago
+- centro de finanzas para `PROVIDER` con visibilidad de Stripe Connect, cobros y refunds ligados a `ProviderOrder`
+- centro de finanzas para `RUNNER` con visibilidad de Stripe Connect, cobros completados y pendientes
+- flujo demo de pago fake para provider y runner cuando el runtime usa Stripe dummy
+- soporte de tracking para pedidos reales con UUID
+- documentación actualizada en README y wiki con métricas, credenciales demo y arquitectura vigente
+- cobertura frontend real con `@vitest/coverage-v8` y artifacts en CI
 
-- **Contexto Orientado a Dominio (DDD):**
-  - Separación formal de `Order` (logística global) y `ProviderOrder` (agregación por tienda).
-  - Implementación de máquina de estados puros con validaciones de invariantes estrictas para ambos modelos.
-- **Consistencia Transaccional:**
-  - Decrementos de stock atómicos mediante restricciones a nivel de base de datos.
-  - Implementación de patrón Saga Lite (soporte para fallo parcial).
-- **Resiliencia en Pagos y Webhooks:**
-  - Verificación de webhook de Stripe con parseo adecuado del cuerpo en crudo (raw-body).
-  - Idempotencia mediante restricciones de unicidad `paymentRef` para proteger contra re-entregas.
-- **Seguridad Distribuida:**
-  - Autorización en tiempo real: Verificación estricta de Handshake + inyección contextual en sockets.
-  - Rotación de JWT "Zero-Downtime" de doble secreto mediante algoritmos de Fallback.
-  - Inyección de `Helmet` para bastionado básico XSS/HTTP.
-  - Plan de escalabilidad distribuido diseñado para mapas de WebSocket.
-- **Separación de Privilegios:**
-  - Mapeo estricto para acciones de Administración, previniendo manipulación de parámetros en `/users/roles/*`.
-  - Decoradores avanzados de RBAC aplicados en toda la API.
-  - Evaluaciones de propiedad mapeadas directamente contra la base de datos dentro de los escenarios de negocio.
+### Changed
 
-### Fase 4: Tiempo Real (Infraestructura WebSocket) & Seguridad (Nivel 3/4)
+- la demo pública usa la misma app y el mismo circuito real que producción, aislando datos e integraciones por entorno
+- `runtime-config` queda forzado a `/api` bajo el mismo host para evitar cruces demo -> prod
+- despliegue dual endurecido con preflight de secrets, limpieza de puertos, warmup de Nginx y smoke checks más robustos
+- `security.yml` ahora pasa `GITHUB_TOKEN` explícitamente a Gitleaks en PRs
+- `ci.yml` usa la CLI local de Prisma vía `npm exec -- prisma ...` para evitar incompatibilidades del runner con Prisma 7
+- dependencias `picomatch` fijadas a versiones seguras en lockfiles raíz, backend y frontend
+- demo seed alineada para que las cuentas compartan credenciales conocidas y el dataset pueda reseedearse de forma consistente
 
-#### Añadido
+### Fixed
 
-- **Revisión Completa de Autenticación:**
-  - **Magic Links:** Eliminada la autenticación por contraseña en favor de enlaces mágicos por correo.
-  - **Imposición de MFA:** Configuración obligatoria de 2FA/login OTP para todos los usuarios.
-  - **Gestión de Roles:** Migración a sistema de roles basado en arrays (Client, Provider, Runner, Admin).
-- **Funcionalidades del Proveedor:**
-  - **Gestión de Inventario:** UI/UX completa para crear, editar y listar productos.
-  - **Analítica de Ventas:**
-    - Gráficos interactivos de comparación usando `recharts`.
-    - Identificación del "Producto Estrella".
-    - Historial de ventas detallado y métricas de ingresos.
-  - **Seguridad:** Endpoint "Mis Productos" para garantizar el aislamiento de datos.
+- corrección de enlaces rotos y copy no localizado en navbar, footer y páginas públicas
+- corrección de `runtime-config` bajo rutas con locale
+- corrección del tracking que rompía con pedidos UUID
+- eliminación de imports no usados en `provider/finance/page.tsx`
+- endurecimiento de tests de bootstrap, cart sync y otras rutas sensibles para evitar flakes en CI
+- correcciones de Nginx y deploy dual:
+  - certificado propio para `demo.mecerka.me`
+  - eliminación de opciones IPv6 duplicadas
+  - arranque de `nginx` cuando el servicio no estaba activo
+  - liberación de puertos ocupados antes del `docker compose up`
 
-#### Cambiado
+## [2026-03-27]
 
-- **Navegación:** Enlaces de la barra de navegación (Navbar) adaptativos basados en el rol del usuario (ej., "Inventario" para Proveedores).
-- **Refactorización:** Mejora de `OrdersService` y `ProductsService` para manejar lógica basada en roles.
+### Added
 
-#### Corregido
+- actualización de `PROJECT_STATUS.md` con estado real del repo, métricas verificadas y prioridades actuales
+- actualización de `CHANGELOG.md` para reflejar el circuito actual cliente/provider/runner/demo
 
-- **Registro:** Corregida lógica de validación para nuevos flujos de Proveedor/Runner.
-- **MFA:** Resueltos problemas de verificación de OTP por discrepancia de versiones de `otplib`.
-- **Docker:** Corregido comando de build de backend (`tsc -p tsconfig.build.json`) y nombres de servicio.
-- **WebSocket:** Corregido namespace (`/tracking`) y problemas de CORS.
-- **Enrutamiento:** Solucionados errores 404 de Next.js consolidando la estructura del directorio `app`.
-- **Estabilidad:** Añadidas verificaciones de montado en cliente para componentes de Mapa para prevenir errores de hidratación SSR.
+## [2026-03-26]
 
-### Añadido
+### Added
 
-- Documentación inicial: README.md, PROJECT_STATUS.md, y estructura de gobierno.
-- Definición de alcance y requisitos (Fase de Exploración/Discovery).
-- **Slice 1 (Base de Datos):** Modelos Prisma (User, City, Category, Product, Order) y migración inicial.
-- **Slice 2 (API de Datos Maestros):** Endpoints CRUD para Ciudades y Categorías.
-  - DTOs con validación estricta (class-validator).
-  - Script de inicialización (Seed) para datos de prueba.
-- **Slice 3 (Auth):** Sistema de Identidad completo (Registro, Login, JWT, RBAC).
-- **Slice 4 (Productos):** Gestión de catálogo para proveedores con reglas de propiedad y pertenencia.
-- **Slice 5 (Pedidos):** Sistema transaccional completo de pedidos.
-  - Validación de stock y agrupación por ciudad.
-  - Instantánea de precios (`priceAtPurchase`).
-  - Lógica atómica con `prisma.$transaction`.
-- **Slice F1 (Frontend):** Arquitectura base Next.js App Router.
-  - AuthProvider (Contexto, Almacenamiento en Memoria).
-  - Wrapper `apiFetch` para peticiones autenticadas.
-  - Rutas protegidas y públicas separadas por Layouts.
-- **Slice F2 (Integración Auth):** UI de Autenticación conectada.
-  - Formularios Login/Register con manejo de errores y tipos estrictos.
-  - Redirección y protección de rutas en `layout.tsx`.
-  - Dashboard reactivo al Rol del usuario.
-- **Slice F3 (Catálogo de Productos):** Visualización pública de productos.
-  - Servicios tipados (`getProducts`, `getProductById`).
-  - Componentes `ProductCard` y Grid Layout.
-  - Estado Load/Error/Empty manejado.
-  - Botón "Editar" visible solo para el proveedor dueño.
-- **Slice F4 (Carrito de Compras):** Gestión de carrito de cliente.
-  - `CartContext` con persistencia en memoria.
-  - Validación estricta: todos los productos deben ser de la misma ciudad.
-  - UI: Contador en Navbar, página `/cart` con gestión de cantidades y eliminación.
-- **Slice F5 (Checkout):** Integración del proceso de pago con Backend.
-  - Servicio `ordersService.createOrder` interactivo y transaccional.
-  - Botón "Proceder al Pago" correctamente conectado.
-  - Manejo de flujo: Chequeo de Auth -> Crear Pedido -> Limpiar Carrito -> Redirigir al Dashboard.
-- **Slice F6 (Dashboard de Cliente):** Analítica básica y pedidos.
-  - Tabla de pedidos en `/dashboard` (ID, Fecha, Ciudad, Estado, Total).
-  - Integración segura inter-rol vía `GET /orders`.
-  - Estados de carga y error manejados.
-- **Slice F7 (Ventas del Proveedor):** Tablero de Ventas.
-  - Backend: `OrdersService.findAll` soporta filtrado dinámico por Rol.
-    - Clientes ven sus pedidos.
-    - Proveedores ven pedidos que contienen sus productos (aislamiento riguroso).
-  - Frontend: Nueva ruta `/provider/sales` protegida.
-  - Tabla de ventas con desglose de ítems (Producto, Cantidad, Precio Único, Rendimiento).
-  - Logística de Navbar condicional al estatus `Sales`.
-- **Slice F8 (Integración Frontend V2):** Ingesta del motor V2 de Next.js (Visual Engine).
-  - Implementación de Patrón Adaptador en servicios (`products-service`, `orders-service`) para transformar Data Contracts del backend a formatos consumibles por UI.
-  - Auditoría general de control de vista: JWT restringido.
+- credenciales demo unificadas y documentadas para cuentas `admin`, `provider`, `runner` y `client`
+- endpoints demo para cerrar pagos fake del circuito cuando Stripe no está activo de verdad
 
-### Fase 3: Gobernanza, Administración & Comunicación (Nivel 3)
+### Changed
 
-#### Añadido
+- cierre visible del circuito cliente post-checkout:
+  - pagos -> pedidos
+  - pagos -> tracking
+  - mensaje explícito cuando ya no quedan pagos pendientes
 
-- **Backend (Módulo Administrador):**
-  - **Roles y Seguridad:** Se añadió el rol `ADMIN`, inicialización segura (`admin@meceka.local`), y guardia global `RolesGuard`.
-  - **Gestión de Usuarios:** Endpoints para listar, bloquear y promocionar usuarios (`PATCH`). Prevenido modificar super-administradores.
-  - **Datos Maestros:** Trazabilidad CRUD completa para Ciudades y Categorías usando anotaciones DTO exigentes.
-  - **Métricas:** Cálculos analíticos delegados al motor de base de datos (`count`, `sum`) para escalabilidad.
-- **Sistema de Correos (SMTP Local):**
-  - **Integración de Mailpit:** Servicio pasivo lanzado dentro del ciclo de vida en los puertos 1025/8025 de Docker.
-  - **Disparadores Asíncronos:** Recepción/Bienvenida (Registration), Inyección One-Time (Código MFA), Resiliencia (Restablecimiento).
-  - **Disponibilidad:** Sistema delegativo `nodemailer` inyectado para previsiones sin cuello de botella en los main threads HTTP.
-- **Frontend (Panel de Administrador):**
-  - **Rutas Protegidas:** Mapeos de `/admin/*` inyectados y rediseños directos ante faltas de autorización hacia página principal.
-  - **UI/UX Moderno:** Vista lateral, recuentos e informes tabulados, control profesional responsive a cualquier pantalla gráfica.
-  - **Herramientas de Gestión:**
-    - **Usuarios:** Etiquetas de estado dinámicas (Activo/Bloqueado) y conmutación de roles directa.
-    - **Maestros:** Interfaz de pestañas amigable listada para Ciudades y su encaje relacional con Categorías.
-- **Gobernanza Técnica (Automatizados & Flujos CI/CD):**
-  - Optimizaciones de inicialización de `mailpit` sobre el CLI de `docker-compose`.
-  - Pruebas Linter puras integradas sin emisión ni transpilaciones huérfanas.
+### Fixed
 
-#### Corregido
+- despliegue dual endurecido hasta dejar `mecerka.me` y `demo.mecerka.me` operativos con healthchecks públicos correctos
 
-- **Archivos Fantasmas:** Erradicadas las referencias muertas generadas al cambiar los servicios principales `frontend/services/orders.ts`.
-- **Linting:** Migrado a configuración estándar base y forzadas optimizaciones en validadores como `useEffect` dep rules o advertencias de hidratación de imágenes HTML/Next.
-- **Dependencias Puras:** Intersecciones de compatibilidad estabilizadas con dependencias `peerDependencies` sobre manipuladores estrictos (ej. librerías fecha).
-- **Seguridad de Interfaz API:** Envoltorio `PrismaClientExceptionFilter` blindado con excepciones contextuales limpias e hidrogenadas. Impidió escapes SQL directos hacia los visores JSON al invocar objetos fantasma (P2025 null references/P2002 duplicates).
-- **Validación Limpia Regex y Contexto:** Generación robusta de `Slugs` en nombres, depurando peticiones REST a nivel middleware antes de golpear el RDBMS.
+## [2026-03-24]
+
+### Added
+
+- auditoría priorizada de casos de uso en:
+  - [/Users/machinehead/Documents/TFM/docs/use-case-audit-priority.md](/Users/machinehead/Documents/TFM/docs/use-case-audit-priority.md)
+- especificación funcional de cancelación y reembolso en:
+  - [/Users/machinehead/Documents/TFM/docs/cancel-refund-use-case-spec.md](/Users/machinehead/Documents/TFM/docs/cancel-refund-use-case-spec.md)
+- cobertura frontend y backend publicada como métrica verificable en documentación
+
+### Changed
+
+- README y wiki alineados con la arquitectura y despliegue dual reales
+- documentación de producto reorientada a casos de uso reales en vez de historia de slices antiguos
+
+### Fixed
+
+- validación de smoke checks y deploy sobre demo/prod con runtime config aislado

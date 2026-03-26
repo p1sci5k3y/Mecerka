@@ -1,93 +1,147 @@
-# Estado del Proyecto (Project Status)
+# Estado Del Proyecto
 
-## Progreso General
+Fecha de actualización: `27/03/2026`
 
-- **Fase 1 (MVP)**: Finalizada ✅
-- **Fase 2 (Autenticación y Frontend Base)**: Finalizada ✅
-- **Fase 3 (Gobernanza, Administración y Comunicación)**: Finalizada ✅
-- **Fase 4 (Tiempo Real & Seguridad Funcional)**: Finalizada ✅
-- **Fase 5 (Dominio Zero-Trust & Bastionado Avanzado)**: Finalizada ✅
-- **Fase 6 (Governance & Metrics)**: Finalizada ✅
-- **Fase 7 (Deploy, Security & Documentation)**: Finalizada ✅
-- **Fase 8 (Stripe Connect & Split Payments)**: Finalizada ✅
-- **Fase 9 (AWS EC2 Production Deployment)**: En Progreso 🚧
+## Resumen Ejecutivo
 
-## Hitos Completados (Milestones & Fases Socráticas)
+Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, cobertura backend alta y una superficie frontend ya razonablemente cerrada para cliente, provider, runner y admin.
 
-### Fase 1: MVP Identity & Basics
-- **Propósito:** Base de datos relacional y autenticación estructural (JWT).
-- **Flujos:** Registro, Login, ABM de Ciudades y Categorías.
-- **Invariantes:** Contraseñas hasheadas (Argon2).
+El proyecto ya no está en fase de construir infraestructura base. El trabajo de mayor retorno ahora consiste en cerrar agujeros de continuidad de negocio y experiencia visible, no en añadir capas técnicas nuevas.
 
-### Fase 2: Public Catalog & Privacy
-- **Propósito:** Catálogo público purgando PII (Personally Identifiable Information).
-- **Flujos:** Explorador de productos por categoría y ciudad para clientes no autenticados.
-- **Invariantes:** Solo productos con `isActive: true` son visibles; sin exponer correos de proveedores.
+## Estado General
 
-### Fase 3: Order Integrity
-- **Propósito:** Integridad en la creación de pedidos consolidados.
-- **Flujos:** Conversión de carrito local a Order en BD.
-- **Invariantes:** Tolerancia cero al stock negativo, sin cruce de ciudades (`crossing-cities`), consolidación matemática (Map) anti-duplicados.
+- `Backend`: estable, modularizado y con cobertura alta.
+- `Frontend`: funcional y bastante más cubierto que al inicio, aunque aún con deuda en áreas genéricas y administrativas.
+- `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
+- `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
+- `Documentación`: README y wiki actualizados; este documento queda alineado con ese estado.
 
-### Fase 4: State Machines (Real-Time & Role Security)
-- **Propósito:** Trazabilidad estricta y delegación de estado de sub-pedidos.
-- **Flujos:** ProviderOrder state machine (`PENDING` -> `ACCEPTED` -> `PREPARING` -> `READY_FOR_PICKUP` -> `PICKED_UP`).
-- **Invariantes:** Transición atómica optimista; Cancelación parcial frena la distribución logística global (DeliveryStatus estancado).
+## Métricas Verificadas
 
-### Fase 5: Payment, Webhook, & Atomic Idempotency
-- **Propósito:** Motor financiero de cero pérdidas y cero overselling.
-- **Flujos:** Recepción nativa de Webhook Stripe (`payment_intent.succeeded`) -> Confirmación de Pedido.
-- **Invariantes:** Idempotencia garantizada por BD (`WebhookEvent`). Descuento de stock en concurrencia estricta (`updateMany { stock: { gte: cantidad } }`).
+### Backend
 
-### Fase 6: Governance, Metrics, & Admin Consistency
-- **Propósito:** Estadísticas puras y jerarquías sin pérdida accidental.
-- **Flujos:** Dashboard de ingresos y gestión de usuarios por Admin.
-- **Invariantes:** Granting aditivo usando `Set`. Métricas procesan exclusivamente estados económicamente vigentes.
+- Cobertura statements: `91.68%`
+- Cobertura branches: `84.64%`
+- Cobertura functions: `90.69%`
+- Cobertura lines: `92.03%`
+- Suites: `112`
+- Tests: `1206`
 
-### Fase 7: Despliegue, Seguridad y Documentación Fiel (Actual/Finalizada ✅)
-- **Propósito:** Erradicar la deuda técnica antes de la puesta en producción asegurando una cobertura robusta de CI/CD, fortaleciendo la seguridad perimetral contra vulnerabilidades web (OWASP) y documentando fielmente la arquitectura socrática.
-- **Flujos:** 
-  - **CI/CD Integrado:** El pipeline de *GitHub Actions* asegura la ejecución automática de la suite `npm run test`, bloqueando explícitamente cualquier PR que rompa las pruebas.
-  - **Ciclo Completo Integrado (E2E Tests):** Se desarrollaron flujos simulados a través de `orders.e2e-spec.ts` probando desde el registro del cliente hasta la liberación del producto y la asignación al Runner con Stripe _mockeado_.
-  - **Revocación Concurrente:** Creación de un endpoint `POST /auth/logout` que incrementa un estado interno en Prisma, forzando un rechazo instantáneo en las estrategias locales.
-- **Invariantes:** 
-  - **Rate Limiting Estricto:** Objeto `ThrottlerModule` corregido bajo los estándares de NestJS v10+ previniendo denegación de servicio (DoS).
-  - **Autenticación Inmutable:** Inyección de `tokenVersion` en BD; todo JWT capturado cuyo número de versión sea inferior al registrado será inmediatamente revocado sin esperas de expiración.
-  - **Tipado Seguro:** Interfaz `RequestWithUser` sustituyendo la ambigüedad nativa de `any` en los controladores y refactorización del core de transacciones a `PaymentsService`, para aislar la complejidad financiera.
+### Frontend
 
-## Próximos Pasos (Deploy & Producto)
+- Cobertura statements: `37.99%`
+- Cobertura branches: `44.32%`
+- Cobertura functions: `39.71%`
+- Cobertura lines: `37.98%`
+- Archivos de test: `37`
+- Tests: `132`
 
-- Puesta en producción (Vercel / Railway).
-- Revisión de UX Final para proveedores.
-- Pruebas E2E de simulación de flota con múltiples ventanas.
+## Capacidades Cerradas
 
----
+### Cliente
 
-## Fase 8: Stripe Connect (Split Payments) 🏗️ *(Finalizada ✅)*
-**Propósito:** Transicionar de un modelo "Dummy Merchant" a un Marketplace real Multi-Vendor (Zero-Liability Architecture) sin custodia de credenciales de terceros.
+- registro, login y sesión por roles
+- catálogo público por ciudad y categoría
+- detalle de producto
+- carrito con restricción por ciudad
+- checkout multi-proveedor
+- pagos separados por provider y runner
+- centro de `Mis pedidos`
+- centro de `Pagos y tarjetas`
+- seguimiento de pedido por UUID real
+- flujo demo de pago fake cuando Stripe está en modo dummy
 
-**Flujos Críticos:**
-1. **Onboarding Seguro (OAuth):** Flujo en el Dashboard donde Providers y Runners vinculan sus cuentas de cobro ("Connect with Stripe"), devolviendo un `account_id` transparente.
-2. **Checkout Unificado (Client):** El cliente paga un único monto (Pedido + Tarifa de Envío) a través de Stripe Payment Element (Soporte Google Pay, Apple Pay).
-3. **Split Computado (Direct Charges):** El backend de Mecerka utiliza *PaymentIntents* con el header `Stripe-Account` para crear el Cargo Directamente a la cuenta del Proveedor. Mecerka aísla el coste logístico a través de `application_fee_amount` para luego transferirlo al Runner, logrando un flujo donde la plataforma asume **Cero Responsabilidad** (Zero Liability) legal por *chargebacks* o devoluciones.
+### Provider
 
-**Invariantes:**
-- Mecerka JAMÁS almacenará ni solicitará llaves secretas (`sk_live_...`) de proveedores ni repartidores en sus bases de datos.
-- Las comisiones o costes (Application Fee) se deducen dinámicamente mediante el orquestador backend con precisión aritmética (`Math.round()` en céntimos) y tipados estrictos.
-- KYC Obligatorio: Un proveedor sin la cuenta verificada `stripeAccountId` tiene denegada por API la subida de inventario y no puede recibir órdenes de compra.
+- solicitud de rol
+- inventario y CRUD de productos
+- panel operativo de ventas
+- transición hasta `READY_FOR_PICKUP`
+- centro de `Cobros y devoluciones`
+- visibilidad de Stripe Connect y refunds ligados a `ProviderOrder`
 
----
+### Runner
 
-## Fase 9: AWS EC2 Production Deployment 🚀 *(Finalizada ✅)*
-**Propósito:** Desplegar la plataforma monolítica (Frontend SSR + Backend NestJS + PostgreSQL) en una instancia AWS EC2, asegurando certificados SSL, resiliencia con contenedores y pipelines de integración continua.
+- solicitud de rol
+- panel operativo con pedidos asignables y activos
+- aceptación de reparto y ciclo de reparto
+- tracking en tiempo real
+- centro financiero con cobros y estado de Stripe Connect
 
-**Flujos Críticos:**
-1. **Bootstrap & Swap:** Instancia `t3.micro` provisionada con Terraform. Se configuró `user_data` para el setup inicial de Docker y Swap de 2GB para soportar builds pesados de Next.js.
-2. **Infrastructure-as-Code (IaC):** Gestionada con Terraform (`mecerka-production-sg` e import de instancia).
-3. **Dockerización Prod:** `docker-compose.prod.yml` orquestando Postgres, Backend y Frontend, con secretos inyectados dinámicamente.
-4. **CI/CD Action:** Workflow `deploy.yml` configurado para inyectar secretos vía SSH y realizar `docker compose up -d` automáticamente en cada push exitoso a `main`.
+### Admin
 
-**Invariantes:**
-- Puertos cerrados: 5432 (Postgres) bloqueado al exterior. 22 (SSH) restringido a la IP del administrador.
-- Cero Secretos en Código: Todas las claves (`POSTGRES_PASSWORD`, `JWT_SECRET`) se gestionan exclusivamente vía GitHub Secrets y se inyectan en caliente durante el deploy.
-- Producción viva en: `http://54.217.186.6` (Nginx en Bienvenida, pendiente de primer deploy exitoso de la app).
+- rutas protegidas
+- dashboard de métricas
+- gestión de usuarios y roles
+- visibilidad de refund requests y gobierno operativo base
+
+### Sistema
+
+- pedido raíz + `ProviderOrder` por comercio
+- reserva y restauración de stock
+- delivery planning por cobertura
+- lifecycle de pedido, provider order y runner
+- Stripe Connect / split payments
+- modo demo con dataset reseteable y credenciales compartidas
+- deploy dual con runtime config aislado por host
+
+## Casos De Uso Priorizados
+
+Referencia de auditoría:
+- [/Users/machinehead/Documents/TFM/docs/use-case-audit-priority.md](/Users/machinehead/Documents/TFM/docs/use-case-audit-priority.md)
+
+### Implementados Y Demostrables
+
+- `UC-001` checkout multi-proveedor en una ciudad
+- `UC-002` reserva y liberación de stock
+- `UC-003` máquina de estados del pedido
+- `UC-005` flujo provider hasta `READY_FOR_PICKUP`
+
+### Parcialmente Implementados
+
+- `UC-004` cancelación y reembolso
+
+Lectura honesta:
+- backend y reglas de negocio de `UC-004` están bastante cerrados
+- la parte más floja sigue siendo la experiencia visible y completa de refunds/cancelaciones en frontend y backoffice
+
+## Superficie Visible Cerrada Recientemente
+
+- `Mis pedidos` con separación entre pendientes e histórico
+- navegación desde pagos a pedido y tracking
+- `Pagos y tarjetas` para cliente, dejando explícito que todavía no hay wallet persistente
+- finanzas de provider y runner con lectura honesta de Stripe Connect
+- pago demo explícito para provider/runner cuando Stripe está en modo dummy
+- tracking soportando pedidos UUID reales
+
+## Limitaciones Reales Que Siguen Abiertas
+
+- no existe todavía una wallet persistente de tarjetas del cliente
+- la gestión de refunds sigue siendo más sólida en backend que en frontend
+- admin/backoffice aún necesita más recorrido visible para resolución completa de incidencias
+- la cobertura frontend sigue siendo modesta comparada con backend
+- faltan más flujos e2e públicos sobre demo para defensa integral por perfil
+
+## Riesgos Actuales
+
+- deuda de continuidad UX entre pantallas operativas y financieras
+- deuda de cobertura frontend en zonas de UI genérica y rutas secundarias
+- riesgo de percepción de producto “a medias” si no se sigue cerrando caso de uso por caso de uso
+
+## Siguiente Prioridad Recomendada
+
+### Prioridad 1
+
+1. cerrar frontend/backoffice de cancelación y refund visible
+2. validar e2e sobre `demo.mecerka.me` el circuito `CLIENT -> payments -> tracking`
+3. reforzar continuidad entre paneles operativos y financieros de provider/runner
+
+### Prioridad 2
+
+1. tabla funcional formal de estados para defensa
+2. más e2e multi-rol sobre demo
+3. seguir levantando cobertura frontend en auth, admin y componentes transversales
+
+## Conclusión
+
+El proyecto ya no está en “MVP incompleto” ni en “infraestructura en construcción”. Está en una fase de cierre de circuito real de negocio. La base técnica es sólida; lo que queda por hacer es transformar piezas ya implementadas en experiencia completa, visible y defendible de extremo a extremo.
