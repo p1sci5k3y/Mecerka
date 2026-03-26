@@ -109,6 +109,16 @@
     "socket.io-parser": "4.2.6",
     "file-entry-cache": "^11.1.2",
     "flat-cache": "^6.1.21",
-    "flatted": "^3.4.1"
+    "flatted": "^3.4.1",
+    "picomatch": "^4.0.4",
+    "anymatch": {
+      "picomatch": "^2.3.2"
+    },
+    "micromatch": {
+      "picomatch": "^2.3.2"
+    },
+    "readdirp": {
+      "picomatch": "^2.3.2"
+    }
   }
 }
