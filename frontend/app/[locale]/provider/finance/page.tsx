@@ -10,10 +10,9 @@ import { getApiBaseUrl } from "@/lib/runtime-config"
 import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
-import type { Order, ProviderOrder, RefundSummary } from "@/lib/types"
+import type { ProviderOrder, RefundSummary } from "@/lib/types"
 import {
   AlertCircle,
-  ArrowRight,
   CheckCircle2,
   CreditCard,
   Loader2,
