@@ -1,10 +1,15 @@
 # Mecerka
 
-- GitHub/Drive: [Pendiente: URL repositorio o carpeta compartida]
-- Despliegue: [Pendiente: URL despliegue]
+- GitHub: https://github.com/p1sci5k3y/Mecerka/
+- Despliegue: https://mecerka.me
+- Despliegue demo: https://demo.mecerka.me
+- Credenciales demo:
+****    admin.demo@local.test / DemoPass123! ****
+****    provider.demo@local.test / DemoPass123! ****
+****    runner.demo@local.test / DemoPass123! ****
+****    user.demo@local.test / DemoPass123! ****
 - Slides: [Pendiente: URL de trabajo o edición de las slides]
-- Formulario de envío: [Pendiente: URL formulario]
-- URL a las slides: [Pendiente: URL pública de las slides]
+
 
 ## Descripción general
 
