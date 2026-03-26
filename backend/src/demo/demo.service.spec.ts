@@ -210,6 +210,48 @@ describe('DemoService', () => {
     );
   });
 
+  it('confirms a runner payment in demo mode while the delivery is already in transit', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'production';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.deliveryOrder.findUnique.mockResolvedValue({
+      id: 'delivery-1',
+      runnerId: 'runner-1',
+      status: 'IN_TRANSIT',
+      paymentStatus: 'PENDING',
+      order: { id: 'order-1', clientId: 'client-1' },
+      paymentSessions: [],
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: 'acct_runner_1',
+    });
+    prismaMock.runnerPaymentSession.create.mockResolvedValue({
+      id: 'runner-session-1',
+      status: PaymentSessionStatus.READY,
+      externalSessionId: 'demo_runner_pi_delivery1',
+    });
+
+    const result = await service.confirmDemoRunnerPayment(
+      'delivery-1',
+      'client-1',
+      ['CLIENT'] as never,
+    );
+
+    expect(deliveryServiceMock.confirmRunnerPayment).toHaveBeenCalledWith(
+      expect.stringContaining('demo_runner_pi_'),
+      expect.stringContaining('demo_runner_evt_'),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        deliveryOrderId: 'delivery-1',
+        orderId: 'order-1',
+        mode: 'demo_runner_confirmed',
+      }),
+    );
+  });
+
   it('blocks demo endpoints in production unless DEMO_MODE=true', async () => {
     configService.get.mockImplementation((key: string) => {
       if (key === 'NODE_ENV') return 'production';

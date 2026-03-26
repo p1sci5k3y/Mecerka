@@ -443,6 +443,8 @@ export class DemoService implements OnApplicationBootstrap {
     const eligibleStatuses: DeliveryOrderStatus[] = [
       DeliveryOrderStatus.RUNNER_ASSIGNED,
       DeliveryOrderStatus.PICKUP_PENDING,
+      DeliveryOrderStatus.PICKED_UP,
+      DeliveryOrderStatus.IN_TRANSIT,
     ];
     if (!eligibleStatuses.includes(deliveryOrder.status)) {
       throw new ConflictException(

@@ -170,9 +170,12 @@ export class ProviderPaymentAggregateService {
 
   private isDemoStripeCheckoutUnavailable() {
     const demoMode = this.configService.get<string>('DEMO_MODE') === 'true';
-    const stripeSecretKey =
-      this.configService.get<string>('STRIPE_SECRET_KEY')?.trim() ?? '';
+    if (!demoMode) {
+      return false;
+    }
 
-    return demoMode && (!stripeSecretKey || stripeSecretKey.includes('dummy'));
+    // Demo environments use the same business flow with demo-only payment
+    // confirmations. They should never try to open live Stripe sessions.
+    return true;
   }
 }
