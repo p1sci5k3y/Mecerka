@@ -1,11 +1,20 @@
 import {
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import {
+  DeliveryOrderStatus,
+  PaymentSessionStatus,
+  ProviderPaymentStatus,
+  Role,
+  RunnerPaymentStatus,
+} from '@prisma/client';
 import { AdminService } from '../admin/admin.service';
 import { AuthService } from '../auth/auth.service';
 import { CartService } from '../cart/cart.service';
@@ -123,6 +132,18 @@ export class DemoService implements OnApplicationBootstrap {
     if (isProduction && !demoMode) {
       throw new ForbiddenException(
         'Demo endpoints are disabled in production unless DEMO_MODE=true',
+      );
+    }
+  }
+
+  private assertDemoClientOrAdminAccess(
+    ownerUserId: string,
+    actorUserId: string,
+    roles: Role[],
+  ) {
+    if (!roles.includes(Role.ADMIN) && ownerUserId !== actorUserId) {
+      throw new ForbiddenException(
+        'Demo payment actions are only available to the owning client or an admin',
       );
     }
   }
@@ -276,6 +297,230 @@ export class DemoService implements OnApplicationBootstrap {
 
     return {
       status: 'reset_complete',
+    };
+  }
+
+  async confirmDemoProviderOrderPayment(
+    providerOrderId: string,
+    actorUserId: string,
+    roles: Role[],
+  ) {
+    this.assertDemoEnabled();
+
+    const providerOrder = await this.prisma.providerOrder.findUnique({
+      where: { id: providerOrderId },
+      include: {
+        order: {
+          select: {
+            id: true,
+            clientId: true,
+          },
+        },
+      },
+    });
+
+    if (!providerOrder) {
+      throw new NotFoundException('ProviderOrder not found');
+    }
+
+    this.assertDemoClientOrAdminAccess(
+      providerOrder.order.clientId,
+      actorUserId,
+      roles,
+    );
+
+    if (providerOrder.paymentStatus === ProviderPaymentStatus.PAID) {
+      return {
+        providerOrderId,
+        orderId: providerOrder.order.id,
+        paymentStatus: ProviderPaymentStatus.PAID,
+        mode: 'demo_provider_already_paid',
+      };
+    }
+
+    const session = await this.ordersService.prepareProviderOrderPayment(
+      providerOrder.id,
+    );
+    const externalSessionId = `demo_pi_${providerOrder.id.replace(/-/g, '').slice(0, 24)}`;
+
+    await this.prisma.providerPaymentSession.update({
+      where: { id: session.id },
+      data: {
+        externalSessionId,
+      },
+    });
+
+    await this.prisma.providerOrder.update({
+      where: { id: providerOrder.id },
+      data: {
+        paymentRef: externalSessionId,
+      },
+    });
+
+    const provider = await this.prisma.user.findUnique({
+      where: { id: providerOrder.providerId },
+      select: {
+        stripeAccountId: true,
+      },
+    });
+
+    if (!provider?.stripeAccountId) {
+      throw new ConflictException(
+        'Demo provider is missing a connected account bootstrap value',
+      );
+    }
+
+    const result = await this.paymentsService.confirmProviderOrderPayment(
+      externalSessionId,
+      `demo_evt_${providerOrder.id.replace(/-/g, '')}`,
+      'payment_intent.succeeded',
+      {
+        amount: Math.round(Number(providerOrder.subtotalAmount) * 100),
+        amountReceived: Math.round(Number(providerOrder.subtotalAmount) * 100),
+        currency: 'eur',
+        accountId: provider.stripeAccountId,
+        metadata: {
+          orderId: providerOrder.order.id,
+          providerOrderId: providerOrder.id,
+          providerPaymentSessionId: session.id,
+        },
+      },
+    );
+
+    return {
+      providerOrderId,
+      orderId: providerOrder.order.id,
+      paymentStatus: ProviderPaymentStatus.PAID,
+      mode: 'demo_provider_confirmed',
+      result,
+    };
+  }
+
+  async confirmDemoRunnerPayment(
+    deliveryOrderId: string,
+    actorUserId: string,
+    roles: Role[],
+  ) {
+    this.assertDemoEnabled();
+
+    const deliveryOrder = await this.prisma.deliveryOrder.findUnique({
+      where: { id: deliveryOrderId },
+      include: {
+        order: {
+          select: {
+            id: true,
+            clientId: true,
+          },
+        },
+        paymentSessions: {
+          where: {
+            status: {
+              in: [PaymentSessionStatus.CREATED, PaymentSessionStatus.READY],
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!deliveryOrder) {
+      throw new NotFoundException('DeliveryOrder not found');
+    }
+
+    this.assertDemoClientOrAdminAccess(
+      deliveryOrder.order.clientId,
+      actorUserId,
+      roles,
+    );
+
+    if (!deliveryOrder.runnerId) {
+      throw new ConflictException(
+        'DeliveryOrder does not have an assigned runner',
+      );
+    }
+
+    const eligibleStatuses: DeliveryOrderStatus[] = [
+      DeliveryOrderStatus.RUNNER_ASSIGNED,
+      DeliveryOrderStatus.PICKUP_PENDING,
+    ];
+    if (!eligibleStatuses.includes(deliveryOrder.status)) {
+      throw new ConflictException(
+        'DeliveryOrder is not eligible for demo payment confirmation',
+      );
+    }
+
+    if (deliveryOrder.paymentStatus === RunnerPaymentStatus.PAID) {
+      return {
+        deliveryOrderId,
+        orderId: deliveryOrder.order.id,
+        paymentStatus: RunnerPaymentStatus.PAID,
+        mode: 'demo_runner_already_paid',
+      };
+    }
+
+    const runner = await this.prisma.user.findUnique({
+      where: { id: deliveryOrder.runnerId },
+      select: {
+        stripeAccountId: true,
+      },
+    });
+
+    if (!runner?.stripeAccountId) {
+      throw new ConflictException(
+        'Demo runner is missing a connected account bootstrap value',
+      );
+    }
+
+    const externalSessionId =
+      deliveryOrder.paymentSessions[0]?.externalSessionId ||
+      `demo_runner_pi_${deliveryOrder.id.replace(/-/g, '').slice(0, 24)}`;
+
+    const session =
+      deliveryOrder.paymentSessions[0] ||
+      (await this.prisma.runnerPaymentSession.create({
+        data: {
+          deliveryOrderId: deliveryOrder.id,
+          paymentProvider: 'STRIPE',
+          externalSessionId,
+          paymentUrl: null,
+          status: PaymentSessionStatus.READY,
+          expiresAt: null,
+          providerMetadata: {
+            stripeAccountId: runner.stripeAccountId,
+            paymentIntentId: externalSessionId,
+            livemode: false,
+          },
+        },
+      }));
+
+    if (!deliveryOrder.paymentSessions[0]) {
+      await this.prisma.deliveryOrder.update({
+        where: { id: deliveryOrder.id },
+        data: {
+          paymentStatus: RunnerPaymentStatus.PAYMENT_READY,
+        },
+      });
+    } else if (!deliveryOrder.paymentSessions[0]?.externalSessionId) {
+      await this.prisma.runnerPaymentSession.update({
+        where: { id: session.id },
+        data: {
+          externalSessionId,
+        },
+      });
+    }
+
+    const result = await this.deliveryService.confirmRunnerPayment(
+      externalSessionId,
+      `demo_runner_evt_${deliveryOrder.id.replace(/-/g, '')}`,
+    );
+
+    return {
+      deliveryOrderId,
+      orderId: deliveryOrder.order.id,
+      paymentStatus: RunnerPaymentStatus.PAID,
+      mode: 'demo_runner_confirmed',
+      result,
     };
   }
 }

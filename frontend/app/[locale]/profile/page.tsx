@@ -313,6 +313,22 @@ function ProfileContent() {
             </div>
           </section>
 
+          <section>
+            <SectionHeader title="Pagos y tarjetas" subtitle="Aclara cómo se introducen hoy los pagos del cliente y accede a tus pedidos pendientes de cobro." />
+            <div className="mt-6 rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Mecerka todavía no guarda tarjetas del cliente dentro del perfil. Los cobros se introducen en la pantalla de cada pedido, con sesiones de pago separadas por comercio y reparto cuando corresponda.
+                </p>
+                <div>
+                  <Button asChild variant="outline" className="h-12 rounded-xl font-bold">
+                    <Link href="/profile/payments">Abrir centro de pagos</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Role Management */}
           <section>
             <SectionHeader title="Solicitud de roles" subtitle="Solicita tu alta como proveedor o repartidor desde tu cuenta actual." />

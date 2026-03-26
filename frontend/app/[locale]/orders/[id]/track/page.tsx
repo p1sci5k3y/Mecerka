@@ -16,7 +16,12 @@ const DynamicDeliveryMap = dynamic(() => import('@/components/tracking/DynamicDe
 export default function TrackOrderPage() {
     const params = useParams()
     const { user } = useAuth()
-    const orderId = Number(params.id)
+    const orderId =
+        typeof params.id === "string"
+            ? params.id
+            : Array.isArray(params.id)
+              ? params.id[0] || ""
+              : ""
 
     const isRunner = user?.roles?.includes("RUNNER")
 

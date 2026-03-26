@@ -35,6 +35,23 @@ vi.mock("@/components/footer", () => ({
   Footer: () => <footer data-testid="footer" />,
 }))
 
+vi.mock("@/components/ui/button", () => ({
+  Button: ({
+    children,
+    asChild,
+    ...rest
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) =>
+    asChild ? <>{children}</> : <button {...rest}>{children}</button>,
+}))
+
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 vi.mock("@/components/protected-route", () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -150,6 +167,10 @@ describe("Runner dashboard experience", () => {
       expect(screen.getByText(/En el Barrio \(1\)/)).toBeInTheDocument()
     })
 
+    expect(screen.getByRole("link", { name: /Cobros y estado/i })).toHaveAttribute(
+      "href",
+      "/runner/finance",
+    )
     expect(screen.getByTestId("available-list")).toHaveTextContent("available:1")
     expect(screen.getByText(/Tu Histórico \(1\)/)).toBeInTheDocument()
   })

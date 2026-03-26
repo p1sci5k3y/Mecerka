@@ -36,7 +36,7 @@ vi.mock("@/components/protected-route", () => ({
 describe("TrackOrderPage", () => {
   beforeEach(() => {
     mapPropsSpy.mockReset()
-    mockUseParams.mockReturnValue({ id: "123" })
+    mockUseParams.mockReturnValue({ id: "577731b8-f2e9-4a16-8594-981b5dff09b2" })
   })
 
   it("passes runner mode when the authenticated user is a runner", async () => {
@@ -47,11 +47,15 @@ describe("TrackOrderPage", () => {
     const TrackOrderPage = (await import("@/app/[locale]/orders/[id]/track/page")).default
     render(<TrackOrderPage />)
 
-    expect(screen.getByText("Seguimiento del Pedido #123")).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Seguimiento del Pedido #577731b8-f2e9-4a16-8594-981b5dff09b2",
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByTestId("dynamic-delivery-map")).toBeInTheDocument()
     expect(mapPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderId: 123,
+        orderId: "577731b8-f2e9-4a16-8594-981b5dff09b2",
         isRunner: true,
         initialLat: 40.4168,
         initialLng: -3.7038,
@@ -69,7 +73,7 @@ describe("TrackOrderPage", () => {
 
     expect(mapPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderId: 123,
+        orderId: "577731b8-f2e9-4a16-8594-981b5dff09b2",
         isRunner: false,
       }),
     )

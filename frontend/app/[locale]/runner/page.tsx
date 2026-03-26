@@ -6,8 +6,10 @@ import { Order } from "@/lib/types"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { Button } from "@/components/ui/button"
+import { Link } from "@/lib/navigation"
 import { toast } from "sonner"
-import { Clock, History, AlertTriangle } from "lucide-react"
+import { Clock, History, AlertTriangle, CreditCard } from "lucide-react"
 import { SealBadge } from "@/components/ui/seal-badge"
 
 import { RunnerAvailableList } from "@/components/runner/RunnerAvailableList"
@@ -152,9 +154,17 @@ function RunnerContent() {
             <div className="bg-primary/5 border-b border-border/60 py-8 relative overflow-hidden">
                 <div className="container relative z-10 px-4 md:px-6 max-w-7xl">
                     <SealBadge className="mb-4 shadow-none bg-background border-primary/20">Logística Local</SealBadge>
-                    <h1 className="font-display text-3xl font-extrabold text-foreground tracking-tight sm:text-4xl">
-                        Panel de Repartidor
-                    </h1>
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <h1 className="font-display text-3xl font-extrabold text-foreground tracking-tight sm:text-4xl">
+                            Panel de Repartidor
+                        </h1>
+                        <Button asChild variant="outline">
+                            <Link href="/runner/finance">
+                                <CreditCard className="mr-2 h-4 w-4" />
+                                Cobros y estado
+                            </Link>
+                        </Button>
+                    </div>
                 </div>
             </div>
 

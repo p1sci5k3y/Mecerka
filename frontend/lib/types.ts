@@ -135,6 +135,23 @@ export interface RunnerPaymentSessionSummary {
   paymentStatus: string
 }
 
+export interface RefundSummary {
+  id: string
+  incidentId: string | null
+  providerOrderId: string | null
+  deliveryOrderId: string | null
+  type: string
+  status: string
+  amount: number
+  currency: string
+  requestedById: string
+  reviewedById: string | null
+  externalRefundId: string | null
+  createdAt: string
+  reviewedAt: string | null
+  completedAt: string | null
+}
+
 export interface OrderProviderPaymentsAggregate {
   orderId: string
   orderStatus: string

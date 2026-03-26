@@ -7,6 +7,8 @@ import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { ordersService } from "@/lib/services/orders-service"
+import { Link } from "@/lib/navigation"
+import { Button } from "@/components/ui/button"
 import type { Order } from "@/lib/types"
 import { OrderKanbanColumn } from "@/components/provider/OrderKanbanColumn"
 import { useNow } from "@/hooks/use-now"
@@ -146,6 +148,9 @@ function ProviderKanbanContent() {
               Hola, {user?.name}. Supervisa tus envíos en tiempo real.
             </p>
           </div>
+          <Button asChild variant="outline" className="self-start sm:self-auto">
+            <Link href="/provider/finance">Cobros y devoluciones</Link>
+          </Button>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">

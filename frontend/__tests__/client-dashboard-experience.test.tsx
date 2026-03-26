@@ -141,6 +141,10 @@ describe("ClientDashboard experience", () => {
     expect(screen.getByText("2")).toBeInTheDocument()
     expect(screen.getByText("1")).toBeInTheDocument()
     expect(screen.getByText(/Cuenco artesanal/)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Historial Completo/i })).toHaveAttribute(
+      "href",
+      "/orders",
+    )
     expect(
       screen.getByText("Recibo completo no disponible en esta vista"),
     ).toBeInTheDocument()

@@ -31,6 +31,14 @@ vi.mock("@/components/footer", () => ({
   Footer: () => <footer data-testid="footer" />,
 }))
 
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 vi.mock("@/components/protected-route", () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
@@ -140,6 +148,9 @@ describe("Provider sales experience", () => {
     })
 
     expect(screen.getByText(/Hola, Taller Sevilla/)).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: /Cobros y devoluciones/i }),
+    ).toHaveAttribute("href", "/provider/finance")
     expect(screen.getByText("3")).toBeInTheDocument()
     expect(screen.getByText("1")).toBeInTheDocument()
     expect(screen.getByText("90.00 €")).toBeInTheDocument()

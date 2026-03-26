@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import { PaymentSessionStatus } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { DemoService } from './demo.service';
@@ -15,11 +16,23 @@ import { BaseSeedService } from '../seed/base-seed.service';
 describe('DemoService', () => {
   let service: DemoService;
   let configService: { get: jest.Mock };
+  let deliveryServiceMock: { confirmRunnerPayment: jest.Mock };
+  let paymentsServiceMock: {
+    confirmProviderOrderPayment: jest.Mock;
+  };
+  let ordersServiceMock: { prepareProviderOrderPayment: jest.Mock };
   let prismaMock: {
     user: { count: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock };
     product: { count: jest.Mock };
     order: { count: jest.Mock };
-    deliveryOrder: { count: jest.Mock };
+    deliveryOrder: {
+      count: jest.Mock;
+      findUnique: jest.Mock;
+      update: jest.Mock;
+    };
+    providerOrder: { findUnique: jest.Mock; update: jest.Mock };
+    providerPaymentSession: { update: jest.Mock };
+    runnerPaymentSession: { create: jest.Mock; update: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -44,7 +57,33 @@ describe('DemoService', () => {
       },
       deliveryOrder: {
         count: jest.fn().mockResolvedValue(0),
+        findUnique: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
       },
+      providerOrder: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
+      providerPaymentSession: {
+        update: jest.fn(),
+      },
+      runnerPaymentSession: {
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+    };
+    deliveryServiceMock = {
+      confirmRunnerPayment: jest.fn().mockResolvedValue({ status: 'PAID' }),
+    };
+    paymentsServiceMock = {
+      confirmProviderOrderPayment: jest
+        .fn()
+        .mockResolvedValue({ status: 'PAID' }),
+    };
+    ordersServiceMock = {
+      prepareProviderOrderPayment: jest
+        .fn()
+        .mockResolvedValue({ id: 'session-1' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -55,10 +94,10 @@ describe('DemoService', () => {
         { provide: AuthService, useValue: {} },
         { provide: AdminService, useValue: {} },
         { provide: ProductsService, useValue: {} },
-        { provide: OrdersService, useValue: {} },
-        { provide: DeliveryService, useValue: {} },
+        { provide: OrdersService, useValue: ordersServiceMock },
+        { provide: DeliveryService, useValue: deliveryServiceMock },
         { provide: CartService, useValue: {} },
-        { provide: PaymentsService, useValue: {} },
+        { provide: PaymentsService, useValue: paymentsServiceMock },
         {
           provide: BaseSeedService,
           useValue: { ensureBaseData: jest.fn().mockResolvedValue(undefined) },
@@ -90,6 +129,85 @@ describe('DemoService', () => {
 
     expect(cleanupSpy).toHaveBeenCalledTimes(2);
     expect(seedSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('confirms a provider payment in demo mode for the owning client', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'production';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.providerOrder.findUnique.mockResolvedValue({
+      id: 'provider-order-1',
+      providerId: 'provider-1',
+      subtotalAmount: 18,
+      paymentStatus: 'PAYMENT_PENDING',
+      order: { id: 'order-1', clientId: 'client-1' },
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: 'acct_provider_1',
+    });
+
+    const result = await service.confirmDemoProviderOrderPayment(
+      'provider-order-1',
+      'client-1',
+      ['CLIENT'] as never,
+    );
+
+    expect(ordersServiceMock.prepareProviderOrderPayment).toHaveBeenCalledWith(
+      'provider-order-1',
+    );
+    expect(paymentsServiceMock.confirmProviderOrderPayment).toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        providerOrderId: 'provider-order-1',
+        orderId: 'order-1',
+        mode: 'demo_provider_confirmed',
+      }),
+    );
+  });
+
+  it('confirms a runner payment in demo mode for the owning client', async () => {
+    configService.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'production';
+      if (key === 'DEMO_MODE') return 'true';
+      return undefined;
+    });
+    prismaMock.deliveryOrder.findUnique.mockResolvedValue({
+      id: 'delivery-1',
+      runnerId: 'runner-1',
+      status: 'RUNNER_ASSIGNED',
+      paymentStatus: 'PAYMENT_PENDING',
+      order: { id: 'order-1', clientId: 'client-1' },
+      paymentSessions: [],
+    });
+    prismaMock.user.findUnique.mockResolvedValue({
+      stripeAccountId: 'acct_runner_1',
+    });
+    prismaMock.runnerPaymentSession.create.mockResolvedValue({
+      id: 'runner-session-1',
+      status: PaymentSessionStatus.READY,
+      externalSessionId: 'demo_runner_pi_delivery1',
+    });
+
+    const result = await service.confirmDemoRunnerPayment(
+      'delivery-1',
+      'client-1',
+      ['CLIENT'] as never,
+    );
+
+    expect(prismaMock.runnerPaymentSession.create).toHaveBeenCalled();
+    expect(deliveryServiceMock.confirmRunnerPayment).toHaveBeenCalledWith(
+      expect.stringContaining('demo_runner_pi_'),
+      expect.stringContaining('demo_runner_evt_'),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        deliveryOrderId: 'delivery-1',
+        orderId: 'order-1',
+        mode: 'demo_runner_confirmed',
+      }),
+    );
   });
 
   it('blocks demo endpoints in production unless DEMO_MODE=true', async () => {

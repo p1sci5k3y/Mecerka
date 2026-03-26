@@ -13,6 +13,8 @@ const getOneMock = vi.fn()
 const prepareOrderProviderPaymentsMock = vi.fn()
 const prepareProviderOrderPaymentMock = vi.fn()
 const prepareRunnerPaymentMock = vi.fn()
+const confirmDemoProviderOrderPaymentMock = vi.fn()
+const confirmDemoRunnerPaymentMock = vi.fn()
 const useAuthMock = vi.fn()
 const getPublicRuntimeConfigMock = vi.fn()
 const toastInfoMock = vi.fn()
@@ -44,6 +46,14 @@ vi.mock("@/lib/services/payments-service", () => ({
       prepareProviderOrderPaymentMock(...args),
     prepareRunnerPayment: (...args: unknown[]) =>
       prepareRunnerPaymentMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/demo-service", () => ({
+  demoService: {
+    confirmProviderOrderPayment: (...args: unknown[]) =>
+      confirmDemoProviderOrderPaymentMock(...args),
+    confirmRunnerPayment: (...args: unknown[]) => confirmDemoRunnerPaymentMock(...args),
   },
 }))
 
@@ -212,6 +222,8 @@ describe("OrderPaymentsPage experience", () => {
     prepareOrderProviderPaymentsMock.mockReset()
     prepareProviderOrderPaymentMock.mockReset()
     prepareRunnerPaymentMock.mockReset()
+    confirmDemoProviderOrderPaymentMock.mockReset()
+    confirmDemoRunnerPaymentMock.mockReset()
     getPublicRuntimeConfigMock.mockReset()
     toastInfoMock.mockReset()
     toastErrorMock.mockReset()
@@ -295,6 +307,218 @@ describe("OrderPaymentsPage experience", () => {
     expect(
       screen.getByText(/el runner sigue siendo un pago separado y visible/i),
     ).toBeInTheDocument()
+  })
+
+  it("completes provider and runner payments through the explicit demo flow when Stripe is dummy", async () => {
+    getPublicRuntimeConfigMock.mockResolvedValue({
+      stripePublishableKey: "pk_test_dummy",
+    })
+    getOneMock
+      .mockResolvedValueOnce(makeOrder())
+      .mockResolvedValueOnce(
+        makeOrder({
+          providerOrders: [
+            makeProviderOrder({
+              id: "provider-order-1",
+              paymentStatus: "PAID",
+              status: "READY_FOR_PICKUP",
+            }),
+            makeProviderOrder({
+              id: "provider-order-2",
+              providerId: "provider-2",
+              providerName: "Cuero Sur",
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              subtotal: 24,
+              originalSubtotal: 24,
+              discountAmount: 0,
+            }),
+          ],
+          deliveryOrder: {
+            id: "delivery-1",
+            runnerId: "runner-1",
+            status: "ASSIGNED",
+            paymentStatus: "PAYMENT_PENDING",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeOrder({
+          providerOrders: [
+            makeProviderOrder({
+              id: "provider-order-1",
+              paymentStatus: "PAID",
+              status: "READY_FOR_PICKUP",
+            }),
+            makeProviderOrder({
+              id: "provider-order-2",
+              providerId: "provider-2",
+              providerName: "Cuero Sur",
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              subtotal: 24,
+              originalSubtotal: 24,
+              discountAmount: 0,
+            }),
+          ],
+          deliveryOrder: {
+            id: "delivery-1",
+            runnerId: "runner-1",
+            status: "ASSIGNED",
+            paymentStatus: "PAID",
+          },
+        }),
+      )
+    prepareOrderProviderPaymentsMock
+      .mockResolvedValueOnce(
+        makeAggregate({
+          paymentEnvironment: "UNAVAILABLE",
+          paymentEnvironmentMessage: "Stripe no está habilitado en demo.",
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeAggregate({
+          paymentEnvironment: "UNAVAILABLE",
+          paymentEnvironmentMessage: "Stripe no está habilitado en demo.",
+          providerPaymentStatus: "PARTIALLY_PAID",
+          paidProviderOrders: 2,
+          providerOrders: [
+            {
+              providerOrderId: "provider-order-1",
+              providerId: "provider-1",
+              providerName: "Cerámica Norte",
+              subtotalAmount: 18,
+              originalSubtotalAmount: 22,
+              discountAmount: 4,
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              paymentRequired: false,
+              paymentSession: null,
+            },
+            {
+              providerOrderId: "provider-order-2",
+              providerId: "provider-2",
+              providerName: "Cuero Sur",
+              subtotalAmount: 24,
+              originalSubtotalAmount: 24,
+              discountAmount: 0,
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              paymentRequired: false,
+              paymentSession: null,
+            },
+          ],
+          runnerPayment: {
+            paymentMode: "DELIVERY_ORDER_SESSION",
+            deliveryOrderId: "delivery-1",
+            runnerId: "runner-1",
+            deliveryStatus: "ASSIGNED",
+            paymentStatus: "PAYMENT_PENDING",
+            paymentRequired: true,
+            sessionPrepared: false,
+            amount: 6.5,
+            currency: "EUR",
+            pricingDistanceKm: 4,
+            pickupCount: 2,
+            additionalPickupCount: 1,
+            baseFee: 3.5,
+            perKmFee: 0.5,
+            distanceFee: 2,
+            extraPickupFee: 1,
+            extraPickupCharge: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeAggregate({
+          paymentEnvironment: "UNAVAILABLE",
+          paymentEnvironmentMessage: "Stripe no está habilitado en demo.",
+          providerPaymentStatus: "PAID",
+          paidProviderOrders: 2,
+          providerOrders: [
+            {
+              providerOrderId: "provider-order-1",
+              providerId: "provider-1",
+              providerName: "Cerámica Norte",
+              subtotalAmount: 18,
+              originalSubtotalAmount: 22,
+              discountAmount: 4,
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              paymentRequired: false,
+              paymentSession: null,
+            },
+            {
+              providerOrderId: "provider-order-2",
+              providerId: "provider-2",
+              providerName: "Cuero Sur",
+              subtotalAmount: 24,
+              originalSubtotalAmount: 24,
+              discountAmount: 0,
+              status: "READY_FOR_PICKUP",
+              paymentStatus: "PAID",
+              paymentRequired: false,
+              paymentSession: null,
+            },
+          ],
+          runnerPayment: {
+            paymentMode: "DELIVERY_ORDER_SESSION",
+            deliveryOrderId: "delivery-1",
+            runnerId: "runner-1",
+            deliveryStatus: "PICKUP_PENDING",
+            paymentStatus: "PAID",
+            paymentRequired: false,
+            sessionPrepared: false,
+            amount: 6.5,
+            currency: "EUR",
+            pricingDistanceKm: 4,
+            pickupCount: 2,
+            additionalPickupCount: 1,
+            baseFee: 3.5,
+            perKmFee: 0.5,
+            distanceFee: 2,
+            extraPickupFee: 1,
+            extraPickupCharge: 1,
+          },
+        }),
+      )
+    confirmDemoProviderOrderPaymentMock.mockResolvedValueOnce({ ok: true })
+    confirmDemoRunnerPaymentMock.mockResolvedValueOnce({ ok: true })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: /Completar pago demo de este comercio/i,
+        }),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Completar pago demo de este comercio/i,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(confirmDemoProviderOrderPaymentMock).toHaveBeenCalledWith(
+        "provider-order-1",
+      )
+    })
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Completar pago demo de reparto/i,
+      }),
+    )
+
+    await waitFor(() => {
+      expect(confirmDemoRunnerPaymentMock).toHaveBeenCalledWith("delivery-1")
+      expect(getOneMock).toHaveBeenCalledTimes(3)
+      expect(prepareOrderProviderPaymentsMock).toHaveBeenCalledTimes(3)
+    })
   })
 
   it("redirects guests back to login preserving the return target", async () => {
@@ -433,5 +657,117 @@ describe("OrderPaymentsPage experience", () => {
       expect(getOneMock).toHaveBeenCalledTimes(2)
       expect(prepareOrderProviderPaymentsMock).toHaveBeenCalledTimes(2)
     })
+  })
+
+  it("keeps direct exits to order center and tracking", async () => {
+    getOneMock.mockResolvedValueOnce(makeOrder())
+    prepareOrderProviderPaymentsMock.mockResolvedValueOnce(makeAggregate())
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Pedido y pagos por comercio")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver mis pedidos/i }))
+    expect(routerPushMock).toHaveBeenCalledWith("/orders")
+
+    fireEvent.click(screen.getByRole("button", { name: /Seguir este pedido/i }))
+    expect(routerPushMock).toHaveBeenCalledWith("/orders/order-1/track")
+  })
+
+  it("surfaces a clear post-payment banner when the order is already economically covered", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        providerOrders: [
+          makeProviderOrder({
+            id: "provider-order-1",
+            paymentStatus: "PAID",
+            status: "READY_FOR_PICKUP",
+          }),
+          makeProviderOrder({
+            id: "provider-order-2",
+            providerId: "provider-2",
+            providerName: "Cuero Sur",
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PAID",
+            subtotal: 24,
+            originalSubtotal: 24,
+            discountAmount: 0,
+          }),
+        ],
+        deliveryOrder: {
+          id: "delivery-1",
+          runnerId: "runner-1",
+          status: "ASSIGNED",
+          paymentStatus: "PAID",
+        },
+      }),
+    )
+    prepareOrderProviderPaymentsMock.mockResolvedValueOnce(
+      makeAggregate({
+        providerPaymentStatus: "PAID",
+        paidProviderOrders: 2,
+        providerOrders: [
+          {
+            providerOrderId: "provider-order-1",
+            providerId: "provider-1",
+            providerName: "Cerámica Norte",
+            subtotalAmount: 18,
+            originalSubtotalAmount: 22,
+            discountAmount: 4,
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PAID",
+            paymentRequired: false,
+            paymentSession: null,
+          },
+          {
+            providerOrderId: "provider-order-2",
+            providerId: "provider-2",
+            providerName: "Cuero Sur",
+            subtotalAmount: 24,
+            originalSubtotalAmount: 24,
+            discountAmount: 0,
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PAID",
+            paymentRequired: false,
+            paymentSession: null,
+          },
+        ],
+        runnerPayment: {
+          paymentMode: "DELIVERY_ORDER_SESSION",
+          deliveryOrderId: "delivery-1",
+          runnerId: "runner-1",
+          deliveryStatus: "ASSIGNED",
+          paymentStatus: "PAID",
+          paymentRequired: false,
+          sessionPrepared: false,
+          amount: 6.5,
+          currency: "EUR",
+          pricingDistanceKm: 4,
+          pickupCount: 2,
+          additionalPickupCount: 1,
+          baseFee: 3.5,
+          perKmFee: 0.5,
+          distanceFee: 2,
+          extraPickupFee: 1,
+          extraPickupCharge: 1,
+        },
+      }),
+    )
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Este pedido ya no tiene pagos pendientes."),
+      ).toBeInTheDocument()
+    })
+
+    expect(
+      screen.getByText(/el circuito económico del pedido está cubierto/i),
+    ).toBeInTheDocument()
   })
 })

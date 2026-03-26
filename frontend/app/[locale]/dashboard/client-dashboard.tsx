@@ -91,7 +91,7 @@ export function ClientDashboard() {
                     <section>
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-slate-100">Último Encargo</h2>
-                            <Link href="/profile" className="text-sm font-medium text-[#df795d] hover:underline">Historial Completo</Link>
+                            <Link href="/orders" className="text-sm font-medium text-[#df795d] hover:underline">Historial Completo</Link>
                         </div>
 
                         {activeOrders.length === 0 && pastOrders.length === 0 ? (

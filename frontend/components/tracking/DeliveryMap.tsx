@@ -66,7 +66,7 @@ async function geocode(address: string, fallbackLat: number, fallbackLng: number
 }
 
 export interface DeliveryMapProps {
-    orderId: number;
+    orderId: number | string;
     initialLat?: number;
     initialLng?: number;
     isRunner?: boolean;

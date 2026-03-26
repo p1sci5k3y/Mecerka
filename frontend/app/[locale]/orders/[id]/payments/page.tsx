@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { StripeDirectCheckout } from "@/components/payments/stripe-direct-checkout"
 import { ordersService } from "@/lib/services/orders-service"
 import { paymentsService } from "@/lib/services/payments-service"
+import { demoService } from "@/lib/services/demo-service"
 import { getPublicRuntimeConfig } from "@/lib/runtime-config"
 import { toast } from "sonner"
 import type {
@@ -191,6 +192,9 @@ export default function OrderPaymentsPage() {
   const stripeClientUsable = Boolean(
     stripePublishableKey && !stripePublishableKey.includes("dummy"),
   )
+  const demoStripeMode = Boolean(
+    stripePublishableKey && stripePublishableKey.includes("dummy"),
+  )
 
   useEffect(() => {
     void getPublicRuntimeConfig().then((config) => {
@@ -287,6 +291,13 @@ export default function OrderPaymentsPage() {
     paymentsAggregate?.paymentEnvironment === "UNAVAILABLE"
   const paidCount = paymentsAggregate?.paidProviderOrders ?? 0
   const totalCount = paymentsAggregate?.totalProviderOrders ?? providerPayments.length
+  const allProviderPaymentsCovered =
+    providerPayments.length > 0 &&
+    providerPayments.every((providerOrder) => !providerOrder.paymentRequired)
+  const runnerPaymentCovered =
+    !runnerPayment.paymentRequired || runnerPayment.paymentStatus === "PAID"
+  const orderEconomicallyCovered =
+    allProviderPaymentsCovered && runnerPaymentCovered
 
   const prepareProviderPayment = async (providerOrderId: string) => {
     setPreparingProviderId(providerOrderId)
@@ -354,6 +365,40 @@ export default function OrderPaymentsPage() {
     }
   }
 
+  const confirmDemoProviderPayment = async (providerOrderId: string) => {
+    setPreparingProviderId(providerOrderId)
+    try {
+      await demoService.confirmProviderOrderPayment(providerOrderId)
+      toast.info("Pago demo del comercio confirmado. Actualizando pedido...")
+      await loadPage("refresh")
+    } catch (error: unknown) {
+      toast.error(
+        getErrorMessage(error, "No pudimos completar el pago demo de este comercio."),
+      )
+    } finally {
+      setPreparingProviderId(null)
+    }
+  }
+
+  const confirmDemoRunnerPayment = async () => {
+    if (!runnerPayment.deliveryOrderId) {
+      return
+    }
+
+    setPreparingRunner(true)
+    try {
+      await demoService.confirmRunnerPayment(runnerPayment.deliveryOrderId)
+      toast.info("Pago demo del reparto confirmado. Actualizando pedido...")
+      await loadPage("refresh")
+    } catch (error: unknown) {
+      toast.error(
+        getErrorMessage(error, "No pudimos completar el pago demo del reparto."),
+      )
+    } finally {
+      setPreparingRunner(false)
+    }
+  }
+
   if (isLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -374,11 +419,11 @@ export default function OrderPaymentsPage() {
           <div className="mb-8 flex flex-col gap-3">
             <button
               type="button"
-              onClick={() => router.push("/cart")}
+              onClick={() => router.push("/orders")}
               className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />
-              Volver a la cesta
+              Volver a mis pedidos
             </button>
             <h1 className="font-display text-4xl font-extrabold text-foreground">
               Pedido y pagos por comercio
@@ -401,6 +446,15 @@ export default function OrderPaymentsPage() {
                 El pedido raíz ya existe y los pagos siguen separados por comercio. La estructura económica del pedido sigue siendo válida aunque este entorno no abra las sesiones reales de cobro.
               </p>
               <p className="mt-2">{aggregateError}</p>
+            </div>
+          ) : null}
+
+          {orderEconomicallyCovered ? (
+            <div className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-900">
+              <div className="font-semibold">Este pedido ya no tiene pagos pendientes.</div>
+              <p className="mt-2">
+                El circuito económico del pedido está cubierto. Desde aquí ya puedes pasar a seguimiento y al centro de pedidos sin perder el contexto.
+              </p>
             </div>
           ) : null}
 
@@ -532,32 +586,58 @@ export default function OrderPaymentsPage() {
                     {providerOrder.paymentRequired ? (
                       <div className="mt-5 flex flex-col gap-4">
                         <div className="flex flex-wrap gap-3">
-                          <Button
-                            onClick={() =>
-                              void prepareProviderPayment(
-                                providerOrder.providerOrderId,
-                              )
-                            }
-                            disabled={
-                              paymentsUnavailable ||
-                              preparingProviderId === providerOrder.providerOrderId
-                            }
-                            className="gap-2"
-                          >
-                            {preparingProviderId === providerOrder.providerOrderId ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Preparando pago...
-                              </>
-                            ) : (
-                              <>
-                                <CreditCard className="h-4 w-4" />
-                                {providerOrder.paymentSession
-                                  ? "Revisar pago de este comercio"
-                                  : "Preparar pago de este comercio"}
-                              </>
-                            )}
-                          </Button>
+                          {paymentsUnavailable && demoStripeMode ? (
+                            <Button
+                              onClick={() =>
+                                void confirmDemoProviderPayment(
+                                  providerOrder.providerOrderId,
+                                )
+                              }
+                              disabled={
+                                preparingProviderId === providerOrder.providerOrderId
+                              }
+                              className="gap-2"
+                            >
+                              {preparingProviderId === providerOrder.providerOrderId ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Confirmando pago demo...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="h-4 w-4" />
+                                  Completar pago demo de este comercio
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() =>
+                                void prepareProviderPayment(
+                                  providerOrder.providerOrderId,
+                                )
+                              }
+                              disabled={
+                                paymentsUnavailable ||
+                                preparingProviderId === providerOrder.providerOrderId
+                              }
+                              className="gap-2"
+                            >
+                              {preparingProviderId === providerOrder.providerOrderId ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Preparando pago...
+                                </>
+                              ) : (
+                                <>
+                                  <CreditCard className="h-4 w-4" />
+                                  {providerOrder.paymentSession
+                                    ? "Revisar pago de este comercio"
+                                    : "Preparar pago de este comercio"}
+                                </>
+                              )}
+                            </Button>
+                          )}
 
                           {providerOrder.paymentSession && canOpenStripe ? (
                             <Button
@@ -574,7 +654,11 @@ export default function OrderPaymentsPage() {
                           ) : null}
                         </div>
 
-                        {paymentsUnavailable ? (
+                        {paymentsUnavailable && demoStripeMode ? (
+                          <p className="text-sm text-muted-foreground">
+                            Este entorno demo mantiene el pedido multiproveedor y permite confirmar pagos demo por comercio sin abrir Stripe real.
+                          </p>
+                        ) : paymentsUnavailable ? (
                           <p className="text-sm text-muted-foreground">
                             Este entorno demo conserva el pedido multiproveedor y sus subtotales, pero no abre cobros Stripe reales por comercio.
                           </p>
@@ -696,20 +780,37 @@ export default function OrderPaymentsPage() {
 
                   {runnerPayment.paymentRequired && runnerPayment.deliveryOrderId ? (
                     <div className="mt-5 flex flex-col gap-4">
-                      <Button
-                        variant="outline"
-                        onClick={() => void prepareRunnerPayment()}
-                        disabled={paymentsUnavailable || preparingRunner}
-                      >
-                        {preparingRunner ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Preparando pago de reparto...
-                          </>
-                        ) : (
-                          "Preparar pago de reparto"
-                        )}
-                      </Button>
+                      {paymentsUnavailable && demoStripeMode ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => void confirmDemoRunnerPayment()}
+                          disabled={preparingRunner}
+                        >
+                          {preparingRunner ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Confirmando pago demo de reparto...
+                            </>
+                          ) : (
+                            "Completar pago demo de reparto"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => void prepareRunnerPayment()}
+                          disabled={paymentsUnavailable || preparingRunner}
+                        >
+                          {preparingRunner ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Preparando pago de reparto...
+                            </>
+                          ) : (
+                            "Preparar pago de reparto"
+                          )}
+                        </Button>
+                      )}
 
                       {runnerSession?.clientSecret &&
                       runnerSession.stripeAccountId &&
@@ -728,6 +829,10 @@ export default function OrderPaymentsPage() {
                         </div>
                       ) : null}
                     </div>
+                  ) : paymentsUnavailable && demoStripeMode ? (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                      En la demo el runner sigue siendo un pago separado y visible, y puedes confirmarlo con un flujo demo sin pasar por Stripe real.
+                    </p>
                   ) : paymentsUnavailable ? (
                     <p className="mt-4 text-sm text-muted-foreground">
                       En la demo el runner sigue siendo un pago separado y visible, pero el cobro Stripe real queda desactivado de forma explícita.
@@ -762,6 +867,17 @@ export default function OrderPaymentsPage() {
                         </>
                       )}
                     </Button>
+                    <Button variant="outline" onClick={() => router.push("/orders")}>
+                      Ver mis pedidos
+                    </Button>
+                    {orderId ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => router.push(`/orders/${orderId}/track`)}
+                      >
+                        Seguir este pedido
+                      </Button>
+                    ) : null}
                     <Button variant="outline" onClick={() => router.push("/products")}>
                       Seguir comprando
                     </Button>
