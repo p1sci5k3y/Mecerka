@@ -365,6 +365,9 @@ describe('AdminService role grants', () => {
             incidentId: null,
             providerOrderId: 'provider-order-1',
             deliveryOrderId: null,
+            incident: null,
+            providerOrder: { orderId: 'order-1' },
+            deliveryOrder: null,
             type: 'PROVIDER_PARTIAL',
             status: 'UNDER_REVIEW',
             amount: { toString: () => '18.5' },
@@ -392,6 +395,7 @@ describe('AdminService role grants', () => {
           expect.objectContaining({
             id: 'refund-1',
             amount: 18.5,
+            orderId: 'order-1',
             requestedByEmail: 'client@example.com',
             reviewedByEmail: 'admin@example.com',
           }),
@@ -405,6 +409,7 @@ describe('AdminService role grants', () => {
           {
             id: 'incident-1',
             deliveryOrderId: 'delivery-order-1',
+            deliveryOrder: { orderId: 'order-7' },
             reporterId: 'runner-1',
             reporterRole: 'RUNNER',
             type: 'FAILED_DELIVERY',
@@ -428,6 +433,7 @@ describe('AdminService role grants', () => {
         expect(result).toEqual([
           expect.objectContaining({
             id: 'incident-1',
+            orderId: 'order-7',
             reporterEmail: 'runner@example.com',
             reporterName: 'Runner Demo',
           }),

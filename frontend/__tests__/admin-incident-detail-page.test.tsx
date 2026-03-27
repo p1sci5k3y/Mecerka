@@ -46,6 +46,7 @@ vi.mock("@/components/ui/badge", () => ({
 const incident = {
   id: "incident-1",
   deliveryOrderId: "delivery-order-1",
+  orderId: "order-7",
   reporterId: "runner-1",
   reporterRole: "RUNNER",
   type: "FAILED_DELIVERY",
@@ -72,6 +73,14 @@ describe("Admin incident detail page", () => {
     expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
     expect(screen.getByText("delivery-order-1")).toBeInTheDocument()
     expect(screen.getByText("Runner Demo")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Ver pedido cliente/i })).toHaveAttribute(
+      "href",
+      "/orders/order-7",
+    )
+    expect(screen.getByRole("link", { name: /Ver entrega de reparto/i })).toHaveAttribute(
+      "href",
+      "/runner/orders/delivery-order-1",
+    )
     expect(screen.getByRole("link", { name: /Ver evidencia/i })).toHaveAttribute(
       "href",
       "https://example.com/evidence.jpg",

@@ -172,6 +172,7 @@ export interface DeliveryIncidentSummary {
 }
 
 export interface AdminRefundSummary extends RefundSummary {
+  orderId: string | null
   requestedByEmail: string
   requestedByName: string | null
   reviewedByEmail: string | null
@@ -181,6 +182,7 @@ export interface AdminRefundSummary extends RefundSummary {
 export interface AdminIncidentSummary {
   id: string
   deliveryOrderId: string
+  orderId: string
   reporterId: string
   reporterRole: string
   type: string

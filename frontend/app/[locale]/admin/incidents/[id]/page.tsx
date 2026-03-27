@@ -8,7 +8,7 @@ import type { AdminIncidentSummary } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { AlertTriangle, ArrowLeft, Camera, Route, UserRound } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Camera, ExternalLink, Route, ShoppingBag, UserRound } from "lucide-react"
 
 function formatDate(value: string | null) {
   if (!value) return "Sin fecha"
@@ -45,6 +45,21 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
     default:
       return "outline"
   }
+}
+
+function buildIncidentLinks(incident: AdminIncidentSummary) {
+  return [
+    {
+      href: `/orders/${incident.orderId}`,
+      label: "Ver pedido cliente",
+      icon: ShoppingBag,
+    },
+    {
+      href: `/runner/orders/${incident.deliveryOrderId}`,
+      label: "Ver entrega de reparto",
+      icon: Route,
+    },
+  ]
 }
 
 export default function AdminIncidentDetailPage() {
@@ -212,6 +227,26 @@ export default function AdminIncidentDetailPage() {
         </section>
 
         <aside className="space-y-6">
+          <div className="rounded-xl border bg-card p-6">
+            <div className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Saltos de contexto</h2>
+            </div>
+            <div className="mt-5 flex flex-col gap-2">
+              {buildIncidentLinks(incident).map((link) => {
+                const Icon = link.icon
+                return (
+                  <Button key={link.href} asChild variant="outline" className="justify-start">
+                    <Link href={link.href}>
+                      <Icon className="mr-2 h-4 w-4" />
+                      {link.label}
+                    </Link>
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="rounded-xl border bg-card p-6">
             <div className="flex items-center gap-2">
               <UserRound className="h-5 w-5 text-primary" />

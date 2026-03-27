@@ -8,7 +8,7 @@ import type { AdminRefundSummary } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { ArrowLeft, CreditCard, HandCoins, Receipt, UserRound } from "lucide-react"
+import { ArrowLeft, CreditCard, ExternalLink, HandCoins, Receipt, Route, ShoppingBag, UserRound } from "lucide-react"
 
 function formatAmount(amount: number, currency: string) {
   return new Intl.NumberFormat("es-ES", {
@@ -62,6 +62,39 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
     default:
       return "outline"
   }
+}
+
+function buildRefundLinks(refund: AdminRefundSummary) {
+  return [
+    refund.orderId
+      ? {
+          href: `/orders/${refund.orderId}`,
+          label: "Ver pedido cliente",
+          icon: ShoppingBag,
+        }
+      : null,
+    refund.providerOrderId
+      ? {
+          href: `/provider/sales/${refund.providerOrderId}`,
+          label: "Ver venta de comercio",
+          icon: CreditCard,
+        }
+      : null,
+    refund.deliveryOrderId
+      ? {
+          href: `/runner/orders/${refund.deliveryOrderId}`,
+          label: "Ver entrega de reparto",
+          icon: Route,
+        }
+      : null,
+    refund.incidentId
+      ? {
+          href: `/admin/incidents/${refund.incidentId}`,
+          label: "Ver incidencia origen",
+          icon: ExternalLink,
+        }
+      : null,
+  ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
 }
 
 export default function AdminRefundDetailPage() {
@@ -248,6 +281,26 @@ export default function AdminRefundDetailPage() {
         </section>
 
         <aside className="space-y-6">
+          <div className="rounded-xl border bg-card p-6">
+            <div className="flex items-center gap-2">
+              <ExternalLink className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Saltos de contexto</h2>
+            </div>
+            <div className="mt-5 flex flex-col gap-2">
+              {buildRefundLinks(refund).map((link) => {
+                const Icon = link.icon
+                return (
+                  <Button key={link.href} asChild variant="outline" className="justify-start">
+                    <Link href={link.href}>
+                      <Icon className="mr-2 h-4 w-4" />
+                      {link.label}
+                    </Link>
+                  </Button>
+                )
+              })}
+            </div>
+          </div>
+
           <div className="rounded-xl border bg-card p-6">
             <div className="flex items-center gap-2">
               <UserRound className="h-5 w-5 text-primary" />

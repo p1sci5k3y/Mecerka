@@ -50,6 +50,7 @@ const refund = {
   incidentId: null,
   providerOrderId: "provider-order-1",
   deliveryOrderId: null,
+  orderId: "order-1",
   type: "PROVIDER_PARTIAL",
   status: "UNDER_REVIEW",
   amount: 12.5,
@@ -80,6 +81,14 @@ describe("Admin refund detail page", () => {
     expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
     expect(screen.getByText("Comercio provider-order-1")).toBeInTheDocument()
     expect(screen.getByText("Client Demo")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Ver pedido cliente/i })).toHaveAttribute(
+      "href",
+      "/orders/order-1",
+    )
+    expect(screen.getByRole("link", { name: /Ver venta de comercio/i })).toHaveAttribute(
+      "href",
+      "/provider/sales/provider-order-1",
+    )
     expect(screen.getByRole("button", { name: /Aprobar/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Rechazar/i })).toBeInTheDocument()
   })

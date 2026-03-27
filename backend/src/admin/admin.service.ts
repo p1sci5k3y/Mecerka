@@ -311,6 +311,25 @@ export class AdminService {
         incidentId: true,
         providerOrderId: true,
         deliveryOrderId: true,
+        incident: {
+          select: {
+            deliveryOrder: {
+              select: {
+                orderId: true,
+              },
+            },
+          },
+        },
+        providerOrder: {
+          select: {
+            orderId: true,
+          },
+        },
+        deliveryOrder: {
+          select: {
+            orderId: true,
+          },
+        },
         type: true,
         status: true,
         amount: true,
@@ -341,6 +360,11 @@ export class AdminService {
       incidentId: refund.incidentId ?? null,
       providerOrderId: refund.providerOrderId ?? null,
       deliveryOrderId: refund.deliveryOrderId ?? null,
+      orderId:
+        refund.providerOrder?.orderId ??
+        refund.deliveryOrder?.orderId ??
+        refund.incident?.deliveryOrder.orderId ??
+        null,
       type: refund.type,
       status: refund.status,
       amount: Number(refund.amount),
@@ -365,6 +389,11 @@ export class AdminService {
       select: {
         id: true,
         deliveryOrderId: true,
+        deliveryOrder: {
+          select: {
+            orderId: true,
+          },
+        },
         reporterId: true,
         reporterRole: true,
         type: true,
@@ -385,6 +414,7 @@ export class AdminService {
     return incidents.map((incident) => ({
       id: incident.id,
       deliveryOrderId: incident.deliveryOrderId,
+      orderId: incident.deliveryOrder.orderId,
       reporterId: incident.reporterId,
       reporterRole: incident.reporterRole,
       type: incident.type,
