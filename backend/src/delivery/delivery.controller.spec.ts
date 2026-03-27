@@ -45,6 +45,7 @@ describe('DeliveryController', () => {
       getDeliveryTracking: jest.fn().mockResolvedValue({}),
       getDeliveryLocationHistory: jest.fn().mockResolvedValue([]),
       createIncident: jest.fn().mockResolvedValue({ id: 'incident-1' }),
+      listMyIncidents: jest.fn().mockResolvedValue([]),
       getIncident: jest.fn().mockResolvedValue({ id: 'incident-1' }),
       listDeliveryIncidents: jest.fn().mockResolvedValue([]),
       reviewIncident: jest.fn().mockResolvedValue({ id: 'incident-1' }),
@@ -233,6 +234,13 @@ describe('DeliveryController', () => {
         'incident-1',
         'client-1',
         [Role.CLIENT],
+      );
+    });
+
+    it('listMyIncidents delegates correctly', async () => {
+      await controller.listMyIncidents({ user: clientUser });
+      expect(deliveryServiceMock.listMyIncidents).toHaveBeenCalledWith(
+        'client-1',
       );
     });
 

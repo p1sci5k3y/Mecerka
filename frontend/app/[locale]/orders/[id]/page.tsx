@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CreditCard,
+  LifeBuoy,
   Loader2,
   MapPinned,
   PackageCheck,
@@ -287,6 +288,12 @@ function OrderDetailContent() {
                       <Link href={`/orders/${order.id}/track`}>
                         <Truck className="mr-2 h-4 w-4" />
                         {actions?.deliveryActive ? "Seguir pedido" : "Abrir seguimiento"}
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/profile/support">
+                        <LifeBuoy className="mr-2 h-4 w-4" />
+                        Mi soporte
                       </Link>
                     </Button>
                     <Button asChild variant="outline">

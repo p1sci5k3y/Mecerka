@@ -259,6 +259,33 @@ export class DeliveryIncidentService {
     );
   }
 
+  async listClientIncidents(userId: string) {
+    const incidents = await this.prisma.deliveryIncident.findMany({
+      where: {
+        deliveryOrder: {
+          order: {
+            clientId: userId,
+          },
+        },
+      },
+      include: {
+        deliveryOrder: {
+          select: {
+            orderId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return incidents.map((incident) => ({
+      ...this.domainPolicy.sanitizeIncident(incident),
+      orderId: incident.deliveryOrder.orderId,
+    }));
+  }
+
   async reviewIncident(incidentId: string, actorId: string) {
     return this.transitionIncidentStatus(
       incidentId,

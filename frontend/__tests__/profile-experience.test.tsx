@@ -129,6 +129,10 @@ describe("Profile role request experience", () => {
       "href",
       "/profile/payments",
     )
+    expect(screen.getByRole("link", { name: "Abrir centro de soporte" })).toHaveAttribute(
+      "href",
+      "/profile/support",
+    )
 
     const roleSelect = screen.getByLabelText("Rol solicitado") as HTMLSelectElement
     expect(roleSelect.value).toBe("PROVIDER")

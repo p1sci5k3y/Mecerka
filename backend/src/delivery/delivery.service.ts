@@ -432,6 +432,10 @@ export class DeliveryService {
     );
   }
 
+  async listMyIncidents(userId: string) {
+    return this.incidentService.listClientIncidents(userId);
+  }
+
   async reviewIncident(incidentId: string, actorId: string) {
     return this.incidentService.reviewIncident(incidentId, actorId);
   }

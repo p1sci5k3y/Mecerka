@@ -3,6 +3,7 @@ import type { RefundSummary } from "@/lib/types"
 
 type BackendRefundSummary = {
   id: string
+  orderId?: string | null
   incidentId?: string | null
   providerOrderId?: string | null
   deliveryOrderId?: string | null
@@ -21,6 +22,7 @@ type BackendRefundSummary = {
 function mapRefund(refund: BackendRefundSummary): RefundSummary {
   return {
     id: String(refund.id),
+    orderId: refund.orderId ?? null,
     incidentId: refund.incidentId ?? null,
     providerOrderId: refund.providerOrderId ?? null,
     deliveryOrderId: refund.deliveryOrderId ?? null,
@@ -38,6 +40,11 @@ function mapRefund(refund: BackendRefundSummary): RefundSummary {
 }
 
 export const refundsService = {
+  async getMyRefunds() {
+    const data = await api.get<BackendRefundSummary[]>("/refunds/me")
+    return data.map(mapRefund)
+  },
+
   async getProviderOrderRefunds(providerOrderId: string) {
     const data = await api.get<BackendRefundSummary[]>(
       `/refunds/provider-order/${providerOrderId}`,

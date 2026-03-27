@@ -329,6 +329,22 @@ function ProfileContent() {
             </div>
           </section>
 
+          <section>
+            <SectionHeader title="Soporte postpedido" subtitle="Consulta incidencias y devoluciones abiertas o cerradas sin buscar pedido a pedido." />
+            <div className="mt-6 rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Cuando un pedido tiene un problema, ya puedes seguir el caso desde su seguimiento. Y desde aquí tienes un centro único para revisar todas tus incidencias y devoluciones.
+                </p>
+                <div>
+                  <Button asChild variant="outline" className="h-12 rounded-xl font-bold">
+                    <Link href="/profile/support">Abrir centro de soporte</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Role Management */}
           <section>
             <SectionHeader title="Solicitud de roles" subtitle="Solicita tu alta como proveedor o repartidor desde tu cuenta actual." />

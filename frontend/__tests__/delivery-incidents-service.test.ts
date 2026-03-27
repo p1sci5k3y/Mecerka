@@ -46,6 +46,38 @@ describe("delivery-incidents-service", () => {
     ])
   })
 
+  it("maps the client-wide incident inbox with order links", async () => {
+    apiGetMock.mockResolvedValueOnce([
+      {
+        id: "incident-3",
+        orderId: "order-9",
+        deliveryOrderId: "delivery-9",
+        reporterRole: "CLIENT",
+        type: "FAILED_DELIVERY",
+        status: "UNDER_REVIEW",
+        description: "El repartidor no pudo completar la entrega",
+        evidenceUrl: null,
+        createdAt: "2026-03-27T12:00:00.000Z",
+        resolvedAt: null,
+      },
+    ])
+
+    const { deliveryIncidentsService } = await import(
+      "@/lib/services/delivery-incidents-service"
+    )
+    const incidents = await deliveryIncidentsService.listMyIncidents()
+
+    expect(apiGetMock).toHaveBeenCalledWith("/delivery/incidents/me")
+    expect(incidents).toEqual([
+      expect.objectContaining({
+        id: "incident-3",
+        orderId: "order-9",
+        deliveryOrderId: "delivery-9",
+        status: "UNDER_REVIEW",
+      }),
+    ])
+  })
+
   it("creates delivery incidents through the backend contract", async () => {
     apiPostMock.mockResolvedValueOnce({
       id: "incident-2",

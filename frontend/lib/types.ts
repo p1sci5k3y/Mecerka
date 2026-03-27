@@ -137,6 +137,7 @@ export interface RunnerPaymentSessionSummary {
 
 export interface RefundSummary {
   id: string
+  orderId?: string | null
   incidentId: string | null
   providerOrderId: string | null
   deliveryOrderId: string | null
@@ -154,6 +155,7 @@ export interface RefundSummary {
 
 export interface DeliveryIncidentSummary {
   id: string
+  orderId?: string | null
   deliveryOrderId: string
   reporterRole: "CLIENT" | "RUNNER" | "PROVIDER" | "ADMIN"
   type:

@@ -151,6 +151,10 @@ describe("OrderDetailPage", () => {
       "href",
       "/orders/order-1/track",
     )
+    expect(screen.getByRole("link", { name: /Mi soporte/i })).toHaveAttribute(
+      "href",
+      "/profile/support",
+    )
     expect(screen.getAllByText("Cerámica Norte")).toHaveLength(2)
     expect(screen.getByText("Cuenco artesanal")).toBeInTheDocument()
   })

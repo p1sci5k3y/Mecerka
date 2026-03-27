@@ -226,4 +226,48 @@ export class RefundRequestQueryService {
       this.refundBoundaryService.sanitizeRefund(refund),
     );
   }
+
+  async listClientRefunds(userId: string) {
+    const refunds = await this.prisma.refundRequest.findMany({
+      where: {
+        OR: [
+          {
+            providerOrder: {
+              order: {
+                clientId: userId,
+              },
+            },
+          },
+          {
+            deliveryOrder: {
+              order: {
+                clientId: userId,
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        providerOrder: {
+          select: {
+            orderId: true,
+          },
+        },
+        deliveryOrder: {
+          select: {
+            orderId: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return refunds.map((refund) => ({
+      ...this.refundBoundaryService.sanitizeRefund(refund),
+      orderId:
+        refund.providerOrder?.orderId ?? refund.deliveryOrder?.orderId ?? null,
+    }));
+  }
 }

@@ -36,6 +36,12 @@ export class RefundsController {
     );
   }
 
+  @Get('me')
+  @Roles(Role.CLIENT)
+  listMyRefunds(@Request() req: RequestWithUser) {
+    return this.refundsService.listClientRefunds(req.user.userId);
+  }
+
   @Get(':id')
   @Roles(Role.CLIENT, Role.PROVIDER, Role.ADMIN)
   getRefund(

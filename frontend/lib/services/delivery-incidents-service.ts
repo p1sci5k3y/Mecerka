@@ -3,6 +3,7 @@ import type { DeliveryIncidentSummary } from "@/lib/types"
 
 type BackendDeliveryIncidentSummary = {
   id: string
+  orderId?: string | null
   deliveryOrderId: string
   reporterRole: "CLIENT" | "RUNNER" | "PROVIDER" | "ADMIN"
   type:
@@ -25,6 +26,7 @@ function mapIncident(
 ): DeliveryIncidentSummary {
   return {
     id: incident.id,
+    orderId: incident.orderId ?? null,
     deliveryOrderId: incident.deliveryOrderId,
     reporterRole: incident.reporterRole,
     type: incident.type,
@@ -37,6 +39,13 @@ function mapIncident(
 }
 
 export const deliveryIncidentsService = {
+  async listMyIncidents() {
+    const data = await api.get<BackendDeliveryIncidentSummary[]>(
+      "/delivery/incidents/me",
+    )
+    return data.map(mapIncident)
+  },
+
   async listDeliveryOrderIncidents(deliveryOrderId: string) {
     const data = await api.get<BackendDeliveryIncidentSummary[]>(
       `/delivery/orders/${deliveryOrderId}/incidents`,

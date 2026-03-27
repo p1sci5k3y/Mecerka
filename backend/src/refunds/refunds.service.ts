@@ -101,6 +101,10 @@ export class RefundsService {
     );
   }
 
+  async listClientRefunds(userId: string) {
+    return this.refundRequestQueryService.listClientRefunds(userId);
+  }
+
   private async transitionRefundStatus(
     refundRequestId: string,
     actorId: string,

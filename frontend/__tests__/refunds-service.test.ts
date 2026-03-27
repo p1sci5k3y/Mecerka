@@ -82,6 +82,40 @@ describe("refunds-service", () => {
     ])
   })
 
+  it("maps the client-wide refund inbox with order links", async () => {
+    apiGetMock.mockResolvedValueOnce([
+      {
+        id: "refund-4",
+        orderId: "order-1",
+        providerOrderId: "provider-order-1",
+        deliveryOrderId: null,
+        type: "PROVIDER_FULL",
+        status: "COMPLETED",
+        amount: "14.20",
+        currency: "EUR",
+        requestedById: "client-1",
+        reviewedById: "admin-1",
+        externalRefundId: "re_done",
+        createdAt: "2026-03-27T14:00:00.000Z",
+        reviewedAt: "2026-03-27T15:00:00.000Z",
+        completedAt: "2026-03-27T16:00:00.000Z",
+      },
+    ])
+
+    const { refundsService } = await import("@/lib/services/refunds-service")
+    const refunds = await refundsService.getMyRefunds()
+
+    expect(apiGetMock).toHaveBeenCalledWith("/refunds/me")
+    expect(refunds).toEqual([
+      expect.objectContaining({
+        id: "refund-4",
+        orderId: "order-1",
+        amount: 14.2,
+        status: "COMPLETED",
+      }),
+    ])
+  })
+
   it("submits refund requests through the backend contract", async () => {
     apiPostMock.mockResolvedValueOnce({
       id: "refund-3",

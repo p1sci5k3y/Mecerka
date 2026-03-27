@@ -6,6 +6,7 @@ describe('RefundsController', () => {
   let refundsServiceMock: {
     requestRefund: jest.Mock;
     getRefund: jest.Mock;
+    listClientRefunds: jest.Mock;
     listProviderOrderRefunds: jest.Mock;
     listDeliveryOrderRefunds: jest.Mock;
     reviewRefund: jest.Mock;
@@ -25,6 +26,7 @@ describe('RefundsController', () => {
     refundsServiceMock = {
       requestRefund: jest.fn().mockResolvedValue({ id: 'refund-1' }),
       getRefund: jest.fn().mockResolvedValue({ id: 'refund-1' }),
+      listClientRefunds: jest.fn().mockResolvedValue([]),
       listProviderOrderRefunds: jest.fn().mockResolvedValue([]),
       listDeliveryOrderRefunds: jest.fn().mockResolvedValue([]),
       reviewRefund: jest.fn().mockResolvedValue({ status: 'UNDER_REVIEW' }),
@@ -49,6 +51,7 @@ describe('RefundsController', () => {
   });
 
   it('delegates refund reads and listing endpoints', async () => {
+    await controller.listMyRefunds(req as never);
     await controller.getRefund(
       '9c1fc56f-d632-4cb0-b01e-e907c3e54eb4',
       req as never,
@@ -62,6 +65,7 @@ describe('RefundsController', () => {
       req as never,
     );
 
+    expect(refundsServiceMock.listClientRefunds).toHaveBeenCalledWith('user-1');
     expect(refundsServiceMock.getRefund).toHaveBeenCalledWith(
       '9c1fc56f-d632-4cb0-b01e-e907c3e54eb4',
       'user-1',

@@ -209,6 +209,12 @@ export class DeliveryController {
     );
   }
 
+  @Get('incidents/me')
+  @Roles(Role.CLIENT)
+  listMyIncidents(@Request() req: { user: UserFromJwt }) {
+    return this.deliveryService.listMyIncidents(req.user.userId);
+  }
+
   @Get('incidents/:id')
   @Roles(Role.CLIENT, Role.RUNNER, Role.PROVIDER, Role.ADMIN)
   getIncident(
