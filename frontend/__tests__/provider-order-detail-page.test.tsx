@@ -5,6 +5,7 @@ import type { Order } from "@/lib/types"
 const mockUseParams = vi.fn()
 const getAllMock = vi.fn()
 const getProviderOrderRefundsMock = vi.fn()
+const listDeliveryOrderIncidentsMock = vi.fn()
 const useAuthMock = vi.fn()
 
 vi.mock("next/navigation", () => ({
@@ -20,6 +21,12 @@ vi.mock("@/lib/services/orders-service", () => ({
 vi.mock("@/lib/services/refunds-service", () => ({
   refundsService: {
     getProviderOrderRefunds: (...args: unknown[]) => getProviderOrderRefundsMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/delivery-incidents-service", () => ({
+  deliveryIncidentsService: {
+    listDeliveryOrderIncidents: (...args: unknown[]) => listDeliveryOrderIncidentsMock(...args),
   },
 }))
 
@@ -143,13 +150,28 @@ describe("ProviderOrderDetailPage", () => {
         completedAt: null,
       },
     ])
+    listDeliveryOrderIncidentsMock.mockResolvedValueOnce([
+      {
+        id: "incident-1",
+        deliveryOrderId: "delivery-1",
+        reporterRole: "CLIENT",
+        type: "DAMAGED_ITEMS",
+        status: "UNDER_REVIEW",
+        description: "La caja llegó dañada",
+        evidenceUrl: null,
+        createdAt: "2026-03-27T12:30:00.000Z",
+        resolvedAt: null,
+      },
+    ])
 
     const Page = (await import("@/app/[locale]/provider/sales/[providerOrderId]/page")).default
     render(<Page />)
 
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
     expect(screen.getByText("Cuenco artesanal")).toBeInTheDocument()
-    expect(screen.getByText("En revisión")).toBeInTheDocument()
+    expect(screen.getAllByText("En revisión")).toHaveLength(2)
+    expect(screen.getByText("La caja llegó dañada")).toBeInTheDocument()
+    expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /Abrir cobros y devoluciones/i })).toHaveAttribute(
       "href",
       "/provider/finance",

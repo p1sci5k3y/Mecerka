@@ -4,6 +4,8 @@ import type { Order } from "@/lib/types"
 
 const mockUseParams = vi.fn()
 const getOneMock = vi.fn()
+const listDeliveryOrderIncidentsMock = vi.fn()
+const getDeliveryOrderRefundsMock = vi.fn()
 
 vi.mock("next/navigation", () => ({
   useParams: () => mockUseParams(),
@@ -12,6 +14,18 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
     getOne: (...args: unknown[]) => getOneMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/delivery-incidents-service", () => ({
+  deliveryIncidentsService: {
+    listDeliveryOrderIncidents: (...args: unknown[]) => listDeliveryOrderIncidentsMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/refunds-service", () => ({
+  refundsService: {
+    getDeliveryOrderRefunds: (...args: unknown[]) => getDeliveryOrderRefundsMock(...args),
   },
 }))
 
@@ -98,6 +112,37 @@ describe("RunnerOrderDetailPage", () => {
 
   it("renders the operational delivery hub with payout and route links", async () => {
     getOneMock.mockResolvedValueOnce(makeOrder())
+    listDeliveryOrderIncidentsMock.mockResolvedValueOnce([
+      {
+        id: "incident-1",
+        deliveryOrderId: "delivery-1",
+        reporterRole: "CLIENT",
+        type: "FAILED_DELIVERY",
+        status: "OPEN",
+        description: "El cliente reportó retraso",
+        evidenceUrl: null,
+        createdAt: "2026-03-27T12:00:00.000Z",
+        resolvedAt: null,
+      },
+    ])
+    getDeliveryOrderRefundsMock.mockResolvedValueOnce([
+      {
+        id: "refund-1",
+        incidentId: "incident-1",
+        providerOrderId: null,
+        deliveryOrderId: "delivery-1",
+        type: "DELIVERY_PARTIAL",
+        status: "UNDER_REVIEW",
+        amount: 3,
+        currency: "EUR",
+        requestedById: "client-1",
+        reviewedById: null,
+        externalRefundId: null,
+        createdAt: "2026-03-27T12:05:00.000Z",
+        reviewedAt: null,
+        completedAt: null,
+      },
+    ])
 
     const Page = (await import("@/app/[locale]/runner/orders/[id]/page")).default
     render(<Page />)
@@ -106,6 +151,8 @@ describe("RunnerOrderDetailPage", () => {
     expect(screen.getByText("Cerámica Norte")).toBeInTheDocument()
     expect(screen.getByText("Calle Feria 12")).toBeInTheDocument()
     expect(screen.getAllByText("Pago pendiente")).toHaveLength(2)
+    expect(screen.getByText("El cliente reportó retraso")).toBeInTheDocument()
+    expect(screen.getByText("DELIVERY_PARTIAL")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /Abrir cobros del runner/i })).toHaveAttribute(
       "href",
       "/runner/finance",

@@ -7,11 +7,13 @@ import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
+import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
-import type { Order, ProviderOrder, RefundSummary } from "@/lib/types"
+import type { DeliveryIncidentSummary, Order, ProviderOrder, RefundSummary } from "@/lib/types"
 import {
+  AlertTriangle,
   ArrowLeft,
   CreditCard,
   Loader2,
@@ -26,6 +28,7 @@ type ProviderOrderDetail = {
   rootOrder: Order
   providerOrder: ProviderOrder
   refunds: RefundSummary[]
+  incidents: DeliveryIncidentSummary[]
 }
 
 function formatCurrency(amount: number) {
@@ -115,6 +118,21 @@ function refundStatusLabel(status: string) {
   }
 }
 
+function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
+  switch (status) {
+    case "OPEN":
+      return "Abierta"
+    case "UNDER_REVIEW":
+      return "En revisión"
+    case "RESOLVED":
+      return "Resuelta"
+    case "REJECTED":
+      return "Rechazada"
+    default:
+      return status
+  }
+}
+
 export default function ProviderOrderDetailPage() {
   return (
     <ProtectedRoute allowedRoles={["PROVIDER"]}>
@@ -165,10 +183,22 @@ function ProviderOrderDetailContent() {
           refunds = []
         }
 
+        let incidents: DeliveryIncidentSummary[] = []
+        if (match.rootOrder.deliveryOrder?.id) {
+          try {
+            incidents = await deliveryIncidentsService.listDeliveryOrderIncidents(
+              match.rootOrder.deliveryOrder.id,
+            )
+          } catch {
+            incidents = []
+          }
+        }
+
         setDetail({
           rootOrder: match.rootOrder,
           providerOrder: match.providerOrder,
           refunds,
+          incidents,
         })
         setError(null)
       } catch (loadError) {
@@ -271,6 +301,14 @@ function ProviderOrderDetailContent() {
                     {detail.refunds.length}
                   </p>
                 </div>
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Incidencias visibles
+                  </p>
+                  <p className="mt-3 text-3xl font-extrabold text-foreground">
+                    {detail.incidents.length}
+                  </p>
+                </div>
               </div>
 
               <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
@@ -356,6 +394,47 @@ function ProviderOrderDetailContent() {
                                 {formatCurrency(refund.amount)}
                               </p>
                             </div>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-primary" />
+                      <h2 className="text-xl font-bold text-foreground">
+                        Incidencias logísticas relacionadas
+                      </h2>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Visibilidad compartida del tramo de entrega para que el comercio entienda si hay incidencias abiertas o ya resueltas.
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      {detail.incidents.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-4 py-8 text-center text-sm text-muted-foreground">
+                          No hay incidencias visibles para esta entrega.
+                        </div>
+                      ) : (
+                        detail.incidents.map((incident) => (
+                          <article
+                            key={incident.id}
+                            className="rounded-xl border border-border/50 bg-background/60 p-4"
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-foreground">{incident.type}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  {incidentStatusLabel(incident.status)}
+                                </p>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {new Date(incident.createdAt).toLocaleString("es-ES")}
+                              </p>
+                            </div>
+                            <p className="mt-3 text-sm text-muted-foreground">
+                              {incident.description}
+                            </p>
                           </article>
                         ))
                       )}

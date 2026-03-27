@@ -7,9 +7,12 @@ import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
+import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
-import type { Order, ProviderOrder } from "@/lib/types"
+import { refundsService } from "@/lib/services/refunds-service"
+import type { DeliveryIncidentSummary, Order, ProviderOrder, RefundSummary } from "@/lib/types"
 import {
+  AlertTriangle,
   ArrowLeft,
   CreditCard,
   Loader2,
@@ -19,6 +22,12 @@ import {
   Store,
   Truck,
 } from "lucide-react"
+
+type RunnerOrderDetail = {
+  order: Order
+  incidents: DeliveryIncidentSummary[]
+  refunds: RefundSummary[]
+}
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString("es-ES", {
@@ -79,6 +88,42 @@ function pickupStatusLabel(status: ProviderOrder["status"]) {
   }
 }
 
+function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
+  switch (status) {
+    case "OPEN":
+      return "Abierta"
+    case "UNDER_REVIEW":
+      return "En revisión"
+    case "RESOLVED":
+      return "Resuelta"
+    case "REJECTED":
+      return "Rechazada"
+    default:
+      return status
+  }
+}
+
+function refundStatusLabel(status: string) {
+  switch (status) {
+    case "REQUESTED":
+      return "Solicitada"
+    case "UNDER_REVIEW":
+      return "En revisión"
+    case "APPROVED":
+      return "Aprobada"
+    case "REJECTED":
+      return "Rechazada"
+    case "EXECUTING":
+      return "Ejecutando"
+    case "COMPLETED":
+      return "Completada"
+    case "FAILED":
+      return "Fallida"
+    default:
+      return status
+  }
+}
+
 export default function RunnerOrderDetailPage() {
   return (
     <ProtectedRoute allowedRoles={["RUNNER"]}>
@@ -89,7 +134,7 @@ export default function RunnerOrderDetailPage() {
 
 function RunnerOrderDetailContent() {
   const params = useParams<{ id: string }>()
-  const [order, setOrder] = useState<Order | null>(null)
+  const [detail, setDetail] = useState<RunnerOrderDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,7 +149,30 @@ function RunnerOrderDetailContent() {
 
       try {
         const data = await ordersService.getOne(orderId)
-        setOrder(data)
+        let incidents: DeliveryIncidentSummary[] = []
+        let refunds: RefundSummary[] = []
+
+        if (data.deliveryOrder?.id) {
+          try {
+            incidents = await deliveryIncidentsService.listDeliveryOrderIncidents(
+              data.deliveryOrder.id,
+            )
+          } catch {
+            incidents = []
+          }
+
+          try {
+            refunds = await refundsService.getDeliveryOrderRefunds(data.deliveryOrder.id)
+          } catch {
+            refunds = []
+          }
+        }
+
+        setDetail({
+          order: data,
+          incidents,
+          refunds,
+        })
         setError(null)
       } catch (loadError) {
         console.error("Error loading runner order detail:", loadError)
@@ -119,12 +187,12 @@ function RunnerOrderDetailContent() {
 
   const activeStops = useMemo(
     () =>
-      (order?.providerOrders || []).filter(
+      (detail?.order.providerOrders || []).filter(
         (providerOrder) =>
           providerOrder.status !== "CANCELLED" &&
           providerOrder.status !== "REJECTED_BY_STORE",
       ),
-    [order],
+    [detail],
   )
 
   const packageCount = useMemo(
@@ -169,11 +237,11 @@ function RunnerOrderDetailContent() {
                   Aquí se juntan ruta, recogidas, entrega y estado de cobro sin saltar entre paneles.
                 </p>
               </div>
-              {order ? (
+              {detail ? (
                 <div className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 text-sm text-primary">
                   <div className="font-semibold">Estado actual</div>
                   <div className="mt-1 text-lg font-bold text-foreground">
-                    {deliveryStatusLabel(order.deliveryOrder?.status || order.status)}
+                    {deliveryStatusLabel(detail.order.deliveryOrder?.status || detail.order.status)}
                   </div>
                 </div>
               ) : null}
@@ -186,7 +254,7 @@ function RunnerOrderDetailContent() {
             </div>
           ) : null}
 
-          {order ? (
+          {detail ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
@@ -194,7 +262,7 @@ function RunnerOrderDetailContent() {
                     Fee visible
                   </p>
                   <p className="mt-3 text-3xl font-extrabold text-foreground">
-                    {formatCurrency(order.deliveryFee)}
+                    {formatCurrency(detail.order.deliveryFee)}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
@@ -218,7 +286,23 @@ function RunnerOrderDetailContent() {
                     Cobro runner
                   </p>
                   <p className="mt-3 text-2xl font-extrabold text-foreground">
-                    {runnerPaymentLabel(order.deliveryOrder?.paymentStatus)}
+                    {runnerPaymentLabel(detail.order.deliveryOrder?.paymentStatus)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Incidencias visibles
+                  </p>
+                  <p className="mt-3 text-3xl font-extrabold text-foreground">
+                    {detail.incidents.length}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-card p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Devoluciones visibles
+                  </p>
+                  <p className="mt-3 text-3xl font-extrabold text-foreground">
+                    {detail.refunds.length}
                   </p>
                 </div>
               </div>
@@ -289,23 +373,81 @@ function RunnerOrderDetailContent() {
                       <p className="text-muted-foreground">
                         Dirección:{" "}
                         <span className="font-semibold text-foreground">
-                          {order.deliveryAddress || "Pendiente de direccion"}
+                          {detail.order.deliveryAddress || "Pendiente de direccion"}
                         </span>
                       </p>
                       <p className="text-muted-foreground">
                         Ciudad:{" "}
                         <span className="font-semibold text-foreground">
-                          {order.city || "Sin ciudad"}
+                          {detail.order.city || "Sin ciudad"}
                         </span>
                       </p>
                       <p className="text-muted-foreground">
                         Distancia planificada:{" "}
                         <span className="font-semibold text-foreground">
-                          {order.deliveryDistanceKm != null
-                            ? `${order.deliveryDistanceKm.toFixed(1)} km`
+                          {detail.order.deliveryDistanceKm != null
+                            ? `${detail.order.deliveryDistanceKm.toFixed(1)} km`
                             : "No disponible"}
                         </span>
                       </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-primary" />
+                      <h2 className="text-xl font-bold text-foreground">
+                        Incidencias y devoluciones visibles
+                      </h2>
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Lectura operativa del soporte asociado a esta entrega. El runner no resuelve el caso aquí, pero ya no pierde el contexto.
+                    </p>
+                    <div className="mt-5 space-y-3">
+                      {detail.incidents.map((incident) => (
+                        <article
+                          key={incident.id}
+                          className="rounded-xl border border-border/50 bg-background/60 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">{incident.type}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {incidentStatusLabel(incident.status)}
+                              </p>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(incident.createdAt).toLocaleString("es-ES")}
+                            </p>
+                          </div>
+                          <p className="mt-3 text-sm text-muted-foreground">
+                            {incident.description}
+                          </p>
+                        </article>
+                      ))}
+                      {detail.refunds.map((refund) => (
+                        <article
+                          key={refund.id}
+                          className="rounded-xl border border-border/50 bg-background/60 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">{refund.type}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {refundStatusLabel(refund.status)}
+                              </p>
+                            </div>
+                            <p className="font-semibold text-foreground">
+                              {formatCurrency(refund.amount)}
+                            </p>
+                          </div>
+                        </article>
+                      ))}
+                      {detail.incidents.length === 0 && detail.refunds.length === 0 ? (
+                        <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-4 py-8 text-center text-sm text-muted-foreground">
+                          No hay incidencias ni devoluciones visibles para esta entrega.
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </section>
@@ -322,19 +464,19 @@ function RunnerOrderDetailContent() {
                       <p className="text-muted-foreground">
                         DeliveryOrder:{" "}
                         <span className="font-semibold text-foreground">
-                          {order.deliveryOrder?.id || "Sin delivery order"}
+                          {detail.order.deliveryOrder?.id || "Sin delivery order"}
                         </span>
                       </p>
                       <p className="text-muted-foreground">
                         Estado entrega:{" "}
                         <span className="font-semibold text-foreground">
-                          {deliveryStatusLabel(order.deliveryOrder?.status || order.status)}
+                          {deliveryStatusLabel(detail.order.deliveryOrder?.status || detail.order.status)}
                         </span>
                       </p>
                       <p className="text-muted-foreground">
                         Cobro:{" "}
                         <span className="font-semibold text-foreground">
-                          {runnerPaymentLabel(order.deliveryOrder?.paymentStatus)}
+                          {runnerPaymentLabel(detail.order.deliveryOrder?.paymentStatus)}
                         </span>
                       </p>
                     </div>
@@ -363,13 +505,13 @@ function RunnerOrderDetailContent() {
                       <p className="text-muted-foreground">
                         Order raíz:{" "}
                         <span className="font-semibold text-foreground">
-                          {order.id}
+                          {detail.order.id}
                         </span>
                       </p>
                       <p className="text-muted-foreground">
                         Creado:{" "}
                         <span className="font-semibold text-foreground">
-                          {new Date(order.createdAt).toLocaleString("es-ES")}
+                          {new Date(detail.order.createdAt).toLocaleString("es-ES")}
                         </span>
                       </p>
                     </div>
