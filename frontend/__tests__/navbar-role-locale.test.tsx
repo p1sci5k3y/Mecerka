@@ -180,6 +180,7 @@ describe("Navbar role and locale experience", () => {
       "href",
       "/profile",
     )
+    expect(screen.queryByLabelText("Cart")).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Logout" })).toBeInTheDocument()
     expect(screen.getByText("Alex Rivera")).toBeInTheDocument()
   })

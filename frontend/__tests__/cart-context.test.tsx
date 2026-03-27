@@ -155,7 +155,10 @@ describe("CartProvider", () => {
   })
 
   it("refreshes the official backend cart for authenticated users on mount", async () => {
-    useAuthMock.mockReturnValue({ isAuthenticated: true })
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
     getMyCartMock.mockResolvedValueOnce(
       buildServerCart({
         cityName: "Sevilla",
@@ -176,7 +179,10 @@ describe("CartProvider", () => {
   })
 
   it("syncs a guest cart into the backend on authenticated mount", async () => {
-    useAuthMock.mockReturnValue({ isAuthenticated: true })
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
     window.localStorage.setItem(
       "mecerka-guest-cart-v1",
       JSON.stringify([{ product: madridProduct, quantity: 1 }]),
@@ -200,5 +206,24 @@ describe("CartProvider", () => {
     await waitFor(() => {
       expect(window.localStorage.getItem("mecerka-guest-cart-v1")).toBeNull()
     })
+  })
+
+  it("does not request the backend cart for authenticated users without client role", async () => {
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["PROVIDER"] },
+    })
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("source:guest")).toBeInTheDocument()
+    })
+
+    expect(getMyCartMock).not.toHaveBeenCalled()
   })
 })

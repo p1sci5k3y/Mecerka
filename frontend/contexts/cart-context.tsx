@@ -156,7 +156,8 @@ function getCartErrorMessage(error: unknown, fallback: string) {
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const canUseServerCart = !isAuthenticated || user?.roles?.includes("CLIENT")
   const [guestItems, setGuestItems] = useState<CartItem[]>([])
   const [serverCart, setServerCart] = useState<CartView | null>(null)
   const [cityConflict, setCityConflict] = useState<string | null>(null)
@@ -174,17 +175,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [guestItems])
 
   const refreshCart = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !canUseServerCart) {
       setServerCart(null)
       return
     }
 
     const cart = await cartService.getMyCart()
     setServerCart(cart)
-  }, [isAuthenticated])
+  }, [canUseServerCart, isAuthenticated])
 
   const syncGuestCartToBackend = useCallback(async () => {
-    if (!isAuthenticated || guestItems.length === 0) return
+    if (!isAuthenticated || !canUseServerCart || guestItems.length === 0) return
 
     if (syncInFlightRef.current) {
       return syncInFlightRef.current
@@ -221,10 +222,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     syncInFlightRef.current = syncPromise
     return syncPromise
-  }, [guestItems, isAuthenticated, refreshCart])
+  }, [canUseServerCart, guestItems, isAuthenticated, refreshCart])
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !canUseServerCart) {
       setServerCart(null)
       return
     }
@@ -241,13 +242,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     })()
-  }, [guestItems.length, isAuthenticated, refreshCart, syncGuestCartToBackend])
+  }, [canUseServerCart, guestItems.length, isAuthenticated, refreshCart, syncGuestCartToBackend])
 
   const addItem = useCallback(
     async (product: Product, quantity = 1) => {
       setCityConflict(null)
 
-      if (isAuthenticated) {
+      if (isAuthenticated && canUseServerCart) {
         try {
           if (guestItems.length > 0) {
             await syncGuestCartToBackend()
@@ -287,14 +288,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       return null
     },
-    [guestItems, isAuthenticated, syncGuestCartToBackend],
+    [canUseServerCart, guestItems, isAuthenticated, syncGuestCartToBackend],
   )
 
   const removeItem = useCallback(
     async (itemId: string) => {
       setCityConflict(null)
 
-      if (isAuthenticated) {
+      if (isAuthenticated && canUseServerCart) {
         const cart = await cartService.removeItem(itemId)
         setServerCart(cart)
         return
@@ -304,7 +305,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         prev.filter((item) => item.product.id !== itemId),
       )
     },
-    [isAuthenticated],
+    [canUseServerCart, isAuthenticated],
   )
 
   const updateQuantity = useCallback(
@@ -314,7 +315,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      if (isAuthenticated) {
+      if (isAuthenticated && canUseServerCart) {
         const cart = await cartService.updateItem(itemId, quantity)
         setServerCart(cart)
         return
@@ -326,13 +327,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ),
       )
     },
-    [isAuthenticated, removeItem],
+    [canUseServerCart, isAuthenticated, removeItem],
   )
 
   const clearCart = useCallback(async () => {
     setCityConflict(null)
 
-    if (isAuthenticated && serverCart) {
+    if (isAuthenticated && canUseServerCart && serverCart) {
       const ids = serverCart.providerGroups.flatMap((provider) =>
         provider.items.map((item) => item.id),
       )
@@ -346,15 +347,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     setGuestItems([])
-  }, [isAuthenticated, refreshCart, serverCart])
+  }, [canUseServerCart, isAuthenticated, refreshCart, serverCart])
 
   const cart = useMemo<CartView>(() => {
-    if (isAuthenticated && serverCart) {
+    if (isAuthenticated && canUseServerCart && serverCart) {
       return serverCart
     }
 
     return buildGuestCartView(guestItems)
-  }, [guestItems, isAuthenticated, serverCart])
+  }, [canUseServerCart, guestItems, isAuthenticated, serverCart])
 
   const items = useMemo(
     () => cart.providerGroups.flatMap((provider) => provider.items),

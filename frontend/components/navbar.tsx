@@ -43,6 +43,7 @@ export function Navbar() {
   const [isPending, startTransition] = useTransition()
 
   const dashboardLink = getPrimaryRouteForUser(user)
+  const canUseCart = !isAuthenticated || user?.roles?.includes("CLIENT")
 
   const handleLanguageChange = (newLocale: string) => {
     startTransition(() => {
@@ -98,20 +99,22 @@ export function Navbar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link href="/cart" aria-label={t('cart')} className="block">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-10 w-10 rounded-full"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {totalItems > 0 && (
-                <span className="absolute -right-1.5 -top-1.5 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground shadow-sm">
-                  {totalItems}
-                </span>
-              )}
-            </Button>
-          </Link>
+          {canUseCart && (
+            <Link href="/cart" aria-label={t('cart')} className="block">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative h-10 w-10 rounded-full"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {totalItems > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground shadow-sm">
+                    {totalItems}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          )}
 
           {isAuthenticated ? (
             <>
@@ -214,19 +217,21 @@ export function Navbar() {
               <span className="text-muted-foreground">/</span>
               <button onClick={() => handleLanguageChange('en')} className={cn("text-sm", locale === 'en' ? "font-bold" : "text-muted-foreground")}>EN</button>
             </div>
-            <Link
-              href="/cart"
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
-              onClick={() => setMobileOpen(false)}
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span>{t('cart')}</span>
-              {totalItems > 0 && (
-                <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
+            {canUseCart && (
+              <Link
+                href="/cart"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary"
+                onClick={() => setMobileOpen(false)}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                <span>{t('cart')}</span>
+                {totalItems > 0 && (
+                  <span className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">
+                    {totalItems}
+                  </span>
+                )}
+              </Link>
+            )}
             {isAuthenticated ? (
               <>
                 <Link
