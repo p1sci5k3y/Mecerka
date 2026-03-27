@@ -24,8 +24,20 @@ export const adminService = {
         return api.get<BackendAdminUser[]>("/admin/users")
     },
 
-    updateUserRole: async (id: string, role: Role) => {
-        return api.patch<BackendAdminUser>(`/admin/users/${id}/role`, { role })
+    grantRole: async (id: string, role: Role) => {
+        return api.post<BackendAdminUser>(`/admin/users/${id}/grant`, { role })
+    },
+
+    revokeRole: async (id: string, role: Role) => {
+        return api.post<BackendAdminUser>(`/admin/users/${id}/revoke`, { role })
+    },
+
+    grantProvider: async (id: string) => {
+        return api.post<BackendAdminUser>(`/admin/users/${id}/grant/provider`)
+    },
+
+    grantRunner: async (id: string) => {
+        return api.post<BackendAdminUser>(`/admin/users/${id}/grant/runner`)
     },
 
     activateUser: async (id: string) => {

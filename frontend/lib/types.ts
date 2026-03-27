@@ -449,6 +449,10 @@ export interface BackendAdminUser {
   createdAt: string
   mfaEnabled: boolean
   active: boolean
+  requestedRole: Role | null
+  roleStatus: "PENDING" | "APPROVED" | "REJECTED" | null
+  requestedAt: string | null
+  lastRoleSource: "USER_REQUEST" | "ADMIN" | "DEMO" | null
 }
 
 export interface ProviderStats {

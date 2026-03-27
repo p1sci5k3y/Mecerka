@@ -27,7 +27,10 @@ describe("admin, users and demo services", () => {
 
     await adminService.getMetrics()
     await adminService.getUsers()
-    await adminService.updateUserRole("user-1", "ADMIN")
+    await adminService.grantRole("user-1", "ADMIN")
+    await adminService.revokeRole("user-1", "ADMIN")
+    await adminService.grantProvider("user-1")
+    await adminService.grantRunner("user-1")
     await adminService.activateUser("user-1")
     await adminService.blockUser("user-1")
     await adminService.getCities()
@@ -49,7 +52,10 @@ describe("admin, users and demo services", () => {
 
     expect(getMock).toHaveBeenCalledWith("/admin/metrics")
     expect(getMock).toHaveBeenCalledWith("/admin/users")
-    expect(patchMock).toHaveBeenCalledWith("/admin/users/user-1/role", { role: "ADMIN" })
+    expect(postMock).toHaveBeenCalledWith("/admin/users/user-1/grant", { role: "ADMIN" })
+    expect(postMock).toHaveBeenCalledWith("/admin/users/user-1/revoke", { role: "ADMIN" })
+    expect(postMock).toHaveBeenCalledWith("/admin/users/user-1/grant/provider")
+    expect(postMock).toHaveBeenCalledWith("/admin/users/user-1/grant/runner")
     expect(patchMock).toHaveBeenCalledWith("/admin/users/user-1/activate")
     expect(patchMock).toHaveBeenCalledWith("/admin/users/user-1/block")
     expect(getMock).toHaveBeenCalledWith("/admin/cities")

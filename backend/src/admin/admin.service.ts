@@ -26,6 +26,10 @@ export class AdminService {
         createdAt: true,
         mfaEnabled: true,
         active: true,
+        requestedRole: true,
+        roleStatus: true,
+        requestedAt: true,
+        lastRoleSource: true,
       },
       orderBy: { createdAt: 'desc' },
     });

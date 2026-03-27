@@ -152,7 +152,9 @@ describe('Privacy and Response Shape (e2e)', () => {
     expect(response.body[0]).not.toHaveProperty('fiscalIdHash');
     expect(response.body[0]).not.toHaveProperty('fiscalCountry');
     expect(response.body[0]).not.toHaveProperty('password');
-    expect(response.body[0]).not.toHaveProperty('requestedRole');
-    expect(response.body[0]).not.toHaveProperty('roleStatus');
+    expect(response.body[0]).toHaveProperty('requestedRole');
+    expect(response.body[0]).toHaveProperty('roleStatus');
+    expect(response.body[0]).toHaveProperty('requestedAt');
+    expect(response.body[0]).toHaveProperty('lastRoleSource');
   });
 });

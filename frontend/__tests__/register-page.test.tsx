@@ -164,7 +164,7 @@ describe("RegisterPage", () => {
     })
 
     expect(toastSuccessMock).toHaveBeenCalled()
-    expect(screen.getByText("successTitle")).toBeInTheDocument()
+    expect(await screen.findByText("successTitle")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "goToLogin" })).toHaveAttribute(
       "href",
       "/login?returnTo=%2Forders",
