@@ -237,8 +237,8 @@ npm run test:e2e:full
 
 Observaciones fieles al estado actual del repositorio:
 
-- la validación automatizada fuerte sigue concentrada en backend;
-- el frontend ya cuenta con suite unitaria en Vitest y cobertura real en [`frontend/coverage`](frontend/coverage);
+- la validación automatizada fuerte sigue concentrada en backend y ya combina amplitud de suites con cobertura global alta;
+- el frontend ya cuenta con suite unitaria en Vitest y cobertura real alta en [`frontend/coverage`](frontend/coverage);
 - la suite backend usa Testcontainers y PostgreSQL efímero, tal como documenta [`docs/testing.md`](docs/testing.md).
 
 ## Estado Verificable Actual
@@ -249,15 +249,15 @@ Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha 
 | --- | --- | --- |
 | Frontend unitario | `59 files`, `228 tests`, OK | `cd frontend && npm run test:cov -- --reporter=dot` |
 | Frontend coverage | `92.17%` lines, `90.66%` statements, `81.85%` branches, `91.94%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
-| Backend unit/integration | `112 suites`, `1208 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
-| Backend coverage | `76.38%` lines, `76.00%` statements, `70.54%` branches, `74.97%` functions | [`backend/coverage/coverage-summary.json`](backend/coverage/coverage-summary.json) |
+| Backend unit/integration | `122 suites`, `1221 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
+| Backend coverage | `95.84%` lines, `95.99%` statements, `84.70%` branches, `93.55%` functions | `cd backend && npm run test:cov -- --runInBand` |
 | Demo pública | `runtime-config` correcto, login demo operativo y Stripe dummy activo | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
 
 Lectura honesta:
 
-- el frontend ya ha superado la barrera del `90%` y queda por encima del backend en cobertura global de líneas;
-- el backend sigue siendo la capa con mayor densidad de negocio y mejores suites integradas, pero su cobertura total real es bastante más baja de lo que reflejaba la documentación anterior;
-- el frontend cubre ya los flujos críticos del circuito cliente/provider/runner/demo, aunque mantiene hotspots claros en `navbar`, `provider/finance`, `runner/page`, `register` y `runtime-config`;
+- el frontend se mantiene ya por encima del `90%` y cubre bien los flujos críticos del circuito cliente/provider/runner/demo;
+- el backend vuelve a situarse por encima del frontend en cobertura global y amplitud de suites, y ya no deja ningún fichero real de código por debajo del `70%` de líneas;
+- el punto débil ya no es “falta de testing” en backend o frontend, sino seguir cerrando continuidad funcional y casos de uso visibles;
 - la demo pública ya usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend.
 
 ## Estructuración

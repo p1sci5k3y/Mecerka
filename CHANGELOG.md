@@ -23,8 +23,9 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
 - la demo pública usa la misma app y el mismo circuito real que producción, aislando datos e integraciones por entorno
 - `runtime-config` queda forzado a `/api` bajo el mismo host para evitar cruces demo -> prod
-- la cobertura frontend queda en `92.17%` líneas (`228` tests, `59` archivos) y pasa a superar la cobertura global actual del backend
-- la documentación principal se corrige para reflejar la cobertura backend real recalculada (`76.38%` líneas, `1208` tests)
+- la cobertura frontend queda en `92.17%` líneas (`228` tests, `59` archivos) y se mantiene en rango alto
+- el backend sube a `95.84%` líneas (`1221` tests, `122` suites) y deja `0` ficheros reales por debajo del `70%` de líneas
+- la documentación principal se corrige de nuevo para reflejar el estado real actual de coverage entre frontend y backend
 - despliegue dual endurecido con preflight de secrets, limpieza de puertos, warmup de Nginx y smoke checks más robustos
 - `security.yml` ahora pasa `GITHUB_TOKEN` explícitamente a Gitleaks en PRs
 - `ci.yml` usa la CLI local de Prisma vía `npm exec -- prisma ...` para evitar incompatibilidades del runner con Prisma 7
@@ -52,6 +53,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 - actualización de `PROJECT_STATUS.md` con estado real del repo, métricas verificadas y prioridades actuales
 - actualización de `CHANGELOG.md` para reflejar el circuito actual cliente/provider/runner/demo
 - validación documentada del circuito completo `CLIENT -> orders -> payments -> demo pay -> track` en `demo.mecerka.me`
+- nuevo bloque de specs backend sobre wiring, DTOs, utilidades, controladores y repositorios para elevar el suelo de cobertura por fichero
 
 ## [2026-03-26]
 

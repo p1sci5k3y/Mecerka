@@ -4,14 +4,14 @@ Fecha de actualización: `27/03/2026`
 
 ## Resumen Ejecutivo
 
-Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, una superficie frontend muy defendida por tests y una base backend estable con suites amplias, aunque con cobertura global más moderada.
+Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, una superficie frontend muy defendida por tests y un backend que vuelve a combinar amplitud de suites con cobertura global alta.
 
 El proyecto ya no está en fase de construir infraestructura base. El trabajo de mayor retorno ahora consiste en cerrar agujeros de continuidad de negocio y experiencia visible, no en añadir capas técnicas nuevas.
 
 ## Estado General
 
-- `Backend`: estable, modularizado y con buena amplitud de pruebas, pero cobertura global moderada.
-- `Frontend`: funcional y ya con cobertura de líneas por encima del backend.
+- `Backend`: estable, modularizado, con suites amplias y cobertura global alta.
+- `Frontend`: funcional, con cobertura alta y defensa fuerte de flujos críticos.
 - `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
 - `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
 - `Documentación`: README y wiki actualizados; este documento queda alineado con ese estado.
@@ -20,12 +20,12 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 
 ### Backend
 
-- Cobertura statements: `76.00%`
-- Cobertura branches: `70.54%`
-- Cobertura functions: `74.97%`
-- Cobertura lines: `76.38%`
-- Suites: `112`
-- Tests: `1208`
+- Cobertura statements: `95.99%`
+- Cobertura branches: `84.70%`
+- Cobertura functions: `93.55%`
+- Cobertura lines: `95.84%`
+- Suites: `122`
+- Tests: `1221`
 
 ### Frontend
 
@@ -119,13 +119,11 @@ Lectura honesta:
 - no existe todavía una wallet persistente de tarjetas del cliente
 - la gestión de refunds sigue siendo más sólida en backend que en frontend
 - admin/backoffice aún necesita más recorrido visible para resolución completa de incidencias
-- el backend sigue teniendo áreas con cobertura global moderada pese a la amplitud de suites
 - faltan más flujos e2e públicos sobre demo para defensa integral por perfil
 
 ## Riesgos Actuales
 
 - deuda de continuidad UX entre pantallas operativas y financieras
-- deuda de cobertura backend en módulos, bootstrap y controladores con poco ejercicio directo
 - riesgo de percepción de producto “a medias” si no se sigue cerrando caso de uso por caso de uso
 
 ## Siguiente Prioridad Recomendada
@@ -133,14 +131,14 @@ Lectura honesta:
 ### Prioridad 1
 
 1. cerrar frontend/backoffice de cancelación y refund visible
-2. reforzar cobertura backend en bootstrap, módulos y controladores con bajo porcentaje real
-3. reforzar continuidad entre paneles operativos y financieros de provider/runner
+2. reforzar continuidad entre paneles operativos y financieros de provider/runner
+3. ampliar e2e públicos y demo multi-rol
 
 ### Prioridad 2
 
 1. tabla funcional formal de estados para defensa
-2. más e2e multi-rol sobre demo
-3. rematar hotspots frontend restantes (`navbar`, `runner`, `provider/finance`, `runtime-config`)
+2. rematar hotspots frontend restantes (`navbar`, `runner`, `provider/finance`, `runtime-config`)
+3. consolidar backoffice visible de incidencias y refunds
 
 ## Conclusión
 
