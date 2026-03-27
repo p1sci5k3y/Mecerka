@@ -316,6 +316,12 @@ function RunnerOrderDetailContent() {
                     </Link>
                   </Button>
                   <Button asChild variant="outline">
+                    <Link href="/runner/support">
+                      <AlertTriangle className="mr-2 h-4 w-4" />
+                      Abrir soporte
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline">
                     <Link href="/runner">
                       Volver al panel
                     </Link>

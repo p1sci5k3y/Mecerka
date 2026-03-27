@@ -198,6 +198,10 @@ describe("Provider finance page", () => {
       "href",
       "/provider/sales/provider-order-1",
     )
+    expect(screen.getByRole("link", { name: /Centro de soporte/i })).toHaveAttribute(
+      "href",
+      "/provider/support",
+    )
     expect(
       screen.getByText(/La revisión y ejecución siguen siendo flujos de backoffice\/admin/i),
     ).toBeInTheDocument()

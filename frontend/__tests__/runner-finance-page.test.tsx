@@ -182,6 +182,14 @@ describe("Runner finance page", () => {
       "href",
       "/runner/orders/order-1",
     )
+    expect(screen.getByRole("link", { name: "Centro de soporte" })).toHaveAttribute(
+      "href",
+      "/runner/support",
+    )
+    expect(screen.getByRole("link", { name: /Abrir centro de soporte/i })).toHaveAttribute(
+      "href",
+      "/runner/support",
+    )
     expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
       "href",
       "/runner/orders/order-1",

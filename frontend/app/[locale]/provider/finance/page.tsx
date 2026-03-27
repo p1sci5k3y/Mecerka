@@ -300,11 +300,16 @@ function ProviderFinanceContent() {
                   Vista operativa de cobro real por pedido de proveedor.
                 </p>
               </div>
-              <Button asChild variant="outline">
-                <Link href="/provider/sales">
-                  Volver al panel operativo
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild variant="outline">
+                  <Link href="/provider/support">Centro de soporte</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/provider/sales">
+                    Volver al panel operativo
+                  </Link>
+                </Button>
+              </div>
             </div>
 
             <div className="mt-6 grid gap-4">

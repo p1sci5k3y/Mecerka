@@ -157,6 +157,10 @@ describe("RunnerOrderDetailPage", () => {
       "href",
       "/runner/finance",
     )
+    expect(screen.getByRole("link", { name: /Abrir soporte/i })).toHaveAttribute(
+      "href",
+      "/runner/support",
+    )
   })
 
   it("shows a safe error state when the delivery cannot be loaded", async () => {

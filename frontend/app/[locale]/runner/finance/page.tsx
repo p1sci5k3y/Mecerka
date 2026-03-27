@@ -256,7 +256,10 @@ function RunnerFinanceContent() {
                   Vista operativa del estado de cobro por entrega. Aquí no se fuerzan pagos: solo se hace visible lo que ya consta en el pedido.
                 </p>
               </div>
-              <Link href="/runner">Volver al panel operativo</Link>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/runner/support">Centro de soporte</Link>
+                <Link href="/runner">Volver al panel operativo</Link>
+              </div>
             </div>
 
             {orders.length === 0 ? (
@@ -354,6 +357,12 @@ function RunnerFinanceContent() {
               )}
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild variant="outline">
+                <Link href="/runner/support">
+                  <AlertCircle className="mr-2 h-4 w-4" />
+                  Abrir centro de soporte
+                </Link>
+              </Button>
               <Button asChild variant="outline">
                 <Link href="/runner">
                   <Truck className="mr-2 h-4 w-4" />

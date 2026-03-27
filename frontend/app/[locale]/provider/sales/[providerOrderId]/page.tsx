@@ -320,6 +320,12 @@ function ProviderOrderDetailContent() {
                     </Link>
                   </Button>
                   <Button asChild variant="outline">
+                    <Link href="/provider/support">
+                      <AlertTriangle className="mr-2 h-4 w-4" />
+                      Abrir soporte
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline">
                     <Link href="/provider/sales">
                       Volver al kanban
                     </Link>
