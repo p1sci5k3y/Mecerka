@@ -452,7 +452,7 @@ export interface BackendAdminUser {
   requestedRole: Role | null
   roleStatus: "PENDING" | "APPROVED" | "REJECTED" | null
   requestedAt: string | null
-  lastRoleSource: "USER_REQUEST" | "ADMIN" | "DEMO" | null
+  lastRoleSource: "SELF_SERVICE" | "ADMIN" | null
 }
 
 export interface ProviderStats {

@@ -110,7 +110,7 @@ describe("Admin users page", () => {
       requestedRole: "RUNNER",
       roleStatus: "PENDING",
       requestedAt: "2026-03-21T10:00:00.000Z",
-      lastRoleSource: "USER_REQUEST",
+      lastRoleSource: "SELF_SERVICE",
     }
     const blockedUser = { ...activeUser, active: false }
 
@@ -128,7 +128,7 @@ describe("Admin users page", () => {
     })
 
     expect(screen.getByText(/solicitud runner pendiente/i)).toBeInTheDocument()
-    expect(screen.getByText(/originado por solicitud/i)).toBeInTheDocument()
+    expect(screen.getByText(/originado por autoservicio/i)).toBeInTheDocument()
     expect(screen.getByText(/mfa activado/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: /Copiar Email/i }))
@@ -214,7 +214,7 @@ describe("Admin users page", () => {
       requestedRole: "RUNNER",
       roleStatus: "PENDING",
       requestedAt: "2026-03-21T10:00:00.000Z",
-      lastRoleSource: "USER_REQUEST",
+      lastRoleSource: "SELF_SERVICE",
     }
     const afterGrant = { ...candidate, roles: ["CLIENT", "PROVIDER", "RUNNER"], roleStatus: "APPROVED" }
     const afterRevoke = { ...afterGrant, roles: ["CLIENT", "RUNNER"] }
@@ -249,5 +249,60 @@ describe("Admin users page", () => {
       expect(revokeRoleMock).toHaveBeenCalledWith("user-3", "PROVIDER")
       expect(toastMock).toHaveBeenCalledWith({ title: "Rol PROVIDER revocado" })
     })
+  })
+
+  it("filters users by search, role and governance source", async () => {
+    getUsersMock.mockResolvedValue([
+      {
+        id: "user-10",
+        name: "Alicia Cliente",
+        email: "alicia@example.com",
+        roles: ["CLIENT"],
+        active: true,
+        mfaEnabled: true,
+        createdAt: "2026-03-20T10:00:00.000Z",
+        requestedRole: null,
+        roleStatus: null,
+        requestedAt: null,
+        lastRoleSource: null,
+      },
+      {
+        id: "user-11",
+        name: "Ramon Runner",
+        email: "ramon@example.com",
+        roles: ["CLIENT", "RUNNER"],
+        active: true,
+        mfaEnabled: false,
+        createdAt: "2026-03-20T10:00:00.000Z",
+        requestedRole: "RUNNER",
+        roleStatus: "APPROVED",
+        requestedAt: "2026-03-21T10:00:00.000Z",
+        lastRoleSource: "ADMIN",
+      },
+    ])
+
+    const Page = (await import("@/app/[locale]/admin/users/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/alicia@example.com/i)).toBeInTheDocument()
+      expect(screen.getByText(/ramon@example.com/i)).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText(/buscar usuarios/i), {
+      target: { value: "ramon" },
+    })
+    expect(screen.queryByText(/alicia@example.com/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/ramon@example.com/i)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/filtrar por rol/i), {
+      target: { value: "RUNNER" },
+    })
+    expect(screen.getByText(/ramon@example.com/i)).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/filtrar por gobernanza/i), {
+      target: { value: "ADMIN" },
+    })
+    expect(screen.getByText(/ramon@example.com/i)).toBeInTheDocument()
   })
 })

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Link } from "@/lib/navigation"
 import {
   Users,
+  UserCog,
   ShoppingBag,
   DollarSign,
   HandCoins,
@@ -68,6 +69,12 @@ function AdminDashboardContent() {
       description: "Bloquea cuentas, revisa roles y controla accesos.",
       href: "/admin/users",
       icon: Users,
+    },
+    {
+      label: "Solicitudes y concesiones",
+      description: "Revisa altas privilegiadas y el último origen de gobierno por usuario.",
+      href: "/admin/role-requests",
+      icon: UserCog,
     },
     {
       label: "Revisar devoluciones",

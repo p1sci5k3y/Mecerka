@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import {
     BadgeCheck,
     Clock3,
@@ -45,8 +45,7 @@ function roleRequestLabel(user: BackendAdminUser) {
 
 function governanceSourceLabel(user: BackendAdminUser) {
     if (user.lastRoleSource === "ADMIN") return "Concedido por admin"
-    if (user.lastRoleSource === "USER_REQUEST") return "Originado por solicitud"
-    if (user.lastRoleSource === "DEMO") return "Sembrado por demo"
+    if (user.lastRoleSource === "SELF_SERVICE") return "Originado por autoservicio"
     return "Sin histórico reciente"
 }
 
@@ -54,6 +53,12 @@ export default function UsersPage() {
     const [users, setUsers] = useState<BackendAdminUser[]>([])
     const [loading, setLoading] = useState(true)
     const [actingUserId, setActingUserId] = useState<string | null>(null)
+    const [search, setSearch] = useState("")
+    const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL")
+    const [accountFilter, setAccountFilter] = useState<"ALL" | "ACTIVE" | "BLOCKED">("ALL")
+    const [governanceFilter, setGovernanceFilter] = useState<
+        "ALL" | "REQUESTED" | "SELF_SERVICE" | "ADMIN" | "MFA_PENDING"
+    >("ALL")
     const { toast } = useToast()
     const { user: currentUser } = useAuth()
 
@@ -123,10 +128,52 @@ export default function UsersPage() {
         }
     }
 
-    if (loading) return <div className="p-8">Cargando usuarios...</div>
-
     const pendingRoleApprovals = users.filter((candidate) => candidate.roleStatus === "PENDING").length
     const blockedUsers = users.filter((candidate) => !candidate.active).length
+    const filteredUsers = useMemo(() => {
+        const normalizedSearch = search.trim().toLowerCase()
+        return users.filter((candidate) => {
+            if (
+                normalizedSearch.length > 0 &&
+                !candidate.name.toLowerCase().includes(normalizedSearch) &&
+                !candidate.email.toLowerCase().includes(normalizedSearch)
+            ) {
+                return false
+            }
+
+            if (roleFilter !== "ALL" && !candidate.roles.includes(roleFilter)) {
+                return false
+            }
+
+            if (accountFilter === "ACTIVE" && !candidate.active) {
+                return false
+            }
+
+            if (accountFilter === "BLOCKED" && candidate.active) {
+                return false
+            }
+
+            if (governanceFilter === "REQUESTED" && candidate.roleStatus !== "PENDING") {
+                return false
+            }
+
+            if (governanceFilter === "SELF_SERVICE" && candidate.lastRoleSource !== "SELF_SERVICE") {
+                return false
+            }
+
+            if (governanceFilter === "ADMIN" && candidate.lastRoleSource !== "ADMIN") {
+                return false
+            }
+
+            if (governanceFilter === "MFA_PENDING" && candidate.mfaEnabled) {
+                return false
+            }
+
+            return true
+        })
+    }, [accountFilter, governanceFilter, roleFilter, search, users])
+
+    if (loading) return <div className="p-8">Cargando usuarios...</div>
 
     return (
         <div>
@@ -147,6 +194,67 @@ export default function UsersPage() {
                 </div>
             </div>
 
+            <div className="mb-6 rounded-xl border bg-card p-4">
+                <div className="grid gap-4 lg:grid-cols-4">
+                    <label className="space-y-2 text-sm">
+                        <span className="font-medium">Buscar</span>
+                        <input
+                            aria-label="Buscar usuarios"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Nombre o email"
+                            className="h-10 w-full rounded-md border bg-background px-3"
+                        />
+                    </label>
+                    <label className="space-y-2 text-sm">
+                        <span className="font-medium">Rol</span>
+                        <select
+                            aria-label="Filtrar por rol"
+                            value={roleFilter}
+                            onChange={(event) => setRoleFilter(event.target.value as "ALL" | Role)}
+                            className="h-10 w-full rounded-md border bg-background px-3"
+                        >
+                            <option value="ALL">Todos</option>
+                            <option value="CLIENT">CLIENT</option>
+                            <option value="PROVIDER">PROVIDER</option>
+                            <option value="RUNNER">RUNNER</option>
+                            <option value="ADMIN">ADMIN</option>
+                        </select>
+                    </label>
+                    <label className="space-y-2 text-sm">
+                        <span className="font-medium">Estado de cuenta</span>
+                        <select
+                            aria-label="Filtrar por estado de cuenta"
+                            value={accountFilter}
+                            onChange={(event) => setAccountFilter(event.target.value as "ALL" | "ACTIVE" | "BLOCKED")}
+                            className="h-10 w-full rounded-md border bg-background px-3"
+                        >
+                            <option value="ALL">Todos</option>
+                            <option value="ACTIVE">Activos</option>
+                            <option value="BLOCKED">Bloqueados</option>
+                        </select>
+                    </label>
+                    <label className="space-y-2 text-sm">
+                        <span className="font-medium">Gobernanza</span>
+                        <select
+                            aria-label="Filtrar por gobernanza"
+                            value={governanceFilter}
+                            onChange={(event) => setGovernanceFilter(event.target.value as "ALL" | "REQUESTED" | "SELF_SERVICE" | "ADMIN" | "MFA_PENDING")}
+                            className="h-10 w-full rounded-md border bg-background px-3"
+                        >
+                            <option value="ALL">Todas</option>
+                            <option value="REQUESTED">Solicitudes abiertas</option>
+                            <option value="SELF_SERVICE">Autoservicio</option>
+                            <option value="ADMIN">Concedido por admin</option>
+                            <option value="MFA_PENDING">MFA pendiente</option>
+                        </select>
+                    </label>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                    Mostrando {filteredUsers.length} de {users.length} usuarios.
+                </p>
+            </div>
+
             <div className="rounded-md border bg-card">
                 <Table>
                     <TableHeader>
@@ -160,7 +268,7 @@ export default function UsersPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((user) => (
+                        {filteredUsers.map((user) => (
                             <TableRow key={user.id}>
                                 <TableCell className="font-medium">{user.name}</TableCell>
                                 <TableCell>{user.email}</TableCell>

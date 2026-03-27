@@ -33,6 +33,10 @@ describe("AdminSidebar", () => {
 
     expect(screen.getByRole("link", { name: /MecerkaAdmin/i })).toHaveAttribute("href", "/")
     expect(screen.getByRole("link", { name: /Usuarios/i })).toHaveAttribute("href", "/admin/users")
+    expect(screen.getByRole("link", { name: /Solicitudes/i })).toHaveAttribute(
+      "href",
+      "/admin/role-requests",
+    )
     expect(screen.getByRole("link", { name: /Ciudades/i })).toHaveAttribute(
       "href",
       "/admin/masters?tab=cities",

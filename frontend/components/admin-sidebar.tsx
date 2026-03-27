@@ -4,6 +4,7 @@ import { Link, usePathname } from "@/lib/navigation"
 import {
     LayoutDashboard,
     Users,
+    UserCog,
     MapPin,
     Tag,
     HandCoins,
@@ -23,6 +24,11 @@ const sidebarItems = [
         title: "Usuarios",
         href: "/admin/users",
         icon: Users,
+    },
+    {
+        title: "Solicitudes",
+        href: "/admin/role-requests",
+        icon: UserCog,
     },
     {
         title: "Ciudades",

@@ -73,6 +73,10 @@ describe("Admin dashboard experience", () => {
     expect(screen.getByText("342")).toBeInTheDocument()
     expect(screen.getByText("12.540,75 €")).toBeInTheDocument()
     expect(screen.getByText("Resumen de Actividad")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Solicitudes y concesiones/i })).toHaveAttribute(
+      "href",
+      "/admin/role-requests",
+    )
     expect(screen.getByRole("link", { name: /Revisar devoluciones/i })).toHaveAttribute(
       "href",
       "/admin/refunds",
