@@ -159,6 +159,21 @@ export interface AdminRefundSummary extends RefundSummary {
   reviewedByName: string | null
 }
 
+export interface AdminIncidentSummary {
+  id: string
+  deliveryOrderId: string
+  reporterId: string
+  reporterRole: string
+  type: string
+  status: string
+  description: string
+  evidenceUrl: string | null
+  createdAt: string
+  resolvedAt: string | null
+  reporterEmail: string
+  reporterName: string | null
+}
+
 export interface OrderProviderPaymentsAggregate {
   orderId: string
   orderStatus: string

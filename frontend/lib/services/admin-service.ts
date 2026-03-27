@@ -1,5 +1,6 @@
 import { api } from "@/lib/api"
 import type {
+    AdminIncidentSummary,
     AdminRefundSummary,
     AdminMetrics,
     BackendAdminUser,
@@ -88,5 +89,22 @@ export const adminService = {
 
     executeRefund: async (id: string) => {
         return api.post<AdminRefundSummary>(`/refunds/${id}/execute`)
+    },
+
+    // Incidents
+    getIncidents: async () => {
+        return api.get<AdminIncidentSummary[]>("/admin/incidents")
+    },
+
+    reviewIncident: async (id: string) => {
+        return api.patch<AdminIncidentSummary>(`/delivery/incidents/${id}/review`)
+    },
+
+    resolveIncident: async (id: string) => {
+        return api.patch<AdminIncidentSummary>(`/delivery/incidents/${id}/resolve`)
+    },
+
+    rejectIncident: async (id: string) => {
+        return api.patch<AdminIncidentSummary>(`/delivery/incidents/${id}/reject`)
     },
 }

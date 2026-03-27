@@ -77,6 +77,10 @@ describe("Admin dashboard experience", () => {
       "href",
       "/admin/refunds",
     )
+    expect(screen.getByRole("link", { name: /Gestionar incidencias/i })).toHaveAttribute(
+      "href",
+      "/admin/incidents",
+    )
   })
 
   it("shows an explicit error state when metrics cannot be loaded", async () => {

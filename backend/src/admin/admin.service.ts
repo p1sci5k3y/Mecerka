@@ -270,6 +270,46 @@ export class AdminService {
     }));
   }
 
+  async getRecentIncidents() {
+    const incidents = await this.prisma.deliveryIncident.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        deliveryOrderId: true,
+        reporterId: true,
+        reporterRole: true,
+        type: true,
+        status: true,
+        description: true,
+        evidenceUrl: true,
+        createdAt: true,
+        resolvedAt: true,
+        reporter: {
+          select: {
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return incidents.map((incident) => ({
+      id: incident.id,
+      deliveryOrderId: incident.deliveryOrderId,
+      reporterId: incident.reporterId,
+      reporterRole: incident.reporterRole,
+      type: incident.type,
+      status: incident.status,
+      description: incident.description,
+      evidenceUrl: incident.evidenceUrl ?? null,
+      createdAt: incident.createdAt,
+      resolvedAt: incident.resolvedAt ?? null,
+      reporterEmail: incident.reporter.email,
+      reporterName: incident.reporter.name ?? null,
+    }));
+  }
+
   // --- Metrics ---
   // --- Metrics ---
   async getMetrics() {

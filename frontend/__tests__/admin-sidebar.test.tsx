@@ -41,6 +41,10 @@ describe("AdminSidebar", () => {
       "href",
       "/admin/refunds",
     )
+    expect(screen.getByRole("link", { name: /Incidencias/i })).toHaveAttribute(
+      "href",
+      "/admin/incidents",
+    )
     expect(screen.getByRole("link", { name: /Usuarios/i }).className).toContain("bg-primary/10")
 
     fireEvent.click(screen.getByRole("button", { name: /Cerrar sesión/i }))

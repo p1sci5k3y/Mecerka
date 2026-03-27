@@ -7,6 +7,7 @@ import {
     MapPin,
     Tag,
     HandCoins,
+    Siren,
     LogOut,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
@@ -37,6 +38,11 @@ const sidebarItems = [
         title: "Devoluciones",
         href: "/admin/refunds",
         icon: HandCoins,
+    },
+    {
+        title: "Incidencias",
+        href: "/admin/incidents",
+        icon: Siren,
     },
 ]
 

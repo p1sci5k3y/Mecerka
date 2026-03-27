@@ -142,6 +142,11 @@ export class AdminController {
     return this.adminService.getRecentRefunds();
   }
 
+  @Get('incidents')
+  getIncidents() {
+    return this.adminService.getRecentIncidents();
+  }
+
   // --- Metrics ---
   @Get('metrics')
   getMetrics() {

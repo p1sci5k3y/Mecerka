@@ -7,6 +7,7 @@ import {
   ShoppingBag,
   DollarSign,
   HandCoins,
+  Siren,
   Settings2,
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
@@ -75,6 +76,12 @@ function AdminDashboardContent() {
       icon: HandCoins,
     },
     {
+      label: "Gestionar incidencias",
+      description: "Revisa entregas problemáticas y decide si se resuelven o se rechazan.",
+      href: "/admin/incidents",
+      icon: Siren,
+    },
+    {
       label: "Editar maestros",
       description: "Mantén ciudades y categorías alineadas con la operación.",
       href: "/admin/masters?tab=cities",
@@ -112,7 +119,7 @@ function AdminDashboardContent() {
 
       <div className="mt-8">
         <h2 className="mb-4 text-lg font-semibold">Operaciones rápidas</h2>
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((action) => (
             <Link
               key={action.href}

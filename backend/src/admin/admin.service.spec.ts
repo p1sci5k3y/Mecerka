@@ -49,6 +49,7 @@ describe('AdminService role grants', () => {
               update: jest.fn(),
               delete: jest.fn(),
             },
+            deliveryIncident: { findMany: jest.fn() },
             refundRequest: { findMany: jest.fn() },
           },
         },
@@ -368,6 +369,42 @@ describe('AdminService role grants', () => {
             amount: 18.5,
             requestedByEmail: 'client@example.com',
             reviewedByEmail: 'admin@example.com',
+          }),
+        ]);
+      });
+    });
+
+    describe('getRecentIncidents', () => {
+      it('returns normalized incident summaries with reporter metadata', async () => {
+        prismaMock.deliveryIncident.findMany.mockResolvedValue([
+          {
+            id: 'incident-1',
+            deliveryOrderId: 'delivery-order-1',
+            reporterId: 'runner-1',
+            reporterRole: 'RUNNER',
+            type: 'FAILED_DELIVERY',
+            status: 'UNDER_REVIEW',
+            description: 'No pude completar la entrega',
+            evidenceUrl: 'https://example.com/evidence.jpg',
+            createdAt: new Date('2026-03-27T10:00:00.000Z'),
+            resolvedAt: null,
+            reporter: { email: 'runner@example.com', name: 'Runner Demo' },
+          },
+        ]);
+
+        const result = await service.getRecentIncidents();
+
+        expect(prismaMock.deliveryIncident.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+        );
+        expect(result).toEqual([
+          expect.objectContaining({
+            id: 'incident-1',
+            reporterEmail: 'runner@example.com',
+            reporterName: 'Runner Demo',
           }),
         ]);
       });
