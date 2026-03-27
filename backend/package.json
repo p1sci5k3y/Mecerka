@@ -40,7 +40,7 @@
     "cookie-parser": "^1.4.7",
     "csv-parse": "^6.1.0",
     "helmet": "^8.1.0",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^8.0.4",
     "otplib": "^13.2.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -136,6 +136,7 @@
     },
     "readdirp": {
       "picomatch": "^2.3.2"
-    }
+    },
+    "handlebars": "4.7.9"
   }
 }
