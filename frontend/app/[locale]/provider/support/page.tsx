@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -11,13 +11,25 @@ import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { DeliveryIncidentSummary, ProviderOrder, RefundSummary } from "@/lib/types"
+import { useToast } from "@/components/ui/use-toast"
 import { AlertTriangle, Loader2, Receipt, RotateCcw } from "lucide-react"
 
 type ProviderOrderWithSupport = ProviderOrder & {
   rootOrderId: string
+  deliveryOrderId: string | null
   refunds: RefundSummary[]
   incidents: DeliveryIncidentSummary[]
 }
+
+const INCIDENT_TYPES = [
+  "MISSING_ITEMS",
+  "DAMAGED_ITEMS",
+  "WRONG_DELIVERY",
+  "FAILED_DELIVERY",
+  "ADDRESS_PROBLEM",
+  "SAFETY_CONCERN",
+  "OTHER",
+] as const
 
 function refundStatusLabel(status: string) {
   switch (status) {
@@ -55,6 +67,27 @@ function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
   }
 }
 
+function incidentTypeLabel(type: DeliveryIncidentSummary["type"]) {
+  switch (type) {
+    case "MISSING_ITEMS":
+      return "Faltan artículos"
+    case "DAMAGED_ITEMS":
+      return "Artículos dañados"
+    case "WRONG_DELIVERY":
+      return "Entrega incorrecta"
+    case "FAILED_DELIVERY":
+      return "Entrega fallida"
+    case "ADDRESS_PROBLEM":
+      return "Problema con la dirección"
+    case "SAFETY_CONCERN":
+      return "Incidencia de seguridad"
+    case "OTHER":
+      return "Otro"
+    default:
+      return type
+  }
+}
+
 export default function ProviderSupportPage() {
   return (
     <ProtectedRoute allowedRoles={["PROVIDER"]}>
@@ -65,62 +98,68 @@ export default function ProviderSupportPage() {
 
 function ProviderSupportContent() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [providerOrders, setProviderOrders] = useState<ProviderOrderWithSupport[]>([])
   const [loading, setLoading] = useState(true)
+  const [targetProviderOrderId, setTargetProviderOrderId] = useState("")
+  const [incidentType, setIncidentType] =
+    useState<DeliveryIncidentSummary["type"]>("DAMAGED_ITEMS")
+  const [incidentDescription, setIncidentDescription] = useState("")
+  const [incidentEvidenceUrl, setIncidentEvidenceUrl] = useState("")
+  const [submittingIncident, setSubmittingIncident] = useState(false)
 
-  useEffect(() => {
-    async function loadData() {
-      if (!user?.userId) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        const orders = await ordersService.getAll()
-        const ownProviderOrders = orders.flatMap((order) =>
-          (order.providerOrders || [])
-            .filter((providerOrder) => providerOrder.providerId === String(user.userId))
-            .map((providerOrder) => ({
-              ...providerOrder,
-              rootOrderId: order.id,
-              deliveryOrderId: order.deliveryOrder?.id || null,
-            })),
-        )
-
-        const withSupport = await Promise.all(
-          ownProviderOrders.map(async (providerOrder) => {
-            const [refunds, incidents] = await Promise.all([
-              refundsService
-                .getProviderOrderRefunds(providerOrder.id)
-                .catch(() => [] as RefundSummary[]),
-              providerOrder.deliveryOrderId
-                ? deliveryIncidentsService
-                    .listDeliveryOrderIncidents(providerOrder.deliveryOrderId)
-                    .catch(() => [] as DeliveryIncidentSummary[])
-                : Promise.resolve([] as DeliveryIncidentSummary[]),
-            ])
-
-            return {
-              ...providerOrder,
-              refunds,
-              incidents,
-            }
-          }),
-        )
-
-        setProviderOrders(
-          withSupport.filter(
-            (providerOrder) =>
-              providerOrder.refunds.length > 0 || providerOrder.incidents.length > 0,
-          ),
-        )
-      } finally {
-        setLoading(false)
-      }
+  const loadData = useCallback(async () => {
+    if (!user?.userId) {
+      setLoading(false)
+      return
     }
 
-    void loadData()
+    try {
+      const orders = await ordersService.getAll()
+      const ownProviderOrders = orders.flatMap((order) =>
+        (order.providerOrders || [])
+          .filter((providerOrder) => providerOrder.providerId === String(user.userId))
+          .map((providerOrder) => ({
+            ...providerOrder,
+            rootOrderId: order.id,
+            deliveryOrderId: order.deliveryOrder?.id || null,
+          })),
+      )
+
+      const withSupport = await Promise.all(
+        ownProviderOrders.map(async (providerOrder) => {
+          const [refunds, incidents] = await Promise.all([
+            refundsService
+              .getProviderOrderRefunds(providerOrder.id)
+              .catch(() => [] as RefundSummary[]),
+            providerOrder.deliveryOrderId
+              ? deliveryIncidentsService
+                  .listDeliveryOrderIncidents(providerOrder.deliveryOrderId)
+                  .catch(() => [] as DeliveryIncidentSummary[])
+              : Promise.resolve([] as DeliveryIncidentSummary[]),
+          ])
+
+          return {
+            ...providerOrder,
+            refunds,
+            incidents,
+          }
+        }),
+      )
+
+      setProviderOrders(withSupport)
+      setTargetProviderOrderId((currentTargetId) => {
+        if (currentTargetId) return currentTargetId
+        return withSupport.find((providerOrder) => providerOrder.deliveryOrderId)?.id || ""
+      })
+    } finally {
+      setLoading(false)
+    }
   }, [user?.userId])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
 
   const visibleIncidents = useMemo(
     () =>
@@ -138,6 +177,58 @@ function ProviderSupportContent() {
       ),
     [providerOrders],
   )
+  const providerOrdersWithDelivery = useMemo(
+    () =>
+      providerOrders.filter(
+        (providerOrder) => typeof providerOrder.deliveryOrderId === "string",
+      ),
+    [providerOrders],
+  )
+  const visibleProviderOrders = useMemo(
+    () =>
+      providerOrders.filter(
+        (providerOrder) =>
+          providerOrder.refunds.length > 0 || providerOrder.incidents.length > 0,
+      ),
+    [providerOrders],
+  )
+  const selectedProviderOrder =
+    providerOrdersWithDelivery.find(
+      (providerOrder) => providerOrder.id === targetProviderOrderId,
+    ) ?? null
+
+  async function submitIncident() {
+    if (!selectedProviderOrder?.deliveryOrderId) return
+
+    setSubmittingIncident(true)
+    try {
+      await deliveryIncidentsService.createIncident({
+        deliveryOrderId: selectedProviderOrder.deliveryOrderId,
+        type: incidentType,
+        description: incidentDescription,
+        ...(incidentEvidenceUrl.trim()
+          ? { evidenceUrl: incidentEvidenceUrl.trim() }
+          : {}),
+      })
+
+      toast({
+        title: "Incidencia registrada",
+        description: "El caso ya es visible para soporte y backoffice.",
+      })
+      setIncidentDescription("")
+      setIncidentEvidenceUrl("")
+      await loadData()
+    } catch (error) {
+      console.error("Error registrando incidencia provider:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo registrar la incidencia del comercio.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmittingIncident(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -206,15 +297,96 @@ function ProviderSupportContent() {
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Abrir incidencia operativa</h2>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Si un caso afecta a la preparación, recogida o entrega, el comercio puede abrirlo desde aquí sin depender solo del cliente.
+            </p>
+            {providerOrdersWithDelivery.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-dashed border-border/70 bg-background/70 px-4 py-6 text-sm text-muted-foreground">
+                No hay provider orders con entrega asociada sobre los que abrir incidencias.
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3">
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium">Provider order</span>
+                  <select
+                    value={targetProviderOrderId}
+                    onChange={(event) => setTargetProviderOrderId(event.target.value)}
+                    className="h-10 w-full rounded-md border bg-background px-3"
+                  >
+                    {providerOrdersWithDelivery.map((providerOrder) => (
+                      <option key={providerOrder.id} value={providerOrder.id}>
+                        {providerOrder.providerName ?? "Comercio"} · Pedido #{providerOrder.rootOrderId.slice(0, 8).toUpperCase()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium">Tipo</span>
+                  <select
+                    value={incidentType}
+                    onChange={(event) =>
+                      setIncidentType(
+                        event.target.value as DeliveryIncidentSummary["type"],
+                      )
+                    }
+                    className="h-10 w-full rounded-md border bg-background px-3"
+                  >
+                    {INCIDENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {incidentTypeLabel(type)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium">Descripción</span>
+                  <textarea
+                    value={incidentDescription}
+                    onChange={(event) => setIncidentDescription(event.target.value)}
+                    placeholder="Describe el problema operativo detectado"
+                    className="min-h-[110px] w-full rounded-md border bg-background px-3 py-2"
+                  />
+                </label>
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium">Evidencia (URL HTTPS, opcional)</span>
+                  <input
+                    value={incidentEvidenceUrl}
+                    onChange={(event) => setIncidentEvidenceUrl(event.target.value)}
+                    placeholder="https://..."
+                    className="h-10 w-full rounded-md border bg-background px-3"
+                  />
+                </label>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    disabled={
+                      submittingIncident ||
+                      incidentDescription.trim().length < 5 ||
+                      !selectedProviderOrder?.deliveryOrderId
+                    }
+                    onClick={() => void submitIncident()}
+                  >
+                    Registrar incidencia
+                  </Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-primary" />
               <h2 className="text-xl font-bold text-foreground">Casos visibles</h2>
             </div>
             <div className="mt-6 grid gap-4">
-              {providerOrders.length === 0 ? (
+              {visibleProviderOrders.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 px-6 py-12 text-center text-sm text-muted-foreground">
                   No hay incidencias ni devoluciones visibles para tu comercio ahora mismo.
                 </div>
               ) : (
-                providerOrders.map((providerOrder) => (
+                visibleProviderOrders.map((providerOrder) => (
                   <article
                     key={providerOrder.id}
                     className="rounded-2xl border border-border/60 bg-background/70 p-5"

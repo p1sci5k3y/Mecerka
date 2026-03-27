@@ -23,6 +23,7 @@ import {
   hasAuthSessionHint,
   setAuthSessionHint,
 } from "@/lib/auth-session"
+import { ApiError } from "@/lib/api"
 
 interface AuthState {
   user: User | null
@@ -37,6 +38,22 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+function buildHydratedUser(input: {
+  id: string
+  email: string
+  roles: User["roles"]
+  mfaEnabled: boolean
+  hasPin: boolean
+}): User {
+  return {
+    userId: input.id,
+    email: input.email,
+    roles: input.roles,
+    mfaEnabled: input.mfaEnabled,
+    hasPin: input.hasPin,
+  }
+}
 
 function isAuthHydrationRequired(pathname: string) {
   const protectedPrefixes = ["/dashboard", "/admin", "/profile", "/mfa", "/provider", "/runner", "/orders"]
@@ -56,9 +73,18 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       const user = await authService.getProfile()
       setAuthSessionHint()
       setState({ user, isLoading: false, isAuthenticated: true })
-    } catch {
-      clearAuthSessionHint()
-      setState({ user: null, isLoading: false, isAuthenticated: false })
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 401) {
+        clearAuthSessionHint()
+        setState({ user: null, isLoading: false, isAuthenticated: false })
+        return
+      }
+
+      setState((current) =>
+        current.isAuthenticated && current.user
+          ? { ...current, isLoading: false }
+          : { user: null, isLoading: false, isAuthenticated: false },
+      )
     }
   }, [])
 
@@ -78,8 +104,13 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const login = useCallback(async (payload: LoginPayload) => {
     const response = await authService.login(payload)
     if (!response?.mfaRequired) {
+      setState({
+        user: buildHydratedUser(response.user),
+        isLoading: false,
+        isAuthenticated: true,
+      })
       setAuthSessionHint()
-      await hydrateUser()
+      void hydrateUser()
     }
     return response
   }, [hydrateUser])

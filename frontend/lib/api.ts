@@ -1,6 +1,6 @@
 import { getApiBaseUrl } from "@/lib/runtime-config"
 
-class ApiError extends Error {
+export class ApiError extends Error {
   constructor(
     message: string,
     readonly statusCode: number,

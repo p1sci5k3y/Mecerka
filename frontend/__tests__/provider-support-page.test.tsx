@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Order } from "@/lib/types"
 
 const getAllMock = vi.fn()
 const getProviderOrderRefundsMock = vi.fn()
 const listDeliveryOrderIncidentsMock = vi.fn()
+const createIncidentMock = vi.fn()
 const useAuthMock = vi.fn()
+const toastMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
@@ -22,6 +24,7 @@ vi.mock("@/lib/services/refunds-service", () => ({
 vi.mock("@/lib/services/delivery-incidents-service", () => ({
   deliveryIncidentsService: {
     listDeliveryOrderIncidents: (...args: unknown[]) => listDeliveryOrderIncidentsMock(...args),
+    createIncident: (...args: unknown[]) => createIncidentMock(...args),
   },
 }))
 
@@ -39,6 +42,12 @@ vi.mock("@/components/navbar", () => ({
 
 vi.mock("@/components/footer", () => ({
   Footer: () => <footer data-testid="footer" />,
+}))
+
+vi.mock("@/components/ui/use-toast", () => ({
+  useToast: () => ({
+    toast: (...args: unknown[]) => toastMock(...args),
+  }),
 }))
 
 vi.mock("@/components/ui/button", () => ({
@@ -194,5 +203,42 @@ describe("Provider support page", () => {
       "href",
       "/provider/finance",
     )
+  })
+
+  it("lets the provider open an incident from the support hub", async () => {
+    getAllMock.mockResolvedValue([makeOrder()])
+    getProviderOrderRefundsMock.mockResolvedValue([])
+    listDeliveryOrderIncidentsMock.mockResolvedValue([])
+    createIncidentMock.mockResolvedValue({
+      id: "incident-new",
+      deliveryOrderId: "delivery-1",
+      reporterRole: "PROVIDER",
+      type: "DAMAGED_ITEMS",
+      status: "OPEN",
+      description: "Caja golpeada en recogida",
+      evidenceUrl: null,
+      createdAt: "2026-03-27T12:00:00.000Z",
+      resolvedAt: null,
+    })
+
+    const Page = (await import("@/app/[locale]/provider/support/page")).default
+    render(<Page />)
+
+    await screen.findByText("Abrir incidencia operativa")
+
+    fireEvent.change(
+      screen.getByPlaceholderText(/Describe el problema operativo detectado/i),
+      { target: { value: "Caja golpeada en recogida" } },
+    )
+    fireEvent.click(screen.getByRole("button", { name: /Registrar incidencia/i }))
+
+    await waitFor(() => {
+      expect(createIncidentMock).toHaveBeenCalledWith({
+        deliveryOrderId: "delivery-1",
+        type: "DAMAGED_ITEMS",
+        description: "Caja golpeada en recogida",
+      })
+    })
+    expect(toastMock).toHaveBeenCalled()
   })
 })

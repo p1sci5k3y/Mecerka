@@ -65,7 +65,7 @@ describe('AuthModule', () => {
       jwtAsyncProvider?.useFactory?.(configService),
     ).resolves.toEqual({
       secret: 'jwt-secret-value',
-      signOptions: { expiresIn: '15m' },
+      signOptions: { expiresIn: '12h' },
     });
     await expect(
       jwtAsyncProvider?.useFactory?.({

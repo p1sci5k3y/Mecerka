@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { User } from "@/lib/types"
 import { AuthProvider, useAuth } from "@/contexts/auth-context"
+import { ApiError } from "@/lib/api"
 
 const usePathnameMock = vi.fn()
 const getProfileMock = vi.fn()
@@ -206,6 +207,60 @@ describe("AuthProvider", () => {
 
     expect(getProfileMock).not.toHaveBeenCalled()
     expect(setAuthSessionHintMock).not.toHaveBeenCalled()
+  })
+
+  it("keeps the provisional session after login when auth hydration fails for a non-401 error", async () => {
+    usePathnameMock.mockReturnValue("/")
+    hasAuthSessionHintMock.mockReturnValue(false)
+    loginMock.mockResolvedValueOnce({
+      access_token: "token",
+      mfaRequired: false,
+      user: {
+        id: "user-1",
+        email: "alex@example.com",
+        roles: ["PROVIDER"],
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+    getProfileMock.mockRejectedValueOnce(new Error("temporary upstream failure"))
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("loading:false")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "login" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("authenticated:true")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("user:alex@example.com")).toBeInTheDocument()
+    expect(clearAuthSessionHintMock).not.toHaveBeenCalled()
+  })
+
+  it("clears the session when auth hydration returns 401", async () => {
+    usePathnameMock.mockReturnValue("/dashboard")
+    hasAuthSessionHintMock.mockReturnValue(true)
+    getProfileMock.mockRejectedValueOnce(new ApiError("Unauthorized", 401))
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText("authenticated:false")).toBeInTheDocument()
+    })
+
+    expect(clearAuthSessionHintMock).toHaveBeenCalled()
   })
 
   it("clears session state even if logout request fails", async () => {

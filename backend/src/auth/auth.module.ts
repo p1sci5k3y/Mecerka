@@ -22,7 +22,7 @@ import { AuthEmailWorkflowService } from './auth-email-workflow.service';
         }
         return {
           secret,
-          signOptions: { expiresIn: '15m' },
+          signOptions: { expiresIn: '12h' },
         };
       },
       inject: [ConfigService],
