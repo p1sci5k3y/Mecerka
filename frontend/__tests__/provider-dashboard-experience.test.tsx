@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Order, SalesChartData } from "@/lib/types"
 
 const getProviderStatsMock = vi.fn()
@@ -8,6 +8,7 @@ const getAllMock = vi.fn()
 const useAuthMock = vi.fn()
 const toastSuccessMock = vi.fn()
 const toastErrorMock = vi.fn()
+const fetchMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
@@ -62,6 +63,8 @@ describe("ProviderDashboard financial experience", () => {
     getAllMock.mockReset()
     toastSuccessMock.mockReset()
     toastErrorMock.mockReset()
+    fetchMock.mockReset()
+    vi.stubGlobal("fetch", fetchMock)
     window.history.replaceState({}, "", "/es/dashboard/provider")
   })
 
@@ -164,5 +167,74 @@ describe("ProviderDashboard financial experience", () => {
       screen.getByText(/No hay suficientes datos de ventas para mostrar la gráfica/i),
     ).toBeInTheDocument()
     expect(screen.getByText(/Aún no hay pedidos en tu taller/i)).toBeInTheDocument()
+  })
+
+  it("starts Stripe onboarding only with a safe Stripe URL and surfaces verification errors", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-1",
+        name: "Taller Sevilla",
+        roles: ["PROVIDER"],
+        stripeAccountId: null,
+      },
+    })
+    getProviderStatsMock.mockResolvedValue({
+      totalRevenue: 0,
+      totalOrders: 0,
+      itemsSold: 0,
+      averageTicket: 0,
+    })
+    getSalesChartMock.mockResolvedValue([])
+    getAllMock.mockResolvedValue([])
+    const { ProviderDashboard } = await import(
+      "@/app/[locale]/dashboard/provider-dashboard"
+    )
+    window.history.replaceState({}, "", "/es/dashboard/provider?error=verification_failed")
+    const { rerender } = render(<ProviderDashboard />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Conectar con Stripe/i }),
+      ).toBeInTheDocument()
+    })
+
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      "Hubo un problema verificando tu cuenta de Stripe. Asegúrate de completar todos los datos.",
+    )
+
+    const locationValue = { href: "", pathname: "/es/dashboard/provider", search: "" }
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: locationValue,
+    })
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://connect.stripe.com/setup/s/provider-demo" }),
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.mecerka.test/payments/connect/link",
+        { credentials: "include" },
+      )
+      expect(locationValue.href).toBe("https://connect.stripe.com/setup/s/provider-demo")
+    })
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://evil.example/phish" }),
+    })
+    rerender(<ProviderDashboard />)
+
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "No se pudo iniciar la conexión con Stripe.",
+      )
+    })
   })
 })

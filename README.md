@@ -247,16 +247,17 @@ Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha 
 
 | Área | Resultado actual | Evidencia |
 | --- | --- | --- |
-| Frontend unitario | `37 files`, `132 tests`, OK | `cd frontend && npm run test:cov` |
-| Frontend coverage | `37.98%` lines, `37.99%` statements, `44.32%` branches, `39.71%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
-| Backend unit/integration | `112 suites`, `1206 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
-| Backend coverage | `92.03%` lines, `91.68%` statements, `84.64%` branches, `90.69%` functions | [`backend/coverage/coverage-summary.json`](backend/coverage/coverage-summary.json) |
+| Frontend unitario | `59 files`, `228 tests`, OK | `cd frontend && npm run test:cov -- --reporter=dot` |
+| Frontend coverage | `92.17%` lines, `90.66%` statements, `81.85%` branches, `91.94%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
+| Backend unit/integration | `112 suites`, `1208 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
+| Backend coverage | `76.38%` lines, `76.00%` statements, `70.54%` branches, `74.97%` functions | [`backend/coverage/coverage-summary.json`](backend/coverage/coverage-summary.json) |
 | Demo pública | `runtime-config` correcto, login demo operativo y Stripe dummy activo | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
 
 Lectura honesta:
 
-- el backend está muy por encima del umbral global del proyecto;
-- el frontend ya tiene una base razonable de cobertura en flujos críticos, pero sigue acumulando deuda en `login`, `register`, `reset-password`, `admin/*` y gran parte de `components/ui`;
+- el frontend ya ha superado la barrera del `90%` y queda por encima del backend en cobertura global de líneas;
+- el backend sigue siendo la capa con mayor densidad de negocio y mejores suites integradas, pero su cobertura total real es bastante más baja de lo que reflejaba la documentación anterior;
+- el frontend cubre ya los flujos críticos del circuito cliente/provider/runner/demo, aunque mantiene hotspots claros en `navbar`, `provider/finance`, `runner/page`, `register` y `runtime-config`;
 - la demo pública ya usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend.
 
 ## Estructuración

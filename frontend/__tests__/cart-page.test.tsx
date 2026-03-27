@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 // ── External module mocks ────────────────────────────────────────────────────
 
@@ -154,6 +154,14 @@ describe("CartPage – empty guest cart", () => {
 
     expect(screen.getByText("La cesta está vacía")).toBeInTheDocument()
     expect(screen.getByText("Explorar el mercado")).toBeInTheDocument()
+  })
+
+  it("lets the user return to the catalog from the empty cart state", async () => {
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Explorar el mercado" }))
+    expect(pushMock).toHaveBeenCalledWith("/products")
   })
 
   it("shows guest cart banner for unauthenticated users", async () => {
@@ -409,5 +417,146 @@ describe("CartPage – authenticated user with server cart", () => {
       "Pedido oficial creado. Ahora debes revisar los pagos separados por comercio.",
     )
     expect(assignMock).toHaveBeenCalledWith("/es/orders/order-99/payments")
+  })
+
+  it("falls back to a timestamp idempotency key and surfaces backend checkout messages", async () => {
+    const refreshCartMock = vi.fn().mockResolvedValue(undefined)
+    mockUseCart.mockReturnValue({
+      ...cartWithItem(),
+      source: "server",
+      cart: {
+        ...cartWithItem().cart,
+        source: "server",
+        cityId: "city-1",
+      },
+      refreshCart: refreshCartMock,
+    })
+
+    const originalCrypto = globalThis.crypto
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: undefined,
+    })
+    checkoutMock.mockRejectedValueOnce({ message: "Checkout roto en backend." })
+
+    const { toast } = await import("sonner")
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.change(screen.getByLabelText("Código postal"), {
+      target: { value: "41003" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    await waitFor(() => {
+      expect(checkoutMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cityId: "city-1",
+          deliveryAddress: "Calle Feria 12",
+          postalCode: "41003",
+        }),
+        expect.stringMatching(/^cart-checkout-\d+$/),
+      )
+    })
+    expect(refreshCartMock).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith("Checkout roto en backend.")
+
+    Object.defineProperty(globalThis, "crypto", {
+      configurable: true,
+      value: originalCrypto,
+    })
+  })
+
+  it("shows the generic checkout fallback when backend errors have no message", async () => {
+    mockUseCart.mockReturnValue({
+      ...cartWithItem(),
+      source: "server",
+      cart: {
+        ...cartWithItem().cart,
+        source: "server",
+        cityId: "city-1",
+      },
+    })
+    checkoutMock.mockRejectedValueOnce({})
+
+    const { toast } = await import("sonner")
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.change(screen.getByLabelText("Código postal"), {
+      target: { value: "41003" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "No pudimos crear el pedido oficial desde el carrito.",
+      )
+    })
+  })
+
+  it("renders provider and item discounts and forwards item controls", async () => {
+    const discountedCart = cartWithItem()
+    discountedCart.providerGroups[0] = {
+      ...discountedCart.providerGroups[0],
+      originalSubtotalAmount: 44,
+      discountAmount: 4.02,
+      items: [
+        {
+          ...discountedCart.providerGroups[0].items[0],
+          baseUnitPrice: 22,
+          unitPrice: 19.99,
+          discountAmount: 2.01,
+          originalSubtotal: 44,
+          subtotal: 39.98,
+          product: {
+          ...discountedCart.providerGroups[0].items[0].product,
+            imageUrl: null,
+          },
+        },
+      ],
+    }
+    discountedCart.items = discountedCart.providerGroups[0].items
+    discountedCart.cart = {
+      ...discountedCart.cart,
+      providerGroups: discountedCart.providerGroups,
+      originalTotalPrice: 44,
+      discountAmount: 4.02,
+    }
+
+    const removeItemMock = vi.fn()
+    const updateQuantityMock = vi.fn()
+    mockUseCart.mockReturnValue({
+      ...discountedCart,
+      source: "server",
+      cart: {
+        ...discountedCart.cart,
+        source: "server",
+        cityId: "city-1",
+      },
+      removeItem: removeItemMock,
+      updateQuantity: updateQuantityMock,
+    })
+
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    expect(screen.getByText(/Descuento del proveedor/i)).toBeInTheDocument()
+    expect(screen.getByText(/Descuento aplicado por Artesanos Madrid/i)).toBeInTheDocument()
+    expect(screen.getByAltText("Producto sin imagen")).toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByRole("button", { name: "" })[0])
+    fireEvent.click(screen.getAllByRole("button", { name: "" })[1])
+    fireEvent.click(screen.getByTitle("Eliminar producto"))
+
+    expect(updateQuantityMock).toHaveBeenCalledWith("item-1", 1)
+    expect(updateQuantityMock).toHaveBeenCalledWith("item-1", 3)
+    expect(removeItemMock).toHaveBeenCalledWith("item-1")
   })
 })

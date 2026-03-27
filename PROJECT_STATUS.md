@@ -4,14 +4,14 @@ Fecha de actualización: `27/03/2026`
 
 ## Resumen Ejecutivo
 
-Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, cobertura backend alta y una superficie frontend ya razonablemente cerrada para cliente, provider, runner y admin.
+Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, una superficie frontend muy defendida por tests y una base backend estable con suites amplias, aunque con cobertura global más moderada.
 
 El proyecto ya no está en fase de construir infraestructura base. El trabajo de mayor retorno ahora consiste en cerrar agujeros de continuidad de negocio y experiencia visible, no en añadir capas técnicas nuevas.
 
 ## Estado General
 
-- `Backend`: estable, modularizado y con cobertura alta.
-- `Frontend`: funcional y bastante más cubierto que al inicio, aunque aún con deuda en áreas genéricas y administrativas.
+- `Backend`: estable, modularizado y con buena amplitud de pruebas, pero cobertura global moderada.
+- `Frontend`: funcional y ya con cobertura de líneas por encima del backend.
 - `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
 - `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
 - `Documentación`: README y wiki actualizados; este documento queda alineado con ese estado.
@@ -20,21 +20,21 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 
 ### Backend
 
-- Cobertura statements: `91.68%`
-- Cobertura branches: `84.64%`
-- Cobertura functions: `90.69%`
-- Cobertura lines: `92.03%`
+- Cobertura statements: `76.00%`
+- Cobertura branches: `70.54%`
+- Cobertura functions: `74.97%`
+- Cobertura lines: `76.38%`
 - Suites: `112`
-- Tests: `1206`
+- Tests: `1208`
 
 ### Frontend
 
-- Cobertura statements: `37.99%`
-- Cobertura branches: `44.32%`
-- Cobertura functions: `39.71%`
-- Cobertura lines: `37.98%`
-- Archivos de test: `37`
-- Tests: `132`
+- Cobertura statements: `90.66%`
+- Cobertura branches: `81.85%`
+- Cobertura functions: `91.94%`
+- Cobertura lines: `92.17%`
+- Archivos de test: `59`
+- Tests: `228`
 
 ## Capacidades Cerradas
 
@@ -119,13 +119,13 @@ Lectura honesta:
 - no existe todavía una wallet persistente de tarjetas del cliente
 - la gestión de refunds sigue siendo más sólida en backend que en frontend
 - admin/backoffice aún necesita más recorrido visible para resolución completa de incidencias
-- la cobertura frontend sigue siendo modesta comparada con backend
+- el backend sigue teniendo áreas con cobertura global moderada pese a la amplitud de suites
 - faltan más flujos e2e públicos sobre demo para defensa integral por perfil
 
 ## Riesgos Actuales
 
 - deuda de continuidad UX entre pantallas operativas y financieras
-- deuda de cobertura frontend en zonas de UI genérica y rutas secundarias
+- deuda de cobertura backend en módulos, bootstrap y controladores con poco ejercicio directo
 - riesgo de percepción de producto “a medias” si no se sigue cerrando caso de uso por caso de uso
 
 ## Siguiente Prioridad Recomendada
@@ -133,14 +133,14 @@ Lectura honesta:
 ### Prioridad 1
 
 1. cerrar frontend/backoffice de cancelación y refund visible
-2. validar e2e sobre `demo.mecerka.me` el circuito `CLIENT -> payments -> tracking`
+2. reforzar cobertura backend en bootstrap, módulos y controladores con bajo porcentaje real
 3. reforzar continuidad entre paneles operativos y financieros de provider/runner
 
 ### Prioridad 2
 
 1. tabla funcional formal de estados para defensa
 2. más e2e multi-rol sobre demo
-3. seguir levantando cobertura frontend en auth, admin y componentes transversales
+3. rematar hotspots frontend restantes (`navbar`, `runner`, `provider/finance`, `runtime-config`)
 
 ## Conclusión
 

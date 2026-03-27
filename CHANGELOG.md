@@ -17,11 +17,14 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 - soporte de tracking para pedidos reales con UUID
 - documentación actualizada en README y wiki con métricas, credenciales demo y arquitectura vigente
 - cobertura frontend real con `@vitest/coverage-v8` y artifacts en CI
+- nuevo bloque de tests frontend sobre `login`, `cart`, `payments`, `orders`, `admin`, `runner`, `provider` y servicios asociados
 
 ### Changed
 
 - la demo pública usa la misma app y el mismo circuito real que producción, aislando datos e integraciones por entorno
 - `runtime-config` queda forzado a `/api` bajo el mismo host para evitar cruces demo -> prod
+- la cobertura frontend queda en `92.17%` líneas (`228` tests, `59` archivos) y pasa a superar la cobertura global actual del backend
+- la documentación principal se corrige para reflejar la cobertura backend real recalculada (`76.38%` líneas, `1208` tests)
 - despliegue dual endurecido con preflight de secrets, limpieza de puertos, warmup de Nginx y smoke checks más robustos
 - `security.yml` ahora pasa `GITHUB_TOKEN` explícitamente a Gitleaks en PRs
 - `ci.yml` usa la CLI local de Prisma vía `npm exec -- prisma ...` para evitar incompatibilidades del runner con Prisma 7
@@ -33,6 +36,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 - corrección de enlaces rotos y copy no localizado en navbar, footer y páginas públicas
 - corrección de `runtime-config` bajo rutas con locale
 - corrección del tracking que rompía con pedidos UUID
+- corrección de métricas y narrativa técnica desalineadas en README, PROJECT_STATUS y wiki
 - eliminación de imports no usados en `provider/finance/page.tsx`
 - endurecimiento de tests de bootstrap, cart sync y otras rutas sensibles para evitar flakes en CI
 - correcciones de Nginx y deploy dual:
@@ -47,6 +51,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
 - actualización de `PROJECT_STATUS.md` con estado real del repo, métricas verificadas y prioridades actuales
 - actualización de `CHANGELOG.md` para reflejar el circuito actual cliente/provider/runner/demo
+- validación documentada del circuito completo `CLIENT -> orders -> payments -> demo pay -> track` en `demo.mecerka.me`
 
 ## [2026-03-26]
 

@@ -148,4 +148,66 @@ describe("OrdersPage experience", () => {
       "/orders/order-past/payments",
     )
   })
+
+  it("shows only history cards when all orders are closed and keeps the total spent summary", async () => {
+    getAllMock.mockResolvedValueOnce([
+      makeOrder({
+        id: "order-cancelled",
+        status: "CANCELLED",
+        total: 30,
+      }),
+      makeOrder({
+        id: "order-delivered",
+        status: "DELIVERED",
+        total: 21,
+      }),
+    ])
+
+    const Page = (await import("@/app/[locale]/orders/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Mis pedidos")).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText("Pedidos pendientes")).not.toBeInTheDocument()
+    expect(screen.getAllByText("Histórico")).toHaveLength(2)
+    expect(screen.getByText(/24,00/)).toBeInTheDocument()
+    expect(screen.getByText(/Cancelado/i, { exact: false })).toBeInTheDocument()
+  })
+
+  it("fails safely when the orders hub cannot be loaded", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    getAllMock.mockRejectedValueOnce(new Error("boom"))
+
+    const Page = (await import("@/app/[locale]/orders/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Aún no tienes pedidos")).toBeInTheDocument()
+    })
+
+    expect(errorSpy).toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+
+  it("renders the full status vocabulary used by the active orders hub", async () => {
+    getAllMock.mockResolvedValueOnce([
+      makeOrder({ id: "order-pending", status: "PENDING" }),
+      makeOrder({ id: "order-ready", status: "READY_FOR_ASSIGNMENT" }),
+      makeOrder({ id: "order-assigned", status: "ASSIGNED" }),
+      makeOrder({ id: "order-unknown", status: "ON_HOLD" as Order["status"] }),
+    ])
+
+    const Page = (await import("@/app/[locale]/orders/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Pendiente")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Listo para asignación")).toBeInTheDocument()
+    expect(screen.getByText("Repartidor asignado")).toBeInTheDocument()
+    expect(screen.getByText("ON_HOLD")).toBeInTheDocument()
+  })
 })

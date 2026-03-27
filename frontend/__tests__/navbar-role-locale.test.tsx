@@ -299,4 +299,57 @@ describe("Navbar role and locale experience", () => {
     fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
     expect(screen.queryAllByRole("link", { name: "Registrarse" })).toHaveLength(1)
   })
+
+  it("shows provider and runner shortcuts inside the authenticated mobile drawer", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            dashboard: "Panel",
+            inventory: "Inventario",
+            deliveries: "Repartos",
+            profile: "Perfil",
+            logout: "Salir",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+            userFallback: "Usuario",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-runner-1",
+        name: "Aitana",
+        roles: ["CLIENT", "PROVIDER", "RUNNER"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 4 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+
+    expect(screen.getAllByRole("link", { name: "Inventario" })[1]).toHaveAttribute(
+      "href",
+      "/provider/products",
+    )
+    expect(screen.getAllByRole("link", { name: "Repartos" })[1]).toHaveAttribute(
+      "href",
+      "/runner",
+    )
+    expect(screen.getAllByRole("link", { name: "Panel" })[1]).toHaveAttribute(
+      "href",
+      "/provider/sales",
+    )
+    expect(screen.getAllByRole("link", { name: "Perfil" })[1]).toHaveAttribute(
+      "href",
+      "/profile",
+    )
+    expect(screen.getAllByText("4")).not.toHaveLength(0)
+  })
 })

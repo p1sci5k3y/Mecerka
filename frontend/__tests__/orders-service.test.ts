@@ -180,4 +180,59 @@ describe("orders-service", () => {
       { status: "READY_FOR_PICKUP" },
     )
   })
+
+  it("forwards provider analytics endpoints without extra transformation", async () => {
+    apiGetMock
+      .mockResolvedValueOnce({ totalRevenue: 10, totalOrders: 2, itemsSold: 3, averageTicket: 5 })
+      .mockResolvedValueOnce([{ date: "2026-03-27", amount: 10 }])
+      .mockResolvedValueOnce([{ name: "Cuenco", quantity: 2, revenue: 20 }])
+
+    const stats = await ordersService.getProviderStats()
+    const chart = await ordersService.getSalesChart()
+    const topProducts = await ordersService.getTopProducts()
+
+    expect(apiGetMock).toHaveBeenNthCalledWith(1, "/orders/provider/stats")
+    expect(apiGetMock).toHaveBeenNthCalledWith(2, "/orders/provider/chart")
+    expect(apiGetMock).toHaveBeenNthCalledWith(3, "/orders/provider/top-products")
+    expect(stats.totalRevenue).toBe(10)
+    expect(chart[0].amount).toBe(10)
+    expect(topProducts[0].name).toBe("Cuenco")
+  })
+
+  it("maps available orders and forwards runner lifecycle transitions", async () => {
+    const backendOrder = makeBackendOrder() as any
+    delete backendOrder.deliveryFee
+    delete backendOrder.deliveryDistanceKm
+    delete backendOrder.runnerBaseFee
+    delete backendOrder.runnerPerKmFee
+    delete backendOrder.runnerExtraPickupFee
+    delete backendOrder.providerOrders
+    delete backendOrder.items
+    backendOrder.deliveryOrder = null
+    delete backendOrder.city
+
+    apiGetMock.mockResolvedValueOnce([backendOrder])
+    apiPatchMock
+      .mockResolvedValueOnce({ id: "99", status: "ACCEPTED" })
+      .mockResolvedValueOnce({ id: "99", status: "IN_TRANSIT" })
+      .mockResolvedValueOnce({ id: "99", status: "DELIVERED" })
+
+    const available = await ordersService.getAvailable()
+    await ordersService.accept("99")
+    await ordersService.markInTransit("99")
+    await ordersService.complete("99")
+
+    expect(apiGetMock).toHaveBeenCalledWith("/orders/available")
+    expect(available[0]).toMatchObject({
+      id: "99",
+      deliveryFee: 0,
+      city: undefined,
+      providerOrders: [],
+      items: [],
+      deliveryOrder: null,
+    })
+    expect(apiPatchMock).toHaveBeenNthCalledWith(1, "/orders/99/accept")
+    expect(apiPatchMock).toHaveBeenNthCalledWith(2, "/orders/99/in-transit")
+    expect(apiPatchMock).toHaveBeenNthCalledWith(3, "/orders/99/complete")
+  })
 })

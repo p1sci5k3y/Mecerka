@@ -75,7 +75,17 @@ vi.mock("@/components/footer", () => ({
 }))
 
 vi.mock("@/components/payments/stripe-direct-checkout", () => ({
-  StripeDirectCheckout: () => <div data-testid="stripe-direct-checkout" />,
+  StripeDirectCheckout: ({
+    onPaymentSuccess,
+  }: {
+    onPaymentSuccess?: () => void
+  }) => (
+    <div data-testid="stripe-direct-checkout">
+      <button type="button" onClick={onPaymentSuccess}>
+        complete-direct-checkout
+      </button>
+    </div>
+  ),
 }))
 
 vi.mock("@/components/ui/button", () => ({
@@ -541,6 +551,22 @@ describe("OrderPaymentsPage experience", () => {
     })
   })
 
+  it("keeps the page in loading mode while auth is still resolving", async () => {
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+    })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    expect(screen.queryByTestId("navbar")).not.toBeInTheDocument()
+    expect(document.querySelector(".animate-spin")).not.toBeNull()
+    expect(getOneMock).not.toHaveBeenCalled()
+    expect(prepareOrderProviderPaymentsMock).not.toHaveBeenCalled()
+  })
+
   it("redirects non-client users away from the payment page", async () => {
     useAuthMock.mockReturnValue({
       user: {
@@ -584,7 +610,7 @@ describe("OrderPaymentsPage experience", () => {
     })
 
     fireEvent.click(
-      screen.getByRole("button", { name: /Preparar pago de este comercio/i }),
+      screen.getAllByRole("button", { name: /Preparar pago de este comercio/i })[0],
     )
 
     await waitFor(() => {
@@ -634,6 +660,152 @@ describe("OrderPaymentsPage experience", () => {
     )
   })
 
+  it("keeps provider preparation in a safe toast-only mode when the key is dummy and surfaces provider status variants", async () => {
+    getPublicRuntimeConfigMock.mockResolvedValue({
+      stripePublishableKey: "pk_test_dummy",
+    })
+    getOneMock.mockResolvedValueOnce(makeOrder())
+    prepareOrderProviderPaymentsMock.mockResolvedValueOnce(
+      makeAggregate({
+        providerOrders: [
+          {
+            providerOrderId: "provider-order-1",
+            providerId: "provider-1",
+            providerName: "Cerámica Norte",
+            subtotalAmount: 18,
+            originalSubtotalAmount: 22,
+            discountAmount: 4,
+            status: "PREPARING",
+            paymentStatus: "FAILED",
+            paymentRequired: true,
+            paymentSession: null,
+          },
+          {
+            providerOrderId: "provider-order-2",
+            providerId: "provider-2",
+            providerName: "Cuero Sur",
+            subtotalAmount: 24,
+            originalSubtotalAmount: 24,
+            discountAmount: 0,
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PENDING",
+            paymentRequired: true,
+            paymentSession: null,
+          },
+        ],
+      }),
+    )
+    prepareProviderOrderPaymentMock.mockResolvedValueOnce({
+      providerOrderId: "provider-order-1",
+      paymentSessionId: "session-1",
+      externalSessionId: null,
+      clientSecret: "secret_provider",
+      stripeAccountId: "acct_provider",
+      expiresAt: null,
+      paymentStatus: "PAYMENT_READY",
+    })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Fallido")).toBeInTheDocument()
+      expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0)
+    })
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /Preparar pago de este comercio/i })[0],
+    )
+
+    await waitFor(() => {
+      expect(prepareProviderOrderPaymentMock).toHaveBeenCalledWith(
+        "provider-order-1",
+      )
+    })
+
+    expect(toastInfoMock).toHaveBeenCalledWith(
+      "La sesión de pago ya está preparada en backend, pero este entorno local no puede completar Stripe.",
+    )
+  })
+
+  it("falls back to local order data when the aggregate fails and surfaces generic demo-payment errors", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        providerOrders: [
+          makeProviderOrder({
+            id: "provider-order-1",
+            providerName: "",
+            providerId: "provider-xyz",
+            items: [],
+            paymentStatus: undefined,
+            status: "REJECTED_BY_STORE",
+          }),
+        ],
+      }),
+    )
+    prepareOrderProviderPaymentsMock.mockRejectedValueOnce({})
+    getPublicRuntimeConfigMock.mockResolvedValueOnce({
+      stripePublishableKey: null,
+    })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "No pudimos preparar las sesiones de pago para este pedido.",
+        ),
+      ).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Proveedor provid")).toBeInTheDocument()
+    expect(screen.getByText("ASSIGNED")).toBeInTheDocument()
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0)
+    expect(screen.getByText("No")).toBeInTheDocument()
+  })
+
+  it("refreshes the page after a successful direct checkout and keeps the catalog exit", async () => {
+    getOneMock
+      .mockResolvedValueOnce(makeOrder())
+      .mockResolvedValueOnce(makeOrder())
+    prepareOrderProviderPaymentsMock
+      .mockResolvedValueOnce(makeAggregate())
+      .mockResolvedValueOnce(makeAggregate())
+    prepareRunnerPaymentMock.mockResolvedValueOnce({
+      deliveryOrderId: "delivery-1",
+      runnerPaymentSessionId: "runner-session-1",
+      clientSecret: "secret_runner",
+      stripeAccountId: "acct_runner",
+      paymentStatus: "PAYMENT_READY",
+    })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Preparar pago de reparto/i }),
+      ).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Preparar pago de reparto/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stripe-direct-checkout")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "complete-direct-checkout" }))
+
+    await waitFor(() => {
+      expect(getOneMock).toHaveBeenCalledTimes(2)
+      expect(prepareOrderProviderPaymentsMock).toHaveBeenCalledTimes(2)
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Seguir comprando/i }))
+    expect(routerPushMock).toHaveBeenCalledWith("/products")
+  })
+
   it("refreshes payment status on demand", async () => {
     getOneMock
       .mockResolvedValueOnce(makeOrder())
@@ -670,11 +842,107 @@ describe("OrderPaymentsPage experience", () => {
       expect(screen.getByText("Pedido y pagos por comercio")).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole("button", { name: /Volver a mis pedidos/i }))
+    expect(routerPushMock).toHaveBeenCalledWith("/orders")
+
     fireEvent.click(screen.getByRole("button", { name: /Ver mis pedidos/i }))
     expect(routerPushMock).toHaveBeenCalledWith("/orders")
 
     fireEvent.click(screen.getByRole("button", { name: /Seguir este pedido/i }))
     expect(routerPushMock).toHaveBeenCalledWith("/orders/order-1/track")
+  })
+
+  it("opens the provider checkout drawer when a reusable Stripe session already exists and refreshes after success", async () => {
+    getOneMock
+      .mockResolvedValueOnce(makeOrder())
+      .mockResolvedValueOnce(makeOrder())
+    prepareOrderProviderPaymentsMock
+      .mockResolvedValueOnce(
+        makeAggregate({
+          providerOrders: [
+            {
+              providerOrderId: "provider-order-1",
+              providerId: "provider-1",
+              providerName: undefined,
+              subtotalAmount: 18,
+              originalSubtotalAmount: 18,
+              discountAmount: 0,
+              status: "PREPARING",
+              paymentStatus: "PAYMENT_READY",
+              paymentRequired: true,
+              paymentSession: {
+                providerOrderId: "provider-order-1",
+                paymentSessionId: "provider-session-1",
+                clientSecret: "secret_provider",
+                stripeAccountId: "acct_provider",
+                expiresAt: "2026-03-27T12:00:00.000Z",
+                paymentStatus: "PAYMENT_READY",
+              },
+            },
+          ],
+          paidProviderOrders: 0,
+          totalProviderOrders: 1,
+          runnerPayment: {
+            ...makeAggregate().runnerPayment,
+            paymentRequired: false,
+            paymentStatus: "PAID",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeAggregate({
+          providerOrders: [
+            {
+              providerOrderId: "provider-order-1",
+              providerId: "provider-1",
+              providerName: undefined,
+              subtotalAmount: 18,
+              originalSubtotalAmount: 18,
+              discountAmount: 0,
+              status: "PREPARING",
+              paymentStatus: "PAID",
+              paymentRequired: false,
+              paymentSession: null,
+            },
+          ],
+          paidProviderOrders: 1,
+          totalProviderOrders: 1,
+          providerPaymentStatus: "PAID",
+          runnerPayment: {
+            ...makeAggregate().runnerPayment,
+            paymentRequired: false,
+            paymentStatus: "PAID",
+          },
+        }),
+      )
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Abrir formulario de pago/i }),
+      ).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/Proveedor provid/i)).toBeInTheDocument()
+    expect(screen.getByText(/Sesión preparada hasta/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: /Abrir formulario de pago/i }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stripe-direct-checkout")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "complete-direct-checkout" }))
+
+    await waitFor(() => {
+      expect(getOneMock).toHaveBeenCalledTimes(2)
+      expect(prepareOrderProviderPaymentsMock).toHaveBeenCalledTimes(2)
+      expect(
+        screen.getByText("Este pedido ya no tiene pagos pendientes."),
+      ).toBeInTheDocument()
+    })
   })
 
   it("surfaces a clear post-payment banner when the order is already economically covered", async () => {
@@ -769,5 +1037,52 @@ describe("OrderPaymentsPage experience", () => {
     expect(
       screen.getByText(/el circuito económico del pedido está cubierto/i),
     ).toBeInTheDocument()
+  })
+
+  it("surfaces a clear page error when the root order cannot be loaded", async () => {
+    getOneMock.mockRejectedValueOnce(new Error("pedido caído"))
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("pedido caído"),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("falls back to the order payload when aggregate preparation fails and keeps non-required provider payments closed", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        providerOrders: [
+          makeProviderOrder({
+            id: "provider-order-1",
+            status: "DELIVERED",
+            paymentStatus: "PAID",
+          }),
+        ],
+        deliveryOrder: null,
+      }),
+    )
+    prepareOrderProviderPaymentsMock.mockRejectedValueOnce(new Error("aggregate failed"))
+
+    const Page = (await import("@/app/[locale]/orders/[id]/payments/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Este entorno no puede completar el cobro Stripe real/i),
+      ).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("aggregate failed")).toBeInTheDocument()
+    expect(
+      screen.getByText("Este comercio ya no requiere cobro adicional en este pedido."),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: /Preparar pago de este comercio/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText(/Sin runner asignado/i)).toBeInTheDocument()
   })
 })

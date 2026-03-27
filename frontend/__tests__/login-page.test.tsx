@@ -216,4 +216,105 @@ describe("LoginPage", () => {
       expect(toastErrorMock).toHaveBeenCalledWith("Credenciales inválidas.")
     })
   })
+
+  it("surfaces plain-object login errors and falls back safely when no message exists", async () => {
+    const loginMock = vi
+      .fn()
+      .mockRejectedValueOnce({ message: "Cuenta bloqueada temporalmente." })
+      .mockRejectedValueOnce({})
+    useAuthMock.mockReturnValue({ login: loginMock })
+
+    const { default: LoginPage } = await import("@/app/[locale]/login/page")
+    render(<LoginPage />)
+
+    fireEvent.change(screen.getByLabelText("emailLabel"), {
+      target: { value: "user.demo@local.test" },
+    })
+    fireEvent.change(screen.getByLabelText("passwordLabel"), {
+      target: { value: "wrong" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "loginButton" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Cuenta bloqueada temporalmente.")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "loginButton" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Credenciales inválidas.")
+    })
+  })
+
+  it("lets the user go back, toggle password visibility and preserves safe returnTo on register", async () => {
+    searchParamsGetMock.mockImplementation((key: string) =>
+      key === "returnTo" ? "/orders/order-1/payments" : null,
+    )
+    useAuthMock.mockReturnValue({ login: vi.fn() })
+
+    const { default: LoginPage } = await import("@/app/[locale]/login/page")
+    render(<LoginPage />)
+
+    const passwordInput = screen.getByLabelText("passwordLabel")
+    expect(passwordInput).toHaveAttribute("type", "password")
+
+    fireEvent.click(screen.getAllByRole("button")[1])
+    expect(passwordInput).toHaveAttribute("type", "text")
+
+    fireEvent.click(screen.getAllByRole("button")[0])
+    expect(backMock).toHaveBeenCalled()
+
+    expect(screen.getByRole("link", { name: "createAccount" })).toHaveAttribute(
+      "href",
+      "/register?returnTo=%2Forders%2Forder-1%2Fpayments",
+    )
+  })
+
+  it("supports MFA navigation, backspace focus and invalid verification feedback", async () => {
+    const loginMock = vi.fn().mockResolvedValue({
+      user: { roles: ["CLIENT"], mfaEnabled: true },
+    })
+    useAuthMock.mockReturnValue({ login: loginMock })
+    apiPostMock.mockRejectedValue(new Error("bad token"))
+
+    const { default: LoginPage } = await import("@/app/[locale]/login/page")
+    render(<LoginPage />)
+
+    fireEvent.change(screen.getByLabelText("emailLabel"), {
+      target: { value: "user.demo@local.test" },
+    })
+    fireEvent.change(screen.getByLabelText("passwordLabel"), {
+      target: { value: "DemoPass123!" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "loginButton" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("mfaTitle")).toBeInTheDocument()
+    })
+
+    const otpInputs = screen.getAllByRole("textbox")
+    fireEvent.change(otpInputs[0], { target: { value: "12" } })
+    expect(otpInputs[0]).toHaveValue("")
+
+    fireEvent.change(otpInputs[0], { target: { value: "1" } })
+    fireEvent.change(otpInputs[1], { target: { value: "2" } })
+    otpInputs[1].focus()
+    fireEvent.keyDown(otpInputs[2], { key: "Backspace" })
+    expect(document.activeElement).toBe(otpInputs[1])
+    fireEvent.change(otpInputs[1], { target: { value: "2" } })
+    fireEvent.change(otpInputs[2], { target: { value: "3" } })
+    fireEvent.change(otpInputs[3], { target: { value: "4" } })
+    fireEvent.change(otpInputs[4], { target: { value: "5" } })
+    fireEvent.change(otpInputs[5], { target: { value: "6" } })
+
+    fireEvent.click(screen.getByRole("button", { name: "mfaButton" }))
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith("/auth/mfa/verify", { token: "123456" })
+      expect(toastErrorMock).toHaveBeenCalledWith("Código incorrecto.")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "mfaBack" }))
+    expect(screen.getByRole("button", { name: "loginButton" })).toBeInTheDocument()
+  })
 })
