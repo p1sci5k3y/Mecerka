@@ -22,6 +22,10 @@ import { CreateCityDto } from '../cities/dto/create-city.dto';
 import { UpdateCityDto } from '../cities/dto/update-city.dto';
 import { CreateCategoryDto } from '../categories/dto/create-category.dto';
 import { UpdateCategoryDto } from '../categories/dto/update-category.dto';
+import {
+  SendTestEmailDto,
+  UpdateEmailSettingsDto,
+} from './dto/update-email-settings.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
@@ -145,6 +149,24 @@ export class AdminController {
   @Delete('categories/:id')
   deleteCategory(@Param('id', ParseUUIDPipe) id: string) {
     return this.adminService.deleteCategory(id);
+  }
+
+  @Get('email-settings')
+  getEmailSettings() {
+    return this.adminService.getEmailSettings();
+  }
+
+  @Patch('email-settings')
+  updateEmailSettings(
+    @Body() body: UpdateEmailSettingsDto,
+    @Request() req: { user: UserFromJwt },
+  ) {
+    return this.adminService.updateEmailSettings(body, req.user.userId);
+  }
+
+  @Post('email-settings/test')
+  sendEmailSettingsTest(@Body() body: SendTestEmailDto) {
+    return this.adminService.sendEmailSettingsTest(body.recipient);
   }
 
   @Get('refunds')

@@ -12,6 +12,9 @@ const getCategoriesMock = vi.fn()
 const createCategoryMock = vi.fn()
 const updateCategoryMock = vi.fn()
 const deleteCategoryMock = vi.fn()
+const getEmailSettingsMock = vi.fn()
+const updateEmailSettingsMock = vi.fn()
+const sendEmailSettingsTestMock = vi.fn()
 
 let currentTab = "cities"
 const TabsContext = React.createContext<(value: string) => void>(() => undefined)
@@ -38,6 +41,9 @@ vi.mock("@/lib/services/admin-service", () => ({
     createCategory: (...args: unknown[]) => createCategoryMock(...args),
     updateCategory: (...args: unknown[]) => updateCategoryMock(...args),
     deleteCategory: (...args: unknown[]) => deleteCategoryMock(...args),
+    getEmailSettings: (...args: unknown[]) => getEmailSettingsMock(...args),
+    updateEmailSettings: (...args: unknown[]) => updateEmailSettingsMock(...args),
+    sendEmailSettingsTest: (...args: unknown[]) => sendEmailSettingsTestMock(...args),
   },
 }))
 
@@ -145,8 +151,21 @@ describe("Admin masters page", () => {
     createCategoryMock.mockReset()
     updateCategoryMock.mockReset()
     deleteCategoryMock.mockReset()
+    getEmailSettingsMock.mockReset()
+    updateEmailSettingsMock.mockReset()
+    sendEmailSettingsTestMock.mockReset()
     getCitiesMock.mockResolvedValue([])
     getCategoriesMock.mockResolvedValue([])
+    getEmailSettingsMock.mockResolvedValue({
+      host: "email-smtp.eu-west-1.amazonaws.com",
+      port: 587,
+      user: "smtp-user",
+      from: "no-reply@example.com",
+      secure: false,
+      authConfigured: true,
+      passwordConfigured: true,
+      source: "database",
+    })
     vi.stubGlobal("confirm", vi.fn(() => true))
   })
 
@@ -339,6 +358,56 @@ describe("Admin masters page", () => {
     await waitFor(() => {
       expect(deleteCityMock).toHaveBeenCalledWith("city-1")
       expect(toastMock).toHaveBeenCalledWith({ title: "Ciudad eliminada" })
+    })
+  })
+
+  it("updates smtp settings and sends a test email from the email tab", async () => {
+    currentTab = "email"
+    updateEmailSettingsMock.mockResolvedValue({})
+    sendEmailSettingsTestMock.mockResolvedValue({ ok: true })
+
+    const Page = (await import("@/app/[locale]/admin/masters/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Servidor SMTP")).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText("Host"), {
+      target: { value: "email-smtp.eu-west-1.amazonaws.com" },
+    })
+    fireEvent.change(screen.getByLabelText("Puerto"), {
+      target: { value: "465" },
+    })
+    fireEvent.change(screen.getByLabelText("Usuario SMTP"), {
+      target: { value: "ses-user" },
+    })
+    fireEvent.change(screen.getByLabelText("Contraseña SMTP"), {
+      target: { value: "ses-pass" },
+    })
+    fireEvent.change(screen.getByLabelText("Remitente"), {
+      target: { value: "no-reply@mecerka.me" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar SMTP" }))
+
+    await waitFor(() => {
+      expect(updateEmailSettingsMock).toHaveBeenCalledWith({
+        host: "email-smtp.eu-west-1.amazonaws.com",
+        port: 465,
+        user: "ses-user",
+        password: "ses-pass",
+        clearPassword: false,
+        from: "no-reply@mecerka.me",
+      })
+    })
+
+    fireEvent.change(screen.getByLabelText("Destinatario"), {
+      target: { value: "ops@example.com" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Enviar correo de prueba/i }))
+
+    await waitFor(() => {
+      expect(sendEmailSettingsTestMock).toHaveBeenCalledWith("ops@example.com")
     })
   })
 })

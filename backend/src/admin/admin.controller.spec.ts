@@ -32,6 +32,9 @@ describe('AdminController', () => {
       deleteCategory: jest.fn(),
       getRecentRefunds: jest.fn(),
       getRecentIncidents: jest.fn(),
+      getEmailSettings: jest.fn(),
+      updateEmailSettings: jest.fn(),
+      sendEmailSettingsTest: jest.fn(),
       getMetrics: jest.fn(),
     };
 
@@ -216,6 +219,52 @@ describe('AdminController', () => {
     (adminServiceMock.getMetrics as jest.Mock).mockResolvedValue({ users: 5 });
     const result = await controller.getMetrics();
     expect(result).toEqual({ users: 5 });
+  });
+
+  it('getEmailSettings delegates to adminService.getEmailSettings', async () => {
+    (adminServiceMock.getEmailSettings as jest.Mock).mockResolvedValue({
+      host: 'email-smtp.eu-west-1.amazonaws.com',
+    });
+
+    const result = await controller.getEmailSettings();
+
+    expect(adminServiceMock.getEmailSettings).toHaveBeenCalled();
+    expect(result).toEqual({ host: 'email-smtp.eu-west-1.amazonaws.com' });
+  });
+
+  it('updateEmailSettings delegates to adminService.updateEmailSettings', async () => {
+    (adminServiceMock.updateEmailSettings as jest.Mock).mockResolvedValue({
+      host: 'email-smtp.eu-west-1.amazonaws.com',
+    });
+
+    const body = {
+      host: 'email-smtp.eu-west-1.amazonaws.com',
+      port: 587,
+      user: 'smtp-user',
+      from: 'no-reply@example.com',
+    };
+
+    await controller.updateEmailSettings(body as any, mockReq() as any);
+
+    expect(adminServiceMock.updateEmailSettings).toHaveBeenCalledWith(
+      body,
+      'admin-1',
+    );
+  });
+
+  it('sendEmailSettingsTest delegates to adminService.sendEmailSettingsTest', async () => {
+    (adminServiceMock.sendEmailSettingsTest as jest.Mock).mockResolvedValue({
+      ok: true,
+    });
+
+    const result = await controller.sendEmailSettingsTest({
+      recipient: 'ops@example.com',
+    });
+
+    expect(adminServiceMock.sendEmailSettingsTest).toHaveBeenCalledWith(
+      'ops@example.com',
+    );
+    expect(result).toEqual({ ok: true });
   });
 
   it('getRefunds delegates to adminService.getRecentRefunds', async () => {

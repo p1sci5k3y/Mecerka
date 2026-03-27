@@ -8,12 +8,19 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GovernanceAuditAction, Role, RoleGrantSource } from '@prisma/client';
 import { RoleAssignmentService } from '../users/role-assignment.service';
 import { recordGovernanceAudit } from '../users/governance-audit.util';
+import {
+  EmailSettingsService,
+  SaveEmailSettingsInput,
+} from '../email/email-settings.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly roleAssignmentService: RoleAssignmentService,
+    private readonly emailSettingsService: EmailSettingsService,
+    private readonly emailService: EmailService,
   ) {}
 
   // --- User Management ---
@@ -300,6 +307,30 @@ export class AdminService {
         'Cannot delete category with associated products',
       );
     return this.prisma.category.delete({ where: { id } });
+  }
+
+  async getEmailSettings() {
+    return this.emailSettingsService.getEffectiveSettings();
+  }
+
+  async updateEmailSettings(
+    data: SaveEmailSettingsInput,
+    currentAdminId: string,
+  ) {
+    return this.emailSettingsService.saveSettings(data, currentAdminId);
+  }
+
+  async sendEmailSettingsTest(recipient: string) {
+    await this.emailService.sendEmail(
+      recipient,
+      'Prueba SMTP de Mecerka',
+      `
+        <h1>SMTP configurado correctamente</h1>
+        <p>Este correo confirma que la configuración SMTP guardada en admin está funcionando.</p>
+      `,
+    );
+
+    return { ok: true };
   }
 
   async getRecentRefunds() {

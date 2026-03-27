@@ -8,6 +8,8 @@ import { GovernanceAuditAction, Role, RoleRequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleAssignmentService } from '../users/role-assignment.service';
 import { AdminService } from './admin.service';
+import { EmailSettingsService } from '../email/email-settings.service';
+import { EmailService } from '../email/email.service';
 
 describe('AdminService role grants', () => {
   let service: AdminService;
@@ -16,6 +18,13 @@ describe('AdminService role grants', () => {
     withLockedUser: jest.Mock;
     assignRoleInTx: jest.Mock;
     revokeRoleInTx: jest.Mock;
+  };
+  let emailSettingsServiceMock: {
+    getEffectiveSettings: jest.Mock;
+    saveSettings: jest.Mock;
+  };
+  let emailServiceMock: {
+    sendEmail: jest.Mock;
   };
 
   beforeEach(async () => {
@@ -29,6 +38,15 @@ describe('AdminService role grants', () => {
       withLockedUser: jest.fn(),
       assignRoleInTx: jest.fn(),
       revokeRoleInTx: jest.fn(),
+    };
+
+    emailSettingsServiceMock = {
+      getEffectiveSettings: jest.fn(),
+      saveSettings: jest.fn(),
+    };
+
+    emailServiceMock = {
+      sendEmail: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -73,6 +91,14 @@ describe('AdminService role grants', () => {
         {
           provide: RoleAssignmentService,
           useValue: roleAssignmentServiceMock,
+        },
+        {
+          provide: EmailSettingsService,
+          useValue: emailSettingsServiceMock,
+        },
+        {
+          provide: EmailService,
+          useValue: emailServiceMock,
         },
       ],
     }).compile();
@@ -148,6 +174,69 @@ describe('AdminService role grants', () => {
 
     beforeEach(() => {
       prismaMock = (service as any).prisma;
+    });
+
+    describe('email settings', () => {
+      it('returns the effective email settings summary', async () => {
+        emailSettingsServiceMock.getEffectiveSettings.mockResolvedValue({
+          host: 'email-smtp.eu-west-1.amazonaws.com',
+          port: 587,
+          user: 'smtp-user',
+          from: 'no-reply@example.com',
+          secure: false,
+          authConfigured: true,
+          passwordConfigured: true,
+          source: 'database',
+        });
+
+        const result = await service.getEmailSettings();
+
+        expect(
+          emailSettingsServiceMock.getEffectiveSettings,
+        ).toHaveBeenCalled();
+        expect(result.host).toBe('email-smtp.eu-west-1.amazonaws.com');
+      });
+
+      it('persists email settings through the settings service', async () => {
+        emailSettingsServiceMock.saveSettings.mockResolvedValue({
+          host: 'email-smtp.eu-west-1.amazonaws.com',
+        });
+
+        await service.updateEmailSettings(
+          {
+            host: 'email-smtp.eu-west-1.amazonaws.com',
+            port: 587,
+            user: 'smtp-user',
+            password: 'secret',
+            from: 'no-reply@example.com',
+          },
+          'admin-1',
+        );
+
+        expect(emailSettingsServiceMock.saveSettings).toHaveBeenCalledWith(
+          {
+            host: 'email-smtp.eu-west-1.amazonaws.com',
+            port: 587,
+            user: 'smtp-user',
+            password: 'secret',
+            from: 'no-reply@example.com',
+          },
+          'admin-1',
+        );
+      });
+
+      it('sends a test email using the email service', async () => {
+        emailServiceMock.sendEmail.mockResolvedValue({ messageId: 'msg-1' });
+
+        const result = await service.sendEmailSettingsTest('ops@example.com');
+
+        expect(emailServiceMock.sendEmail).toHaveBeenCalledWith(
+          'ops@example.com',
+          'Prueba SMTP de Mecerka',
+          expect.stringContaining('SMTP configurado correctamente'),
+        );
+        expect(result).toEqual({ ok: true });
+      });
     });
 
     describe('grantRole', () => {

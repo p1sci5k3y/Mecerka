@@ -1,50 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { EmailSettingsService } from './email-settings.service';
 
 @Injectable()
 export class EmailService {
-  private readonly transporter: nodemailer.Transporter;
   private readonly logger = new Logger(EmailService.name);
 
-  constructor() {
-    const useTestTransport =
-      process.env.NODE_ENV === 'test' || process.env.E2E === 'true';
-
-    if (useTestTransport) {
-      this.transporter = nodemailer.createTransport({
-        jsonTransport: true,
-      });
-      this.logger.log(
-        JSON.stringify({
-          event: 'email.transport.configured',
-          message: 'Email transport configured',
-          mode: 'json-test',
-        }),
-      );
-      return;
-    }
-
-    const host = process.env.MAIL_HOST || 'mailpit';
-    const port = Number(process.env.MAIL_PORT) || 1025;
-    const user = process.env.MAIL_USER;
-    const pass = process.env.MAIL_PASS;
-
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // Use SSL for port 465, otherwise STARTTLS
-      auth: user && pass ? { user, pass } : undefined,
-      tls: {
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
-      },
-    });
-    this.logger.log(
-      JSON.stringify({
-        event: 'email.transport.configured',
-        message: 'Email transport configured',
-      }),
-    );
-  }
+  constructor(
+    @Optional()
+    private readonly emailSettingsService?: EmailSettingsService,
+  ) {}
 
   async sendEmail(to: string, subject: string, html: string) {
     // Send asynchronously without blocking the main flow
@@ -100,11 +65,18 @@ export class EmailService {
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {
-    const from = process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>';
+    const transportOptions = await this.buildTransportOptions();
+    const transporter = nodemailer.createTransport(
+      transportOptions as nodemailer.TransportOptions,
+    );
+    const from =
+      'jsonTransport' in transportOptions
+        ? process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>'
+        : transportOptions.from;
     const maskedTo = this.maskEmail(to);
     this.logger.debug(`Sending email to ${maskedTo}`);
 
-    const info = (await this.transporter.sendMail({
+    const info = (await transporter.sendMail({
       from,
       to,
       subject,
@@ -129,5 +101,61 @@ export class EmailService {
     if (!local || !domain) return '***';
 
     return `${local[0]}****@${domain}`;
+  }
+
+  private isTestTransport() {
+    return process.env.NODE_ENV === 'test' || process.env.E2E === 'true';
+  }
+
+  private async buildTransportOptions(): Promise<
+    Record<string, unknown> & { from?: string }
+  > {
+    if (this.isTestTransport()) {
+      this.logger.log(
+        JSON.stringify({
+          event: 'email.transport.configured',
+          message: 'Email transport configured',
+          mode: 'json-test',
+        }),
+      );
+      return {
+        jsonTransport: true,
+      };
+    }
+
+    const settings = this.emailSettingsService
+      ? await this.emailSettingsService.getRuntimeSettings()
+      : {
+          host: process.env.MAIL_HOST || 'mailpit',
+          port: Number(process.env.MAIL_PORT) || 1025,
+          user: process.env.MAIL_USER?.trim() || null,
+          pass: process.env.MAIL_PASS?.trim() || null,
+          from:
+            process.env.MAIL_FROM?.trim() ||
+            '"Mecerka" <no-reply@mecerka.local>',
+          source: process.env.MAIL_HOST ? 'environment' : 'default',
+        };
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'email.transport.configured',
+        message: 'Email transport configured',
+        source: settings.source,
+      }),
+    );
+
+    return {
+      host: settings.host,
+      port: settings.port,
+      secure: settings.port === 465,
+      auth:
+        settings.user && settings.pass
+          ? { user: settings.user, pass: settings.pass }
+          : undefined,
+      tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+      },
+      from: settings.from,
+    };
   }
 }

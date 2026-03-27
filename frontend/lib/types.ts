@@ -197,6 +197,17 @@ export interface AdminIncidentSummary {
   reporterName: string | null
 }
 
+export interface AdminEmailSettings {
+  host: string
+  port: number
+  user: string | null
+  from: string
+  secure: boolean
+  authConfigured: boolean
+  passwordConfigured: boolean
+  source: "database" | "environment" | "default"
+}
+
 export interface OrderProviderPaymentsAggregate {
   orderId: string
   orderStatus: string

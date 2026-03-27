@@ -278,6 +278,7 @@ model User {
   reviewedRefunds RefundRequest[] @relation("ReviewedRefunds")
   governanceEvents GovernanceAuditEntry[] @relation("GovernanceTarget")
   governanceActions GovernanceAuditEntry[] @relation("GovernanceActor")
+  systemSettingsUpdated SystemSetting[] @relation("SystemSettingUpdatedBy")
 
   @@index([requestedRole])
   @@index([roleStatus])
@@ -299,6 +300,18 @@ model GovernanceAuditEntry {
   @@index([userId, createdAt])
   @@index([actorId])
   @@index([action])
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  updatedBy User? @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([updatedById])
 }
 
 model City {

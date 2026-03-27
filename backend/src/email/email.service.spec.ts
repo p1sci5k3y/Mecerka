@@ -158,14 +158,16 @@ describe('EmailService', () => {
       process.env.MAIL_FROM = '"Prod" <prod@example.com>';
 
       const prodService = new EmailService();
-      const transporterOptions = (prodService as any).transporter.options;
 
-      expect(transporterOptions).toEqual({
+      return expect(
+        (prodService as any).buildTransportOptions(),
+      ).resolves.toEqual({
         host: 'smtp.example.com',
         port: 465,
         secure: true,
         auth: { user: 'mailer', pass: 'secret' },
         tls: { rejectUnauthorized: true },
+        from: '"Prod" <prod@example.com>',
       });
     });
 
@@ -178,14 +180,16 @@ describe('EmailService', () => {
       delete process.env.MAIL_PASS;
 
       const devService = new EmailService();
-      const transporterOptions = (devService as any).transporter.options;
 
-      expect(transporterOptions).toEqual({
+      return expect(
+        (devService as any).buildTransportOptions(),
+      ).resolves.toEqual({
         host: 'mailpit',
         port: 1025,
         secure: false,
         auth: undefined,
         tls: { rejectUnauthorized: false },
+        from: '"Mecerka" <no-reply@mecerka.local>',
       });
     });
 
@@ -194,9 +198,42 @@ describe('EmailService', () => {
       process.env.E2E = 'true';
 
       const e2eService = new EmailService();
-      const transporterOptions = (e2eService as any).transporter.options;
 
-      expect(transporterOptions).toEqual({ jsonTransport: true });
+      return expect(
+        (e2eService as any).buildTransportOptions(),
+      ).resolves.toEqual({ jsonTransport: true });
+    });
+
+    it('prefers persisted SMTP settings over environment variables when available', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+      process.env.MAIL_HOST = 'smtp.env.example.com';
+      process.env.MAIL_PORT = '587';
+      process.env.MAIL_USER = 'env-user';
+      process.env.MAIL_PASS = 'env-pass';
+      process.env.MAIL_FROM = 'env@example.com';
+
+      const serviceWithStored = new EmailService({
+        getRuntimeSettings: jest.fn().mockResolvedValue({
+          host: 'email-smtp.eu-west-1.amazonaws.com',
+          port: 465,
+          user: 'db-user',
+          pass: 'db-pass',
+          from: 'db@example.com',
+          source: 'database',
+        }),
+      } as any);
+
+      return expect(
+        (serviceWithStored as any).buildTransportOptions(),
+      ).resolves.toEqual({
+        host: 'email-smtp.eu-west-1.amazonaws.com',
+        port: 465,
+        secure: true,
+        auth: { user: 'db-user', pass: 'db-pass' },
+        tls: { rejectUnauthorized: true },
+        from: 'db@example.com',
+      });
     });
   });
 });

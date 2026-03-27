@@ -2,6 +2,7 @@ import { api } from "@/lib/api"
 import type {
     AdminIncidentSummary,
     AdminGovernanceAuditEntry,
+    AdminEmailSettings,
     AdminRefundSummary,
     AdminMetrics,
     BackendAdminUser,
@@ -146,5 +147,25 @@ export const adminService = {
 
     rejectIncident: async (id: string) => {
         return api.patch<AdminIncidentSummary>(`/delivery/incidents/${id}/reject`)
+    },
+
+    // Email settings
+    getEmailSettings: async () => {
+        return api.get<AdminEmailSettings>("/admin/email-settings")
+    },
+
+    updateEmailSettings: async (data: {
+        host: string
+        port: number
+        user?: string
+        password?: string
+        clearPassword?: boolean
+        from: string
+    }) => {
+        return api.patch<AdminEmailSettings>("/admin/email-settings", data)
+    },
+
+    sendEmailSettingsTest: async (recipient: string) => {
+        return api.post<{ ok: boolean }>("/admin/email-settings/test", { recipient })
     },
 }

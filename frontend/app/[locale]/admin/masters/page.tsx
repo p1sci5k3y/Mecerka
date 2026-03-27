@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "@/lib/navigation"
 import { useSearchParams } from "next/navigation"
-import { Plus, Pencil, Trash2, MapPin, Tag } from "lucide-react"
+import { Plus, Pencil, Trash2, MapPin, Tag, Mail, Send } from "lucide-react"
 import { adminService } from "@/lib/services/admin-service"
-import { BackendCity, BackendCategory } from "@/lib/types"
+import { AdminEmailSettings, BackendCity, BackendCategory } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -50,12 +50,19 @@ export default function MastersPage() {
                         <Tag className="h-4 w-4" />
                         Categorías
                     </TabsTrigger>
+                    <TabsTrigger value="email" className="gap-2">
+                        <Mail className="h-4 w-4" />
+                        Correo SMTP
+                    </TabsTrigger>
                 </TabsList>
                 <TabsContent value="cities" className="space-y-4">
                     <CitiesManager />
                 </TabsContent>
                 <TabsContent value="categories" className="space-y-4">
                     <CategoriesManager />
+                </TabsContent>
+                <TabsContent value="email" className="space-y-4">
+                    <EmailSettingsManager />
                 </TabsContent>
             </Tabs>
         </div>
@@ -335,6 +342,176 @@ function CategoriesManager() {
                     ))}
                 </TableBody>
             </Table>
+        </div>
+    )
+}
+
+function EmailSettingsManager() {
+    const [settings, setSettings] = useState<AdminEmailSettings | null>(null)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [sendingTest, setSendingTest] = useState(false)
+    const { toast } = useToast()
+
+    const [host, setHost] = useState("")
+    const [port, setPort] = useState("587")
+    const [user, setUser] = useState("")
+    const [password, setPassword] = useState("")
+    const [clearPassword, setClearPassword] = useState(false)
+    const [from, setFrom] = useState("")
+    const [testRecipient, setTestRecipient] = useState("")
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const data = await adminService.getEmailSettings()
+                setSettings(data)
+                setHost(data.host)
+                setPort(String(data.port))
+                setUser(data.user ?? "")
+                setFrom(data.from)
+            } catch {
+                toast({ title: "Error al cargar la configuración SMTP", variant: "destructive" })
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchSettings()
+    }, [toast])
+
+    const refreshSettings = async () => {
+        const data = await adminService.getEmailSettings()
+        setSettings(data)
+        setHost(data.host)
+        setPort(String(data.port))
+        setUser(data.user ?? "")
+        setFrom(data.from)
+        setPassword("")
+        setClearPassword(false)
+    }
+
+    const handleSave = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setSaving(true)
+        try {
+            await adminService.updateEmailSettings({
+                host,
+                port: Number(port),
+                user,
+                password: password || undefined,
+                clearPassword,
+                from,
+            })
+            await refreshSettings()
+            toast({ title: "Configuración SMTP guardada" })
+        } catch {
+            toast({ title: "Error al guardar la configuración SMTP", variant: "destructive" })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSendTest = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setSendingTest(true)
+        try {
+            await adminService.sendEmailSettingsTest(testRecipient)
+            toast({ title: "Correo de prueba enviado" })
+        } catch {
+            toast({ title: "Error al enviar el correo de prueba", variant: "destructive" })
+        } finally {
+            setSendingTest(false)
+        }
+    }
+
+    if (loading) return <div>Cargando...</div>
+
+    return (
+        <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+            <div className="rounded-md border bg-card p-4">
+                <div className="mb-4">
+                    <h2 className="text-xl font-semibold">Servidor SMTP</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Esta configuración se guarda en base de datos y tiene prioridad sobre las variables de entorno. Úsala para SES, Mailgun, Resend SMTP o cualquier relay SMTP estándar.
+                    </p>
+                </div>
+
+                <form onSubmit={handleSave} className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="smtp-host">Host</Label>
+                            <Input id="smtp-host" value={host} onChange={(e) => setHost(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="smtp-port">Puerto</Label>
+                            <Input id="smtp-port" type="number" value={port} onChange={(e) => setPort(e.target.value)} required />
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="smtp-user">Usuario SMTP</Label>
+                            <Input id="smtp-user" value={user} onChange={(e) => setUser(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="smtp-pass">Contraseña SMTP</Label>
+                            <Input id="smtp-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={settings?.passwordConfigured ? "********" : ""} />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="smtp-from">Remitente</Label>
+                        <Input id="smtp-from" value={from} onChange={(e) => setFrom(e.target.value)} required />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Switch id="smtp-clear-password" checked={clearPassword} onCheckedChange={setClearPassword} />
+                        <Label htmlFor="smtp-clear-password">Borrar la contraseña guardada</Label>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="submit" disabled={saving}>
+                            {saving ? "Guardando..." : "Guardar SMTP"}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </div>
+
+            <div className="space-y-4">
+                <div className="rounded-md border bg-card p-4">
+                    <h3 className="font-semibold">Estado actual</h3>
+                    <div className="mt-3 space-y-2 text-sm">
+                        <p><strong>Origen:</strong> {settings?.source === "database" ? "Base de datos" : settings?.source === "environment" ? "Variables de entorno" : "Default local"}</p>
+                        <p><strong>Seguridad:</strong> {settings?.secure ? "SSL/TLS (465)" : "STARTTLS / no SSL implícito"}</p>
+                        <p><strong>Autenticación:</strong> {settings?.authConfigured ? "Configurada" : "No configurada"}</p>
+                        <p><strong>Password guardada:</strong> {settings?.passwordConfigured ? "Sí" : "No"}</p>
+                    </div>
+                </div>
+
+                <div className="rounded-md border bg-card p-4">
+                    <h3 className="font-semibold">Enviar prueba</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Envía un correo con la configuración efectiva para validar que el relay responde.
+                    </p>
+                    <form onSubmit={handleSendTest} className="mt-4 space-y-3">
+                        <div className="space-y-2">
+                            <Label htmlFor="smtp-test-recipient">Destinatario</Label>
+                            <Input
+                                id="smtp-test-recipient"
+                                type="email"
+                                value={testRecipient}
+                                onChange={(e) => setTestRecipient(e.target.value)}
+                                required
+                            />
+                        </div>
+                        <Button type="submit" disabled={sendingTest}>
+                            <Send className="mr-2 h-4 w-4" />
+                            {sendingTest ? "Enviando..." : "Enviar correo de prueba"}
+                        </Button>
+                    </form>
+                </div>
+            </div>
         </div>
     )
 }
