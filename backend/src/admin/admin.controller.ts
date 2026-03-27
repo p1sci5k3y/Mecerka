@@ -137,6 +137,11 @@ export class AdminController {
     return this.adminService.deleteCategory(id);
   }
 
+  @Get('refunds')
+  getRefunds() {
+    return this.adminService.getRecentRefunds();
+  }
+
   // --- Metrics ---
   @Get('metrics')
   getMetrics() {

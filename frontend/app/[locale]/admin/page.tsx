@@ -1,11 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Link } from "@/lib/navigation"
 import {
   Users,
   ShoppingBag,
   DollarSign,
-  
+  HandCoins,
+  Settings2,
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
@@ -59,6 +61,27 @@ function AdminDashboardContent() {
     },
   ]
 
+  const quickActions = [
+    {
+      label: "Gestionar usuarios",
+      description: "Bloquea cuentas, revisa roles y controla accesos.",
+      href: "/admin/users",
+      icon: Users,
+    },
+    {
+      label: "Revisar devoluciones",
+      description: "Procesa solicitudes pendientes, aprobaciones y ejecuciones.",
+      href: "/admin/refunds",
+      icon: HandCoins,
+    },
+    {
+      label: "Editar maestros",
+      description: "Mantén ciudades y categorías alineadas con la operación.",
+      href: "/admin/masters?tab=cities",
+      icon: Settings2,
+    },
+  ]
+
   return (
     <div>
       <h1 className="mb-8 font-display text-3xl font-bold">Dashboard</h1>
@@ -85,6 +108,25 @@ function AdminDashboardContent() {
         <p className="text-muted-foreground">
           Bienvenido al panel de administración. Selecciona una opción del menú lateral para gestionar la plataforma.
         </p>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="mb-4 text-lg font-semibold">Operaciones rápidas</h2>
+        <div className="grid gap-4 lg:grid-cols-3">
+          {quickActions.map((action) => (
+            <Link
+              key={action.href}
+              href={action.href}
+              className="rounded-xl border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            >
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <action.icon className="h-5 w-5" />
+              </div>
+              <h3 className="font-semibold">{action.label}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   )

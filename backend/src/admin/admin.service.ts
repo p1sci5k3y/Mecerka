@@ -214,6 +214,62 @@ export class AdminService {
     return this.prisma.category.delete({ where: { id } });
   }
 
+  async getRecentRefunds() {
+    const refunds = await this.prisma.refundRequest.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        incidentId: true,
+        providerOrderId: true,
+        deliveryOrderId: true,
+        type: true,
+        status: true,
+        amount: true,
+        currency: true,
+        requestedById: true,
+        reviewedById: true,
+        externalRefundId: true,
+        createdAt: true,
+        reviewedAt: true,
+        completedAt: true,
+        requestedBy: {
+          select: {
+            email: true,
+            name: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return refunds.map((refund) => ({
+      id: refund.id,
+      incidentId: refund.incidentId ?? null,
+      providerOrderId: refund.providerOrderId ?? null,
+      deliveryOrderId: refund.deliveryOrderId ?? null,
+      type: refund.type,
+      status: refund.status,
+      amount: Number(refund.amount),
+      currency: refund.currency,
+      requestedById: refund.requestedById,
+      reviewedById: refund.reviewedById ?? null,
+      externalRefundId: refund.externalRefundId ?? null,
+      createdAt: refund.createdAt,
+      reviewedAt: refund.reviewedAt ?? null,
+      completedAt: refund.completedAt ?? null,
+      requestedByEmail: refund.requestedBy.email,
+      requestedByName: refund.requestedBy.name ?? null,
+      reviewedByEmail: refund.reviewedBy?.email ?? null,
+      reviewedByName: refund.reviewedBy?.name ?? null,
+    }));
+  }
+
   // --- Metrics ---
   // --- Metrics ---
   async getMetrics() {

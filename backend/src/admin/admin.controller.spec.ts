@@ -28,6 +28,7 @@ describe('AdminController', () => {
       createCategory: jest.fn(),
       updateCategory: jest.fn(),
       deleteCategory: jest.fn(),
+      getRecentRefunds: jest.fn(),
       getMetrics: jest.fn(),
     };
 
@@ -188,5 +189,16 @@ describe('AdminController', () => {
     (adminServiceMock.getMetrics as jest.Mock).mockResolvedValue({ users: 5 });
     const result = await controller.getMetrics();
     expect(result).toEqual({ users: 5 });
+  });
+
+  it('getRefunds delegates to adminService.getRecentRefunds', async () => {
+    (adminServiceMock.getRecentRefunds as jest.Mock).mockResolvedValue([
+      { id: 'refund-1' },
+    ]);
+
+    const result = await controller.getRefunds();
+
+    expect(adminServiceMock.getRecentRefunds).toHaveBeenCalled();
+    expect(result).toEqual([{ id: 'refund-1' }]);
   });
 });

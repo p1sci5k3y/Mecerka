@@ -152,6 +152,13 @@ export interface RefundSummary {
   completedAt: string | null
 }
 
+export interface AdminRefundSummary extends RefundSummary {
+  requestedByEmail: string
+  requestedByName: string | null
+  reviewedByEmail: string | null
+  reviewedByName: string | null
+}
+
 export interface OrderProviderPaymentsAggregate {
   orderId: string
   orderStatus: string

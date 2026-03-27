@@ -27,6 +27,14 @@ vi.mock("@/components/protected-route", () => ({
   }) => <div data-allowed-roles={allowedRoles?.join(",")}>{children}</div>,
 }))
 
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 describe("Admin dashboard experience", () => {
   beforeEach(() => {
     getMetricsMock.mockReset()
@@ -65,6 +73,10 @@ describe("Admin dashboard experience", () => {
     expect(screen.getByText("342")).toBeInTheDocument()
     expect(screen.getByText("12.540,75 €")).toBeInTheDocument()
     expect(screen.getByText("Resumen de Actividad")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Revisar devoluciones/i })).toHaveAttribute(
+      "href",
+      "/admin/refunds",
+    )
   })
 
   it("shows an explicit error state when metrics cannot be loaded", async () => {

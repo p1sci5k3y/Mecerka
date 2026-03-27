@@ -1,5 +1,6 @@
 import { api } from "@/lib/api"
 import type {
+    AdminRefundSummary,
     AdminMetrics,
     BackendAdminUser,
     BackendCity,
@@ -66,5 +67,26 @@ export const adminService = {
 
     deleteCategory: async (id: string) => {
         return api.delete(`/admin/categories/${id}`)
+    },
+
+    // Refunds
+    getRefunds: async () => {
+        return api.get<AdminRefundSummary[]>("/admin/refunds")
+    },
+
+    reviewRefund: async (id: string) => {
+        return api.patch<AdminRefundSummary>(`/refunds/${id}/review`)
+    },
+
+    approveRefund: async (id: string) => {
+        return api.patch<AdminRefundSummary>(`/refunds/${id}/approve`)
+    },
+
+    rejectRefund: async (id: string) => {
+        return api.patch<AdminRefundSummary>(`/refunds/${id}/reject`)
+    },
+
+    executeRefund: async (id: string) => {
+        return api.post<AdminRefundSummary>(`/refunds/${id}/execute`)
     },
 }

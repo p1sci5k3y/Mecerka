@@ -49,6 +49,7 @@ describe('AdminService role grants', () => {
               update: jest.fn(),
               delete: jest.fn(),
             },
+            refundRequest: { findMany: jest.fn() },
           },
         },
         {
@@ -327,6 +328,48 @@ describe('AdminService role grants', () => {
           slug: 'furniture',
         });
         expect(result.id).toBe('cat-new');
+      });
+    });
+
+    describe('getRecentRefunds', () => {
+      it('returns normalized refund summaries with requester and reviewer metadata', async () => {
+        prismaMock.refundRequest.findMany.mockResolvedValue([
+          {
+            id: 'refund-1',
+            incidentId: null,
+            providerOrderId: 'provider-order-1',
+            deliveryOrderId: null,
+            type: 'PROVIDER_PARTIAL',
+            status: 'UNDER_REVIEW',
+            amount: { toString: () => '18.5' },
+            currency: 'EUR',
+            requestedById: 'client-1',
+            reviewedById: 'admin-1',
+            externalRefundId: null,
+            createdAt: new Date('2026-03-27T10:00:00.000Z'),
+            reviewedAt: new Date('2026-03-27T11:00:00.000Z'),
+            completedAt: null,
+            requestedBy: { email: 'client@example.com', name: 'Client Demo' },
+            reviewedBy: { email: 'admin@example.com', name: 'Admin Demo' },
+          },
+        ]);
+
+        const result = await service.getRecentRefunds();
+
+        expect(prismaMock.refundRequest.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+        );
+        expect(result).toEqual([
+          expect.objectContaining({
+            id: 'refund-1',
+            amount: 18.5,
+            requestedByEmail: 'client@example.com',
+            reviewedByEmail: 'admin@example.com',
+          }),
+        ]);
       });
     });
 
