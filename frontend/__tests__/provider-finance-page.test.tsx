@@ -4,6 +4,7 @@ import type { Order } from "@/lib/types"
 
 const getAllMock = vi.fn()
 const getProviderOrderRefundsMock = vi.fn()
+const listDeliveryOrderIncidentsMock = vi.fn()
 const useAuthMock = vi.fn()
 const toastErrorMock = vi.fn()
 const fetchMock = vi.fn()
@@ -17,6 +18,12 @@ vi.mock("@/lib/services/orders-service", () => ({
 vi.mock("@/lib/services/refunds-service", () => ({
   refundsService: {
     getProviderOrderRefunds: (...args: unknown[]) => getProviderOrderRefundsMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/delivery-incidents-service", () => ({
+  deliveryIncidentsService: {
+    listDeliveryOrderIncidents: (...args: unknown[]) => listDeliveryOrderIncidentsMock(...args),
   },
 }))
 
@@ -73,6 +80,12 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
     createdAt: "2026-03-24T10:00:00.000Z",
     updatedAt: "2026-03-24T11:00:00.000Z",
     items: [],
+    deliveryOrder: {
+      id: "delivery-1",
+      runnerId: "runner-1",
+      status: "ASSIGNED",
+      paymentStatus: "PAYMENT_PENDING",
+    },
     providerOrders: [
       {
         id: "provider-order-1",
@@ -118,6 +131,7 @@ describe("Provider finance page", () => {
     getProviderOrderRefundsMock.mockReset()
     toastErrorMock.mockReset()
     fetchMock.mockReset()
+    listDeliveryOrderIncidentsMock.mockReset()
     vi.stubGlobal("fetch", fetchMock)
     useAuthMock.mockReturnValue({
       user: {
@@ -150,6 +164,19 @@ describe("Provider finance page", () => {
         completedAt: null,
       },
     ])
+    listDeliveryOrderIncidentsMock.mockResolvedValueOnce([
+      {
+        id: "incident-1",
+        deliveryOrderId: "delivery-1",
+        reporterRole: "CLIENT",
+        type: "DAMAGED_ITEMS",
+        status: "UNDER_REVIEW",
+        description: "Caja dañada",
+        evidenceUrl: null,
+        createdAt: "2026-03-26T11:00:00.000Z",
+        resolvedAt: null,
+      },
+    ])
 
     const Page = (await import("@/app/[locale]/provider/finance/page")).default
     render(<Page />)
@@ -161,9 +188,11 @@ describe("Provider finance page", () => {
     expect(screen.getAllByText("Provider orders cobrados")).toHaveLength(2)
     expect(screen.getByText("Potencialmente reembolsables")).toBeInTheDocument()
     expect(screen.getAllByText("Devoluciones visibles")).toHaveLength(2)
+    expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
     expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
     expect(screen.getAllByText("Cuenco artesanal")).toHaveLength(2)
     expect(screen.getByText(/Estado:\s*UNDER_REVIEW\s*· Tipo:\s*PROVIDER_PARTIAL/i)).toBeInTheDocument()
+    expect(screen.getByText(/Soporte visible:\s*1 devoluciones · 1 incidencias/i)).toBeInTheDocument()
     expect(screen.getAllByRole("link", { name: /Ver detalle/i })).toHaveLength(2)
     expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
       "href",
@@ -275,6 +304,7 @@ describe("Provider finance page", () => {
       }),
     ])
     getProviderOrderRefundsMock.mockResolvedValueOnce([])
+    listDeliveryOrderIncidentsMock.mockResolvedValueOnce([])
 
     const Page = (await import("@/app/[locale]/provider/finance/page")).default
     render(<Page />)

@@ -7,10 +7,11 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 import { getApiBaseUrl } from "@/lib/runtime-config"
+import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
-import type { ProviderOrder, RefundSummary } from "@/lib/types"
+import type { DeliveryIncidentSummary, ProviderOrder, RefundSummary } from "@/lib/types"
 import {
   AlertCircle,
   CheckCircle2,
@@ -25,6 +26,7 @@ type ProviderOrderWithRefunds = ProviderOrder & {
   rootOrderId: string
   rootOrderCreatedAt: string
   refunds: RefundSummary[]
+  incidents: DeliveryIncidentSummary[]
 }
 
 function formatCurrency(amount: number) {
@@ -94,11 +96,31 @@ function ProviderFinanceContent() {
           }),
         )
 
+        const incidentsByProviderOrder: Array<readonly [string, DeliveryIncidentSummary[]]> =
+          await Promise.all(
+            ownProviderOrders.map(async (providerOrder) => {
+              const parentOrder = orders.find((order) => order.id === providerOrder.rootOrderId)
+              if (!parentOrder?.deliveryOrder?.id) {
+                return [providerOrder.id, [] as DeliveryIncidentSummary[]] as const
+              }
+              try {
+                const incidents = await deliveryIncidentsService.listDeliveryOrderIncidents(
+                  parentOrder.deliveryOrder.id,
+                )
+                return [providerOrder.id, incidents] as const
+              } catch {
+                return [providerOrder.id, [] as DeliveryIncidentSummary[]] as const
+              }
+            }),
+          )
+
         const refundMap = new Map(refundsByProviderOrder)
+        const incidentMap = new Map(incidentsByProviderOrder)
         setProviderOrders(
           ownProviderOrders.map((providerOrder) => ({
             ...providerOrder,
             refunds: refundMap.get(providerOrder.id) || [],
+            incidents: incidentMap.get(providerOrder.id) || [],
           })),
         )
       } catch (error) {
@@ -132,6 +154,14 @@ function ProviderFinanceContent() {
         (sum, providerOrder) =>
           sum +
           providerOrder.refunds.reduce((refundSum, refund) => refundSum + refund.amount, 0),
+        0,
+      ),
+    [providerOrders],
+  )
+  const totalIncidents = useMemo(
+    () =>
+      providerOrders.reduce(
+        (sum, providerOrder) => sum + providerOrder.incidents.length,
         0,
       ),
     [providerOrders],
@@ -218,6 +248,14 @@ function ProviderFinanceContent() {
                 {formatCurrency(totalRefunds)}
               </p>
             </div>
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Incidencias visibles
+              </p>
+              <p className="mt-3 font-display text-3xl font-bold text-foreground">
+                {totalIncidents}
+              </p>
+            </div>
           </div>
 
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
@@ -294,6 +332,10 @@ function ProviderFinanceContent() {
                         <p className="mt-2 text-sm text-muted-foreground">
                           Cobro: {providerPaymentLabel(providerOrder.paymentStatus)}
                         </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Soporte visible: {providerOrder.refunds.length} devoluciones ·{" "}
+                          {providerOrder.incidents.length} incidencias
+                        </p>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-muted-foreground">Subtotal</p>
@@ -350,6 +392,9 @@ function ProviderFinanceContent() {
                         </h3>
                         <p className="mt-2 text-sm text-muted-foreground">
                           Estado: {refund.status} · Tipo: {refund.type}
+                        </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Soporte ligado al provider order
                         </p>
                       </div>
                       <div className="text-right">

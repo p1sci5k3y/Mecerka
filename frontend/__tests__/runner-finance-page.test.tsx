@@ -6,10 +6,24 @@ const getAllMock = vi.fn()
 const useAuthMock = vi.fn()
 const fetchMock = vi.fn()
 const toastErrorMock = vi.fn()
+const listDeliveryOrderIncidentsMock = vi.fn()
+const getDeliveryOrderRefundsMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
     getAll: (...args: unknown[]) => getAllMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/delivery-incidents-service", () => ({
+  deliveryIncidentsService: {
+    listDeliveryOrderIncidents: (...args: unknown[]) => listDeliveryOrderIncidentsMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/refunds-service", () => ({
+  refundsService: {
+    getDeliveryOrderRefunds: (...args: unknown[]) => getDeliveryOrderRefundsMock(...args),
   },
 }))
 
@@ -82,6 +96,8 @@ describe("Runner finance page", () => {
     getAllMock.mockReset()
     fetchMock.mockReset()
     toastErrorMock.mockReset()
+    listDeliveryOrderIncidentsMock.mockReset()
+    getDeliveryOrderRefundsMock.mockReset()
     vi.stubGlobal("fetch", fetchMock)
     useAuthMock.mockReturnValue({
       user: {
@@ -110,6 +126,41 @@ describe("Runner finance page", () => {
         },
       }),
     ])
+    listDeliveryOrderIncidentsMock
+      .mockResolvedValueOnce([
+        {
+          id: "incident-1",
+          deliveryOrderId: "delivery-1",
+          reporterRole: "CLIENT",
+          type: "FAILED_DELIVERY",
+          status: "OPEN",
+          description: "Entrega retrasada",
+          evidenceUrl: null,
+          createdAt: "2026-03-24T12:00:00.000Z",
+          resolvedAt: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
+    getDeliveryOrderRefundsMock
+      .mockResolvedValueOnce([
+        {
+          id: "refund-1",
+          incidentId: "incident-1",
+          providerOrderId: null,
+          deliveryOrderId: "delivery-1",
+          type: "DELIVERY_PARTIAL",
+          status: "UNDER_REVIEW",
+          amount: 2,
+          currency: "EUR",
+          requestedById: "client-1",
+          reviewedById: null,
+          externalRefundId: null,
+          createdAt: "2026-03-24T12:10:00.000Z",
+          reviewedAt: null,
+          completedAt: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
 
     const Page = (await import("@/app/[locale]/runner/finance/page")).default
     render(<Page />)
@@ -121,9 +172,16 @@ describe("Runner finance page", () => {
     expect(screen.getByText("Cobros confirmados")).toBeInTheDocument()
     expect(screen.getByText("Pendientes de cobro")).toBeInTheDocument()
     expect(screen.getByText("Importe visible cobrado")).toBeInTheDocument()
+    expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
+    expect(screen.getByText("Devoluciones visibles")).toBeInTheDocument()
     expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
     expect(screen.getByText("Cobrado")).toBeInTheDocument()
     expect(screen.getByText("Sesion lista")).toBeInTheDocument()
+    expect(screen.getByText(/Soporte visible:\s*1 devoluciones · 1 incidencias/i)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Abrir soporte operativo/i })).toHaveAttribute(
+      "href",
+      "/runner/orders/order-1",
+    )
     expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
       "href",
       "/runner/orders/order-1",
@@ -145,6 +203,8 @@ describe("Runner finance page", () => {
       },
     })
     getAllMock.mockResolvedValueOnce([])
+    listDeliveryOrderIncidentsMock.mockResolvedValue([])
+    getDeliveryOrderRefundsMock.mockResolvedValue([])
 
     const Page = (await import("@/app/[locale]/runner/finance/page")).default
     render(<Page />)
@@ -168,6 +228,8 @@ describe("Runner finance page", () => {
       },
     })
     getAllMock.mockResolvedValueOnce([])
+    listDeliveryOrderIncidentsMock.mockResolvedValue([])
+    getDeliveryOrderRefundsMock.mockResolvedValue([])
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ url: "https://connect.stripe.com/setup/s/demo" }),

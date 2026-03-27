@@ -7,9 +7,11 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 import { getApiBaseUrl } from "@/lib/runtime-config"
+import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
+import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
-import type { Order } from "@/lib/types"
+import type { DeliveryIncidentSummary, Order, RefundSummary } from "@/lib/types"
 import {
   AlertCircle,
   ArrowRight,
@@ -20,6 +22,11 @@ import {
   Truck,
 } from "lucide-react"
 import { toast } from "sonner"
+
+type RunnerOrderWithSupport = Order & {
+  incidents: DeliveryIncidentSummary[]
+  refunds: RefundSummary[]
+}
 
 function formatCurrency(amount: number) {
   return amount.toLocaleString("es-ES", {
@@ -54,14 +61,38 @@ export default function RunnerFinancePage() {
 
 function RunnerFinanceContent() {
   const { user } = useAuth()
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<RunnerOrderWithSupport[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function loadData() {
       try {
         const data = await ordersService.getAll()
-        setOrders(data.filter((order) => order.deliveryOrder))
+        const deliveryOrders = data.filter((order) => order.deliveryOrder)
+        const withSupport = await Promise.all(
+          deliveryOrders.map(async (order) => {
+            const deliveryOrderId = order.deliveryOrder?.id
+            if (!deliveryOrderId) {
+              return { ...order, incidents: [], refunds: [] }
+            }
+
+            const [incidents, refunds] = await Promise.all([
+              deliveryIncidentsService
+                .listDeliveryOrderIncidents(deliveryOrderId)
+                .catch(() => [] as DeliveryIncidentSummary[]),
+              refundsService
+                .getDeliveryOrderRefunds(deliveryOrderId)
+                .catch(() => [] as RefundSummary[]),
+            ])
+
+            return {
+              ...order,
+              incidents,
+              refunds,
+            }
+          }),
+        )
+        setOrders(withSupport)
       } catch (error) {
         console.error("Error loading runner finance center:", error)
       } finally {
@@ -89,6 +120,14 @@ function RunnerFinanceContent() {
   const visibleAmount = useMemo(
     () => paidOrders.reduce((sum, order) => sum + order.deliveryFee, 0),
     [paidOrders],
+  )
+  const visibleIncidents = useMemo(
+    () => orders.reduce((sum, order) => sum + order.incidents.length, 0),
+    [orders],
+  )
+  const visibleRefunds = useMemo(
+    () => orders.reduce((sum, order) => sum + order.refunds.length, 0),
+    [orders],
   )
 
   const handleStripeConnect = async () => {
@@ -136,7 +175,7 @@ function RunnerFinanceContent() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-5">
             <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Cobros confirmados
@@ -159,6 +198,22 @@ function RunnerFinanceContent() {
               </p>
               <p className="mt-3 font-display text-3xl font-bold text-foreground">
                 {formatCurrency(visibleAmount)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Incidencias visibles
+              </p>
+              <p className="mt-3 font-display text-3xl font-bold text-foreground">
+                {visibleIncidents}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Devoluciones visibles
+              </p>
+              <p className="mt-3 font-display text-3xl font-bold text-foreground">
+                {visibleRefunds}
               </p>
             </div>
           </div>
@@ -233,6 +288,9 @@ function RunnerFinanceContent() {
                             {runnerPaymentLabel(order.deliveryOrder?.paymentStatus)}
                           </span>
                         </p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Soporte visible: {order.refunds.length} devoluciones · {order.incidents.length} incidencias
+                        </p>
                       </div>
 
                       <div className="text-right">
@@ -263,6 +321,38 @@ function RunnerFinanceContent() {
             <p className="mt-3 text-sm text-muted-foreground">
               El runner no revisa ni ejecuta devoluciones desde este panel. Si un reparto entra en disputa, reembolso o incidencia economica, el caso sigue por soporte y backoffice/admin.
             </p>
+            <div className="mt-5 grid gap-4">
+              {orders.some((order) => order.refunds.length > 0 || order.incidents.length > 0) ? (
+                orders
+                  .filter((order) => order.refunds.length > 0 || order.incidents.length > 0)
+                  .map((order) => (
+                    <article
+                      key={`support-${order.id}`}
+                      className="rounded-2xl border border-border/60 bg-background/70 p-5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                            Pedido #{order.id.slice(0, 8).toUpperCase()}
+                          </p>
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {order.refunds.length} devoluciones · {order.incidents.length} incidencias
+                          </p>
+                        </div>
+                        <Button asChild size="sm" variant="outline">
+                          <Link href={`/runner/orders/${order.id}`}>
+                            Abrir soporte operativo
+                          </Link>
+                        </Button>
+                      </div>
+                    </article>
+                  ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border/60 bg-background/70 px-6 py-10 text-center text-sm text-muted-foreground">
+                  No hay devoluciones ni incidencias visibles en tus repartos ahora mismo.
+                </div>
+              )}
+            </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button asChild variant="outline">
                 <Link href="/runner">
