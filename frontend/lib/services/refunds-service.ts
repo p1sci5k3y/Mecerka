@@ -44,4 +44,27 @@ export const refundsService = {
     )
     return data.map(mapRefund)
   },
+
+  async getDeliveryOrderRefunds(deliveryOrderId: string) {
+    const data = await api.get<BackendRefundSummary[]>(
+      `/refunds/delivery-order/${deliveryOrderId}`,
+    )
+    return data.map(mapRefund)
+  },
+
+  async requestRefund(payload: {
+    incidentId?: string
+    providerOrderId?: string
+    deliveryOrderId?: string
+    type:
+      | "PROVIDER_FULL"
+      | "PROVIDER_PARTIAL"
+      | "DELIVERY_FULL"
+      | "DELIVERY_PARTIAL"
+    amount: number
+    currency: string
+  }) {
+    const data = await api.post<BackendRefundSummary>("/refunds", payload)
+    return mapRefund(data)
+  },
 }

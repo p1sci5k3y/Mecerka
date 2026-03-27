@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const apiGetMock = vi.fn()
+const apiPostMock = vi.fn()
 
 vi.mock("@/lib/api", () => ({
   api: {
     get: (...args: unknown[]) => apiGetMock(...args),
+    post: (...args: unknown[]) => apiPostMock(...args),
   },
 }))
 
 describe("refunds-service", () => {
   beforeEach(() => {
     apiGetMock.mockReset()
+    apiPostMock.mockReset()
   })
 
   it("maps provider order refunds into frontend summaries", async () => {
@@ -44,5 +47,78 @@ describe("refunds-service", () => {
         status: "REQUESTED",
       }),
     ])
+  })
+
+  it("maps delivery order refunds into frontend summaries", async () => {
+    apiGetMock.mockResolvedValueOnce([
+      {
+        id: "refund-2",
+        providerOrderId: null,
+        deliveryOrderId: "delivery-order-1",
+        type: "DELIVERY_FULL",
+        status: "APPROVED",
+        amount: 4,
+        currency: "EUR",
+        requestedById: "client-1",
+        reviewedById: "admin-1",
+        externalRefundId: "re_1",
+        createdAt: "2026-03-27T10:00:00.000Z",
+        reviewedAt: "2026-03-27T12:00:00.000Z",
+        completedAt: null,
+      },
+    ])
+
+    const { refundsService } = await import("@/lib/services/refunds-service")
+    const refunds = await refundsService.getDeliveryOrderRefunds("delivery-order-1")
+
+    expect(apiGetMock).toHaveBeenCalledWith("/refunds/delivery-order/delivery-order-1")
+    expect(refunds).toEqual([
+      expect.objectContaining({
+        id: "refund-2",
+        deliveryOrderId: "delivery-order-1",
+        amount: 4,
+        status: "APPROVED",
+      }),
+    ])
+  })
+
+  it("submits refund requests through the backend contract", async () => {
+    apiPostMock.mockResolvedValueOnce({
+      id: "refund-3",
+      providerOrderId: "provider-order-9",
+      deliveryOrderId: null,
+      incidentId: null,
+      type: "PROVIDER_PARTIAL",
+      status: "REQUESTED",
+      amount: "9.99",
+      currency: "EUR",
+      requestedById: "client-2",
+      reviewedById: null,
+      externalRefundId: null,
+      createdAt: "2026-03-27T13:00:00.000Z",
+      reviewedAt: null,
+      completedAt: null,
+    })
+
+    const { refundsService } = await import("@/lib/services/refunds-service")
+    const refund = await refundsService.requestRefund({
+      providerOrderId: "provider-order-9",
+      type: "PROVIDER_PARTIAL",
+      amount: 9.99,
+      currency: "EUR",
+    })
+
+    expect(apiPostMock).toHaveBeenCalledWith("/refunds", {
+      providerOrderId: "provider-order-9",
+      type: "PROVIDER_PARTIAL",
+      amount: 9.99,
+      currency: "EUR",
+    })
+    expect(refund).toMatchObject({
+      id: "refund-3",
+      providerOrderId: "provider-order-9",
+      amount: 9.99,
+      status: "REQUESTED",
+    })
   })
 })

@@ -152,6 +152,25 @@ export interface RefundSummary {
   completedAt: string | null
 }
 
+export interface DeliveryIncidentSummary {
+  id: string
+  deliveryOrderId: string
+  reporterRole: "CLIENT" | "RUNNER" | "PROVIDER" | "ADMIN"
+  type:
+    | "MISSING_ITEMS"
+    | "DAMAGED_ITEMS"
+    | "WRONG_DELIVERY"
+    | "FAILED_DELIVERY"
+    | "ADDRESS_PROBLEM"
+    | "SAFETY_CONCERN"
+    | "OTHER"
+  status: "OPEN" | "UNDER_REVIEW" | "RESOLVED" | "REJECTED"
+  description: string
+  evidenceUrl: string | null
+  createdAt: string
+  resolvedAt: string | null
+}
+
 export interface AdminRefundSummary extends RefundSummary {
   requestedByEmail: string
   requestedByName: string | null
