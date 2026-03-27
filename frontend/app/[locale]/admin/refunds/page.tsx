@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { adminService } from "@/lib/services/admin-service"
+import { Link } from "@/lib/navigation"
 import type { AdminRefundSummary } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -261,6 +262,11 @@ export default function AdminRefundsPage() {
                                                     Revisar
                                                 </Button>
                                             )}
+                                            <Button type="button" size="sm" variant="outline" asChild>
+                                                <Link href={`/admin/refunds/${refund.id}`}>
+                                                    Ver caso
+                                                </Link>
+                                            </Button>
                                             {refund.status === "UNDER_REVIEW" && (
                                                 <>
                                                     <Button

@@ -97,6 +97,15 @@ export const adminService = {
         return api.get<AdminRefundSummary[]>("/admin/refunds")
     },
 
+    getRefund: async (id: string) => {
+        const refunds = await api.get<AdminRefundSummary[]>("/admin/refunds")
+        const refund = refunds.find((entry) => entry.id === id)
+        if (!refund) {
+            throw new Error("Refund not found")
+        }
+        return refund
+    },
+
     reviewRefund: async (id: string) => {
         return api.patch<AdminRefundSummary>(`/refunds/${id}/review`)
     },
@@ -116,6 +125,15 @@ export const adminService = {
     // Incidents
     getIncidents: async () => {
         return api.get<AdminIncidentSummary[]>("/admin/incidents")
+    },
+
+    getIncident: async (id: string) => {
+        const incidents = await api.get<AdminIncidentSummary[]>("/admin/incidents")
+        const incident = incidents.find((entry) => entry.id === id)
+        if (!incident) {
+            throw new Error("Incident not found")
+        }
+        return incident
     },
 
     reviewIncident: async (id: string) => {

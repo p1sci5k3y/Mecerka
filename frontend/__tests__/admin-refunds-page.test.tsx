@@ -24,6 +24,14 @@ vi.mock("@/components/ui/use-toast", () => ({
   }),
 }))
 
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, asChild, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) =>
     asChild ? <>{children}</> : <button {...rest}>{children}</button>,
@@ -117,6 +125,10 @@ describe("Admin refunds page", () => {
     expect(screen.getByRole("button", { name: "Aprobadas" })).toBeInTheDocument()
     expect(screen.getAllByText("Client Demo")).toHaveLength(3)
     expect(screen.getAllByText("Comercio provider-order-1")).toHaveLength(3)
+    expect(screen.getAllByRole("link", { name: /Ver caso/i })[0]).toHaveAttribute(
+      "href",
+      "/admin/refunds/refund-requested",
+    )
 
     fireEvent.click(screen.getByRole("button", { name: "Revisar" }))
 

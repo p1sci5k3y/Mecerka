@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { adminService } from "@/lib/services/admin-service"
+import { Link } from "@/lib/navigation"
 import type { AdminIncidentSummary } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -245,6 +246,11 @@ export default function AdminIncidentsPage() {
                                                     Revisar
                                                 </Button>
                                             )}
+                                            <Button type="button" size="sm" variant="outline" asChild>
+                                                <Link href={`/admin/incidents/${incident.id}`}>
+                                                    Ver caso
+                                                </Link>
+                                            </Button>
                                             {incident.status === "UNDER_REVIEW" && (
                                                 <>
                                                     <Button
