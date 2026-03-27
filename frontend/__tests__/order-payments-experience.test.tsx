@@ -842,6 +842,9 @@ describe("OrderPaymentsPage experience", () => {
       expect(screen.getByText("Pedido y pagos por comercio")).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole("button", { name: /Volver al detalle del pedido/i }))
+    expect(routerPushMock).toHaveBeenCalledWith("/orders/order-1")
+
     fireEvent.click(screen.getByRole("button", { name: /Volver a mis pedidos/i }))
     expect(routerPushMock).toHaveBeenCalledWith("/orders")
 

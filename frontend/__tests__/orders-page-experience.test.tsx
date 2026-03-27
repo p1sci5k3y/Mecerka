@@ -139,6 +139,10 @@ describe("OrdersPage experience", () => {
       "href",
       "/orders/order-active/track",
     )
+    expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
+      "href",
+      "/orders/order-active",
+    )
     expect(screen.getByRole("link", { name: /Gestionar pagos/i })).toHaveAttribute(
       "href",
       "/orders/order-active/payments",
@@ -146,6 +150,10 @@ describe("OrdersPage experience", () => {
     expect(screen.getByRole("link", { name: /Ver pagos/i })).toHaveAttribute(
       "href",
       "/orders/order-past/payments",
+    )
+    expect(screen.getAllByRole("link", { name: /Ver detalle/i })[1]).toHaveAttribute(
+      "href",
+      "/orders/order-past",
     )
   })
 

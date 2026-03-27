@@ -417,14 +417,24 @@ export default function OrderPaymentsPage() {
       <main className="flex-1">
         <div className="mx-auto max-w-6xl px-4 py-12 lg:px-8">
           <div className="mb-8 flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => router.push("/orders")}
-              className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver a mis pedidos
-            </button>
+            <div className="flex flex-wrap gap-4">
+              <button
+                type="button"
+                onClick={() => router.push(`/orders/${orderId}`)}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Volver al detalle del pedido
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/orders")}
+                className="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Volver a mis pedidos
+              </button>
+            </div>
             <h1 className="font-display text-4xl font-extrabold text-foreground">
               Pedido y pagos por comercio
             </h1>

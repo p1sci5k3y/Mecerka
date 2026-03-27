@@ -230,6 +230,11 @@ function OrdersContent() {
                         </div>
 
                         <div className="flex flex-wrap gap-3">
+                          <Button asChild variant="outline">
+                            <Link href={`/orders/${order.id}`}>
+                              Ver detalle
+                            </Link>
+                          </Button>
                           <Button asChild>
                             <Link href={`/orders/${order.id}/track`}>
                               Seguir pedido
@@ -284,6 +289,11 @@ function OrdersContent() {
                       </div>
 
                       <div className="flex flex-wrap gap-3">
+                        <Button asChild variant="outline">
+                          <Link href={`/orders/${order.id}`}>
+                            Ver detalle
+                          </Link>
+                        </Button>
                         <Button asChild variant="outline">
                           <Link href={`/orders/${order.id}/payments`}>
                             <CreditCard className="mr-2 h-4 w-4" />
