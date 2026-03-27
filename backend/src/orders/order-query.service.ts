@@ -160,6 +160,14 @@ export class OrderQueryService {
               include: { items: { include: { product: true } } },
             },
             city: true,
+            deliveryOrder: {
+              select: {
+                id: true,
+                runnerId: true,
+                status: true,
+                paymentStatus: true,
+              },
+            },
           },
           orderBy: { createdAt: 'desc' },
         })
@@ -168,12 +176,22 @@ export class OrderQueryService {
         );
     } else if (roles.includes(Role.RUNNER)) {
       return this.prisma.order.findMany({
-        where: { runnerId: userId },
+        where: {
+          OR: [{ runnerId: userId }, { deliveryOrder: { runnerId: userId } }],
+        },
         include: {
           providerOrders: {
             include: { items: { include: { product: true } } },
           },
           city: true,
+          deliveryOrder: {
+            select: {
+              id: true,
+              runnerId: true,
+              status: true,
+              paymentStatus: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -185,6 +203,14 @@ export class OrderQueryService {
             include: { items: { include: { product: true } } },
           },
           city: true,
+          deliveryOrder: {
+            select: {
+              id: true,
+              runnerId: true,
+              status: true,
+              paymentStatus: true,
+            },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -225,7 +251,8 @@ export class OrderQueryService {
     if (roles.includes(Role.ADMIN)) return order;
 
     const isClient = order.clientId === userId;
-    const isRunner = order.runnerId === userId;
+    const isRunner =
+      order.runnerId === userId || order.deliveryOrder?.runnerId === userId;
     const isProvider = order.providerOrders.some(
       (po) => po.providerId === userId,
     );

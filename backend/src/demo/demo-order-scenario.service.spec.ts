@@ -14,6 +14,8 @@ describe('DemoOrderScenarioService', () => {
     prismaMock = {
       user: { findUnique: jest.fn() },
       order: { findUnique: jest.fn() },
+      deliveryIncident: { create: jest.fn() },
+      refundRequest: { create: jest.fn() },
       providerPaymentSession: { update: jest.fn() },
       providerOrder: { update: jest.fn() },
     };
@@ -128,23 +130,32 @@ describe('DemoOrderScenarioService', () => {
       { id: 'order-pending', deliveryFee: 4.5 },
       { id: 'order-delivering', deliveryFee: 5.1 },
       { id: 'order-delivered', deliveryFee: 5.4 },
+      { id: 'order-support', deliveryFee: 4.8 },
     ];
     ordersServiceMock.checkoutFromCart
       .mockResolvedValueOnce(orders[0])
       .mockResolvedValueOnce(orders[1])
-      .mockResolvedValueOnce(orders[2]);
+      .mockResolvedValueOnce(orders[2])
+      .mockResolvedValueOnce(orders[3]);
     jest
       .spyOn(service as any, 'confirmDemoProviderOrderPayment')
       .mockResolvedValue(undefined);
     deliveryServiceMock.createDeliveryOrder
       .mockResolvedValueOnce({ id: 'delivery-1' })
-      .mockResolvedValueOnce({ id: 'delivery-2' });
+      .mockResolvedValueOnce({ id: 'delivery-2' })
+      .mockResolvedValueOnce({ id: 'delivery-3' });
     deliveryServiceMock.assignRunner.mockResolvedValue({});
     deliveryServiceMock.markPickupPending.mockResolvedValue({});
     deliveryServiceMock.confirmPickup.mockResolvedValue({});
     deliveryServiceMock.startTransit.mockResolvedValue({});
     deliveryServiceMock.updateRunnerLocation.mockResolvedValue({});
     deliveryServiceMock.confirmDelivery.mockResolvedValue({});
+    prismaMock.order.findUnique.mockResolvedValue({
+      providerOrders: [{ id: 'provider-order-support' }],
+      deliveryOrder: { id: 'delivery-3' },
+    });
+    prismaMock.deliveryIncident.create.mockResolvedValue({ id: 'incident-1' });
+    prismaMock.refundRequest.create.mockResolvedValue({});
 
     const result = await service.createDemoOrders([
       { id: 'prod-1', name: 'Pan artesano', cityId: 'city-1' },
@@ -155,11 +166,11 @@ describe('DemoOrderScenarioService', () => {
       { id: 'prod-6', name: 'Aceite de oliva', cityId: 'city-1' },
     ]);
 
-    expect(ordersServiceMock.checkoutFromCart).toHaveBeenCalledTimes(3);
+    expect(ordersServiceMock.checkoutFromCart).toHaveBeenCalledTimes(4);
     expect(
       (service as any).confirmDemoProviderOrderPayment,
-    ).toHaveBeenCalledTimes(2);
-    expect(deliveryServiceMock.createDeliveryOrder).toHaveBeenCalledTimes(2);
+    ).toHaveBeenCalledTimes(3);
+    expect(deliveryServiceMock.createDeliveryOrder).toHaveBeenCalledTimes(3);
     expect(deliveryServiceMock.assignRunner).toHaveBeenNthCalledWith(
       1,
       'delivery-1',
@@ -173,6 +184,15 @@ describe('DemoOrderScenarioService', () => {
       [Role.RUNNER],
       { deliveryNotes: 'Entrega demo completada' },
     );
+    expect(prismaMock.deliveryIncident.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          deliveryOrderId: 'delivery-3',
+          reporterId: 'user-2',
+        }),
+      }),
+    );
+    expect(prismaMock.refundRequest.create).toHaveBeenCalledTimes(2);
     expect(result).toEqual(orders);
   });
 });

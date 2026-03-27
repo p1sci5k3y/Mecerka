@@ -3,7 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import {
+  DeliveryIncidentStatus,
+  DeliveryIncidentType,
+  IncidentReporterRole,
+  RefundStatus,
+  RefundType,
+  Role,
+} from '@prisma/client';
 import { CartService } from '../cart/cart.service';
 import { DeliveryService } from '../delivery/delivery.service';
 import { OrdersService } from '../orders/orders.service';
@@ -139,6 +146,70 @@ export class DemoOrderScenarioService {
         },
       },
     );
+  }
+
+  private async seedSupportArtifacts(orderId: string, reporterId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        providerOrders: {
+          select: {
+            id: true,
+          },
+        },
+        deliveryOrder: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    const providerOrderId = order?.providerOrders[0]?.id;
+    const deliveryOrderId = order?.deliveryOrder?.id;
+
+    if (!providerOrderId || !deliveryOrderId) {
+      throw new ConflictException(
+        'Demo support seeding requires a provider order and a delivery order',
+      );
+    }
+
+    const incident = await this.prisma.deliveryIncident.create({
+      data: {
+        deliveryOrderId,
+        reporterId,
+        reporterRole: IncidentReporterRole.CLIENT,
+        type: DeliveryIncidentType.DAMAGED_ITEMS,
+        status: DeliveryIncidentStatus.OPEN,
+        description:
+          'Caso demo para validar soporte postpedido en provider, runner y admin.',
+        evidenceUrl: 'https://demo.mecerka.me/evidence/support-demo-photo.jpg',
+      },
+    });
+
+    await this.prisma.refundRequest.create({
+      data: {
+        incidentId: incident.id,
+        providerOrderId,
+        type: RefundType.PROVIDER_PARTIAL,
+        status: RefundStatus.UNDER_REVIEW,
+        amount: 2.5,
+        currency: 'EUR',
+        requestedById: reporterId,
+      },
+    });
+
+    await this.prisma.refundRequest.create({
+      data: {
+        incidentId: incident.id,
+        deliveryOrderId,
+        type: RefundType.DELIVERY_PARTIAL,
+        status: RefundStatus.REQUESTED,
+        amount: 1.5,
+        currency: 'EUR',
+        requestedById: reporterId,
+      },
+    });
   }
 
   async createDemoOrders(products: DemoSeededProduct[]) {
@@ -298,6 +369,62 @@ export class DemoOrderScenarioService {
       },
     );
 
-    return [pendingOrder, deliveringOrder, deliveredOrder];
+    const supportOrder = await this.createCheckoutOrder(
+      user2.id,
+      [
+        {
+          productId: requireDemoProduct('Pan artesano').id,
+          quantity: 1,
+        },
+        {
+          productId: requireDemoProduct('Empanada gallega').id,
+          quantity: 1,
+        },
+      ],
+      'demo-support-order',
+      cityId,
+      'Plaza de Zocodover, 5',
+      '45001',
+      'Escalera interior',
+    );
+    await this.confirmDemoProviderOrderPayment(supportOrder.id);
+    const supportDelivery = await this.deliveryService.createDeliveryOrder(
+      {
+        orderId: supportOrder.id,
+        deliveryFee: Number(supportOrder.deliveryFee ?? 0),
+        currency: 'EUR',
+      },
+      user2.id,
+      [Role.CLIENT],
+    );
+    await this.deliveryService.assignRunner(
+      supportDelivery.id,
+      { runnerId: runner1.id },
+      user2.id,
+      [Role.CLIENT],
+    );
+    await this.deliveryService.markPickupPending(
+      supportDelivery.id,
+      runner1.id,
+      [Role.RUNNER],
+    );
+    await this.deliveryService.confirmPickup(supportDelivery.id, runner1.id, [
+      Role.RUNNER,
+    ]);
+    await this.deliveryService.startTransit(supportDelivery.id, runner1.id, [
+      Role.RUNNER,
+    ]);
+    await this.deliveryService.updateRunnerLocation(
+      supportDelivery.id,
+      runner1.id,
+      [Role.RUNNER],
+      {
+        latitude: 40.416,
+        longitude: -3.704,
+      },
+    );
+    await this.seedSupportArtifacts(supportOrder.id, user2.id);
+
+    return [pendingOrder, deliveringOrder, deliveredOrder, supportOrder];
   }
 }

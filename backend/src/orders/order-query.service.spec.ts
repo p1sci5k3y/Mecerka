@@ -201,19 +201,34 @@ describe('OrderQueryService', () => {
       const result = await service.findAll(CLIENT_ID, [Role.CLIENT]);
 
       expect(prismaMock.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { clientId: CLIENT_ID } }),
+        expect.objectContaining({
+          where: { clientId: CLIENT_ID },
+          include: expect.objectContaining({
+            deliveryOrder: expect.any(Object),
+          }),
+        }),
       );
       expect(result).toEqual(orders);
     });
 
-    it('returns runner orders for RUNNER role', async () => {
+    it('returns runner orders for RUNNER role using delivery ownership too', async () => {
       const orders = [buildOrder({ runnerId: RUNNER_ID })];
       prismaMock.order.findMany.mockResolvedValue(orders);
 
       const result = await service.findAll(RUNNER_ID, [Role.RUNNER]);
 
       expect(prismaMock.order.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { runnerId: RUNNER_ID } }),
+        expect.objectContaining({
+          where: {
+            OR: [
+              { runnerId: RUNNER_ID },
+              { deliveryOrder: { runnerId: RUNNER_ID } },
+            ],
+          },
+          include: expect.objectContaining({
+            deliveryOrder: expect.any(Object),
+          }),
+        }),
       );
       expect(result).toEqual(orders);
     });
@@ -228,6 +243,9 @@ describe('OrderQueryService', () => {
       expect(prismaMock.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { providerOrders: { some: { providerId: PROVIDER_ID } } },
+          include: expect.objectContaining({
+            deliveryOrder: expect.any(Object),
+          }),
         }),
       );
       expect(Array.isArray(result)).toBe(true);
@@ -433,6 +451,27 @@ describe('OrderQueryService', () => {
         const order = buildOrder({
           clientId: 'other-client',
           runnerId: RUNNER_ID,
+          providerOrders: [],
+        });
+        prismaMock.order.findUnique.mockResolvedValue(order);
+
+        const result = await service.findOne(ORDER_ID, RUNNER_ID, [
+          Role.RUNNER,
+        ]);
+
+        expect(result).toEqual(order);
+      });
+
+      it('returns order when requester is assigned on deliveryOrder.runnerId', async () => {
+        const order = buildOrder({
+          clientId: 'other-client',
+          runnerId: null,
+          deliveryOrder: {
+            id: 'do-1',
+            runnerId: RUNNER_ID,
+            status: 'IN_TRANSIT',
+            paymentStatus: 'PENDING',
+          },
           providerOrders: [],
         });
         prismaMock.order.findUnique.mockResolvedValue(order);
