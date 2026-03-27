@@ -109,6 +109,12 @@ describe("Provider product form pages", () => {
     const Page = (await import("@/app/[locale]/provider/products/new/page")).default
     render(<Page />)
 
+    expect(screen.getByText("Checklist de publicación")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Ver guía de alta/i })).toHaveAttribute(
+      "href",
+      "/provider/onboarding",
+    )
+
     fillCommonFields()
     fireEvent.submit(screen.getByRole("button", { name: "Guardar Producto" }).closest("form")!)
 

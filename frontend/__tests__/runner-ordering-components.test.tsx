@@ -4,6 +4,14 @@ import type { Order } from "@/lib/types"
 import { RunnerAvailableList } from "@/components/runner/RunnerAvailableList"
 import { RunnerOrderCard } from "@/components/runner/RunnerOrderCard"
 
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: "runner-order-1",
@@ -43,6 +51,10 @@ describe("Runner ordering components", () => {
     const onAccept = vi.fn()
     render(<RunnerAvailableList orders={[makeOrder()]} onAccept={onAccept} />)
 
+    expect(screen.getByRole("link", { name: /Ver detalle/i })).toHaveAttribute(
+      "href",
+      "/runner/orders/runner-order-1",
+    )
     fireEvent.click(screen.getByRole("button", { name: /Aceptar Pedido/i }))
 
     expect(onAccept).toHaveBeenCalledWith("runner-order-1")

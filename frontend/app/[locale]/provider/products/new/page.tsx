@@ -138,6 +138,48 @@ function NewProductContent() {
                         </div>
                     </div>
 
+                    <section className="mb-6 rounded-xl border border-border bg-card/70 p-5">
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-lg font-bold text-foreground">
+                                    Checklist de publicación
+                                </h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Completa estos mínimos para que el producto salga listo al inventario.
+                                </p>
+                            </div>
+                            <Button asChild variant="outline">
+                                <Link href="/provider/onboarding">
+                                    Ver guía de alta
+                                </Link>
+                            </Button>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-3">
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-4 text-sm">
+                                <p className="font-semibold text-foreground">Metadatos base</p>
+                                <p className="mt-2 text-muted-foreground">
+                                    {cities.length > 0 && categories.length > 0
+                                        ? "OK. Ciudades y categorías cargadas."
+                                        : "Pendiente de cargar ciudades o categorías."}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-4 text-sm">
+                                <p className="font-semibold text-foreground">Ficha comercial</p>
+                                <p className="mt-2 text-muted-foreground">
+                                    {formData.name && formData.price && formData.stock
+                                        ? "OK. Nombre, precio y stock completados."
+                                        : "Completa nombre, precio y stock para publicar."}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/70 p-4 text-sm">
+                                <p className="font-semibold text-foreground">Siguiente paso</p>
+                                <p className="mt-2 text-muted-foreground">
+                                    Tras guardar, revisa inventario y confirma que el producto aparece con stock correcto.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
                     <form onSubmit={handleSubmit} className="space-y-6 rounded-xl border border-border bg-card p-6">
                         <div className="space-y-4">
                             <div className="grid gap-2">

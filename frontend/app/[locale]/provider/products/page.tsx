@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Plus, Edit, Trash2, MapPin, Tag, Package, Loader2 } from "lucide-react"
+import { Plus, Edit, Trash2, MapPin, Tag, Package, Loader2, BookOpenCheck } from "lucide-react"
 import { Link } from "@/lib/navigation"
 
 import { Navbar } from "@/components/navbar"
@@ -82,12 +82,20 @@ function ProductsContent() {
                                 Gestiona tus productos y stock
                             </p>
                         </div>
-                        <Button asChild>
-                            <Link href="/provider/products/new">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Nuevo Producto
-                            </Link>
-                        </Button>
+                        <div className="flex flex-wrap gap-3">
+                            <Button asChild variant="outline">
+                                <Link href="/provider/onboarding">
+                                    <BookOpenCheck className="mr-2 h-4 w-4" />
+                                    Guía de alta
+                                </Link>
+                            </Button>
+                            <Button asChild>
+                                <Link href="/provider/products/new">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Nuevo Producto
+                                </Link>
+                            </Button>
+                        </div>
                     </div>
 
                     {loading && (
@@ -103,12 +111,20 @@ function ProductsContent() {
                             <p className="mb-4 mt-2 text-sm text-muted-foreground">
                                 Empieza añadiendo tu primer producto a la tienda via el botón "Nuevo Producto".
                             </p>
-                            <Button asChild variant="outline">
-                                <Link href="/provider/products/new">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Crear Producto
-                                </Link>
-                            </Button>
+                            <div className="flex flex-wrap justify-center gap-3">
+                                <Button asChild variant="outline">
+                                    <Link href="/provider/onboarding">
+                                        <BookOpenCheck className="mr-2 h-4 w-4" />
+                                        Abrir guía de alta
+                                    </Link>
+                                </Button>
+                                <Button asChild variant="outline">
+                                    <Link href="/provider/products/new">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Crear Producto
+                                    </Link>
+                                </Button>
+                            </div>
                         </div>
                     )}
 

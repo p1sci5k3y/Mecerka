@@ -1,7 +1,8 @@
 import { Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Coins, Store, Clock, Route } from "lucide-react"
+import { Link } from "@/lib/navigation"
+import { MapPin, Coins, Store, Clock, Route, ArrowRight } from "lucide-react"
 
 interface Props {
     order: Order
@@ -70,13 +71,21 @@ export function RunnerOrderCard({ order, onAccept, disabled }: Props) {
             </div>
 
             {/* Action */}
-            <Button
-                className="mt-2 w-full font-bold h-11"
-                onClick={() => onAccept(order.id)}
-                disabled={disabled}
-            >
-                Aceptar Pedido
-            </Button>
+            <div className="mt-2 flex gap-2">
+                <Button asChild variant="outline" className="flex-1 font-semibold h-11">
+                    <Link href={`/runner/orders/${order.id}`}>
+                        Ver detalle
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+                <Button
+                    className="flex-1 font-bold h-11"
+                    onClick={() => onAccept(order.id)}
+                    disabled={disabled}
+                >
+                    Aceptar Pedido
+                </Button>
+            </div>
         </div>
     )
 }

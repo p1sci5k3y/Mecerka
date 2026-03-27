@@ -1,6 +1,7 @@
 import { Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Link } from "@/lib/navigation"
 import { MapPin, Navigation, CheckCircle2, ChevronRight, Store, Box, Clock } from "lucide-react"
 
 interface Props {
@@ -66,6 +67,13 @@ export function RunnerActiveOrderView({ order, onInTransit, onComplete, disabled
                             <MapPin className="h-3 w-3" /> ~{estDistanceMs.toFixed(1)} km
                         </p>
                     </div>
+                </div>
+                <div className="flex justify-end">
+                    <Button asChild variant="outline" size="sm">
+                        <Link href={`/runner/orders/${order.id}`}>
+                            Ver detalle operativo
+                        </Link>
+                    </Button>
                 </div>
             </div>
 

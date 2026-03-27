@@ -124,6 +124,10 @@ describe("Runner finance page", () => {
     expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
     expect(screen.getByText("Cobrado")).toBeInTheDocument()
     expect(screen.getByText("Sesion lista")).toBeInTheDocument()
+    expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
+      "href",
+      "/runner/orders/order-1",
+    )
     expect(
       screen.getByText(/el runner no revisa ni ejecuta devoluciones desde este panel/i),
     ).toBeInTheDocument()

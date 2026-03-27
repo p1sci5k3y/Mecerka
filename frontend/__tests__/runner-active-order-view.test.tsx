@@ -8,10 +8,10 @@ const onCompleteMock = vi.fn()
 vi.mock("@/components/ui/button", () => ({
   Button: ({
     children,
+    asChild,
     ...rest
-  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-    <button {...rest}>{children}</button>
-  ),
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) =>
+    asChild ? <>{children}</> : <button {...rest}>{children}</button>,
 }))
 
 vi.mock("@/components/ui/badge", () => ({
@@ -19,6 +19,14 @@ vi.mock("@/components/ui/badge", () => ({
     children,
     ...rest
   }: React.HTMLAttributes<HTMLDivElement>) => <div {...rest}>{children}</div>,
+}))
+
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ href, children, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
 }))
 
 function makeProviderOrder(

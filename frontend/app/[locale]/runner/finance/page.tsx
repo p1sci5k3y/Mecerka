@@ -242,6 +242,13 @@ function RunnerFinanceContent() {
                         </p>
                       </div>
                     </div>
+                    <div className="mt-4 flex justify-end">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/runner/orders/${order.id}`}>
+                          Ver detalle
+                        </Link>
+                      </Button>
+                    </div>
                   </article>
                 ))}
               </div>

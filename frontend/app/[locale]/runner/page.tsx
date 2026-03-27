@@ -210,7 +210,8 @@ function RunnerContent() {
                                     </div>
                                 ) : (
                                     historicOrders.map(order => (
-                                        <div key={order.id} className="flex items-center justify-between rounded-xl border border-border/50 bg-card p-4 shadow-sm opacity-80 pointer-events-none grayscale">
+                                        <div key={order.id} className="rounded-xl border border-border/50 bg-card p-4 shadow-sm opacity-90">
+                                            <div className="flex items-center justify-between gap-4">
                                             <div>
                                                 <p className="font-mono text-xs font-bold text-muted-foreground mb-1">#{order.id.slice(0, 8).toUpperCase()}</p>
                                                 <p className="text-sm font-medium text-foreground">
@@ -224,6 +225,14 @@ function RunnerContent() {
                                             <div className="text-right">
                                                 <p className="font-bold text-muted-foreground">{order.deliveryFee.toFixed(2)} €</p>
                                                 <p className="text-xs text-muted-foreground mt-0.5">{order.createdAt?.split('T')[0] || ''}</p>
+                                            </div>
+                                            </div>
+                                            <div className="mt-3 flex justify-end">
+                                                <Button asChild size="sm" variant="outline">
+                                                    <Link href={`/runner/orders/${order.id}`}>
+                                                        Ver detalle
+                                                    </Link>
+                                                </Button>
                                             </div>
                                         </div>
                                     ))

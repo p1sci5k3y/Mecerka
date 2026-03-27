@@ -91,6 +91,7 @@ vi.mock("@/components/runner/RunnerActiveOrderView", () => ({
   }) => (
     <div data-testid="active-order-view">
       <span>{order.id}</span>
+      <a href={`/runner/orders/${order.id}`}>detail-link</a>
       <button type="button" onClick={() => onInTransit(order.id)}>
         in-transit
       </button>
@@ -173,6 +174,10 @@ describe("Runner dashboard experience", () => {
     )
     expect(screen.getByTestId("available-list")).toHaveTextContent("available:1")
     expect(screen.getByText(/Tu Histórico \(1\)/)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Ver detalle/i })).toHaveAttribute(
+      "href",
+      "/runner/orders/historic-1",
+    )
   })
 
   it("accepts an available order and refreshes the runner dashboard", async () => {

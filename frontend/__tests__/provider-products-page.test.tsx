@@ -102,6 +102,10 @@ describe("ProviderProductsPage", () => {
     })
 
     expect(screen.getByText(/Empieza añadiendo tu primer producto/i)).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: /Abrir guía de alta/i })).toHaveAttribute(
+      "href",
+      "/provider/onboarding",
+    )
   })
 
   it("deletes a product and reloads the inventory", async () => {
