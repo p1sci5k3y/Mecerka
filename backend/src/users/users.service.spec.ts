@@ -9,10 +9,14 @@ import { RoleAssignmentService } from './role-assignment.service';
 
 describe('UsersService.requestRole', () => {
   let service: UsersService;
+  let txMock: { governanceAuditEntry: { create: jest.Mock } };
   const originalFiscalPepper = process.env.FISCAL_PEPPER;
   let prismaMock: {
     user: {
       update: jest.Mock;
+    };
+    governanceAuditEntry: {
+      create: jest.Mock;
     };
   };
   let roleAssignmentServiceMock: {
@@ -22,9 +26,17 @@ describe('UsersService.requestRole', () => {
 
   beforeEach(async () => {
     process.env.FISCAL_PEPPER = 'test-fiscal-pepper';
+    txMock = {
+      governanceAuditEntry: {
+        create: jest.fn(),
+      },
+    };
     prismaMock = {
       user: {
         update: jest.fn(),
+      },
+      governanceAuditEntry: {
+        create: jest.fn(),
       },
     };
     roleAssignmentServiceMock = {
@@ -69,16 +81,13 @@ describe('UsersService.requestRole', () => {
   it('rejects a pending privileged request inside the locked transaction', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
-        callback(
-          {},
-          {
-            id: 'user-1',
-            roles: [Role.CLIENT],
-            requestedRole: Role.PROVIDER,
-            roleStatus: RoleRequestStatus.PENDING,
-            requestedAt: new Date('2026-03-17T00:00:00.000Z'),
-          },
-        ),
+        callback(txMock, {
+          id: 'user-1',
+          roles: [Role.CLIENT],
+          requestedRole: Role.PROVIDER,
+          roleStatus: RoleRequestStatus.PENDING,
+          requestedAt: new Date('2026-03-17T00:00:00.000Z'),
+        }),
     );
 
     await expect(
@@ -93,16 +102,13 @@ describe('UsersService.requestRole', () => {
   it('rejects requests inside the cooldown window', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
-        callback(
-          {},
-          {
-            id: 'user-1',
-            roles: [Role.CLIENT],
-            requestedRole: Role.PROVIDER,
-            roleStatus: RoleRequestStatus.APPROVED,
-            requestedAt: new Date(),
-          },
-        ),
+        callback(txMock, {
+          id: 'user-1',
+          roles: [Role.CLIENT],
+          requestedRole: Role.PROVIDER,
+          roleStatus: RoleRequestStatus.APPROVED,
+          requestedAt: new Date(),
+        }),
     );
 
     await expect(
@@ -118,7 +124,10 @@ describe('UsersService.requestRole', () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
         callback(
-          { user: { update: jest.fn() } },
+          {
+            user: { update: jest.fn() },
+            governanceAuditEntry: txMock.governanceAuditEntry,
+          },
           {
             id: 'user-1',
             roles: [Role.CLIENT],
@@ -166,6 +175,18 @@ describe('UsersService.requestRole', () => {
       requestedAt: new Date('2026-03-17T00:00:00.000Z'),
       roles: [Role.CLIENT, Role.PROVIDER],
     });
+    expect(txMock.governanceAuditEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'user-1',
+        actorId: 'user-1',
+        action: 'ROLE_REQUESTED',
+        role: Role.PROVIDER,
+        source: 'SELF_SERVICE',
+        metadata: {
+          roleStatus: RoleRequestStatus.APPROVED,
+        },
+      }),
+    });
   });
 
   it('stores a hashed transaction pin', async () => {
@@ -201,16 +222,13 @@ describe('UsersService.requestRole', () => {
   it('rejects users that already have the requested role', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
-        callback(
-          {},
-          {
-            id: 'user-1',
-            roles: [Role.CLIENT, Role.RUNNER],
-            requestedRole: null,
-            roleStatus: null,
-            requestedAt: null,
-          },
-        ),
+        callback(txMock, {
+          id: 'user-1',
+          roles: [Role.CLIENT, Role.RUNNER],
+          requestedRole: null,
+          roleStatus: null,
+          requestedAt: null,
+        }),
     );
 
     await expect(
@@ -224,7 +242,7 @@ describe('UsersService.requestRole', () => {
 
   it('rejects when the locked user cannot be found', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
-      async (_userId, callback) => callback({}, null),
+      async (_userId, callback) => callback(txMock, null),
     );
 
     await expect(

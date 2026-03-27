@@ -14,6 +14,8 @@ describe('AdminController', () => {
   beforeEach(async () => {
     adminServiceMock = {
       getAllUsers: jest.fn(),
+      getUserById: jest.fn(),
+      getUserGovernanceHistory: jest.fn(),
       grantRole: jest.fn(),
       revokeRole: jest.fn(),
       activateUser: jest.fn(),
@@ -50,6 +52,30 @@ describe('AdminController', () => {
     const result = await controller.getUsers();
     expect(adminServiceMock.getAllUsers).toHaveBeenCalled();
     expect(result).toEqual([]);
+  });
+
+  it('getUser delegates to adminService.getUserById', async () => {
+    (adminServiceMock.getUserById as jest.Mock).mockResolvedValue({
+      id: 'u1',
+    });
+
+    const result = await controller.getUser('u1');
+
+    expect(adminServiceMock.getUserById).toHaveBeenCalledWith('u1');
+    expect(result).toEqual({ id: 'u1' });
+  });
+
+  it('getUserGovernanceHistory delegates to adminService.getUserGovernanceHistory', async () => {
+    (adminServiceMock.getUserGovernanceHistory as jest.Mock).mockResolvedValue([
+      { id: 'audit-1' },
+    ]);
+
+    const result = await controller.getUserGovernanceHistory('u1');
+
+    expect(adminServiceMock.getUserGovernanceHistory).toHaveBeenCalledWith(
+      'u1',
+    );
+    expect(result).toEqual([{ id: 'audit-1' }]);
   });
 
   it('grantRole delegates to adminService with user id, role, and actor', async () => {

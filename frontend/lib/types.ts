@@ -455,6 +455,33 @@ export interface BackendAdminUser {
   lastRoleSource: "SELF_SERVICE" | "ADMIN" | null
 }
 
+export interface BackendAdminUserDetail extends BackendAdminUser {
+  lastRoleGrantedById: string | null
+  lastRoleGrantedBy: {
+    id: string
+    email: string
+    name: string | null
+  } | null
+}
+
+export interface AdminGovernanceAuditEntry {
+  id: string
+  action:
+    | "ACCOUNT_CREATED"
+    | "ROLE_REQUESTED"
+    | "ROLE_GRANTED"
+    | "ROLE_REVOKED"
+    | "USER_ACTIVATED"
+    | "USER_BLOCKED"
+  role: Role | null
+  source: "SELF_SERVICE" | "ADMIN" | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+  actorId: string | null
+  actorEmail: string | null
+  actorName: string | null
+}
+
 export interface ProviderStats {
   totalRevenue: number
   totalOrders: number

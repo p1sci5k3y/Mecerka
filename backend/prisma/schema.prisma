@@ -29,6 +29,15 @@ enum RoleGrantSource {
   ADMIN
 }
 
+enum GovernanceAuditAction {
+  ACCOUNT_CREATED
+  ROLE_REQUESTED
+  ROLE_GRANTED
+  ROLE_REVOKED
+  USER_ACTIVATED
+  USER_BLOCKED
+}
+
 enum DeliveryStatus {
   PENDING
   CONFIRMED
@@ -267,9 +276,29 @@ model User {
   deliveryIncidents DeliveryIncident[]
   requestedRefunds RefundRequest[] @relation("RequestedRefunds")
   reviewedRefunds RefundRequest[] @relation("ReviewedRefunds")
+  governanceEvents GovernanceAuditEntry[] @relation("GovernanceTarget")
+  governanceActions GovernanceAuditEntry[] @relation("GovernanceActor")
 
   @@index([requestedRole])
   @@index([roleStatus])
+}
+
+model GovernanceAuditEntry {
+  id        String                @id @default(uuid()) @db.Uuid
+  userId    String                @db.Uuid
+  actorId   String?               @db.Uuid
+  action    GovernanceAuditAction
+  role      Role?
+  source    RoleGrantSource?
+  metadata  Json?
+  createdAt DateTime              @default(now())
+
+  user  User  @relation("GovernanceTarget", fields: [userId], references: [id])
+  actor User? @relation("GovernanceActor", fields: [actorId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([actorId])
+  @@index([action])
 }
 
 model City {

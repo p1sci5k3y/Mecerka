@@ -35,6 +35,16 @@ export class AdminController {
     return this.adminService.getAllUsers();
   }
 
+  @Get('users/:id')
+  getUser(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.getUserById(id);
+  }
+
+  @Get('users/:id/governance-history')
+  getUserGovernanceHistory(@Param('id', ParseUUIDPipe) id: string) {
+    return this.adminService.getUserGovernanceHistory(id);
+  }
+
   // ... (methods)
 
   // ...

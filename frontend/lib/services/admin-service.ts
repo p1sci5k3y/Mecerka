@@ -1,9 +1,11 @@
 import { api } from "@/lib/api"
 import type {
     AdminIncidentSummary,
+    AdminGovernanceAuditEntry,
     AdminRefundSummary,
     AdminMetrics,
     BackendAdminUser,
+    BackendAdminUserDetail,
     BackendCity,
     BackendCategory,
     Role,
@@ -22,6 +24,14 @@ export const adminService = {
     // Users
     getUsers: async () => {
         return api.get<BackendAdminUser[]>("/admin/users")
+    },
+
+    getUser: async (id: string) => {
+        return api.get<BackendAdminUserDetail>(`/admin/users/${id}`)
+    },
+
+    getUserGovernanceHistory: async (id: string) => {
+        return api.get<AdminGovernanceAuditEntry[]>(`/admin/users/${id}/governance-history`)
     },
 
     grantRole: async (id: string, role: Role) => {

@@ -5,8 +5,9 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role, RoleGrantSource } from '@prisma/client';
+import { GovernanceAuditAction, Role, RoleGrantSource } from '@prisma/client';
 import { RoleAssignmentService } from '../users/role-assignment.service';
+import { recordGovernanceAudit } from '../users/governance-audit.util';
 
 @Injectable()
 export class AdminService {
@@ -35,6 +36,67 @@ export class AdminService {
     });
   }
 
+  async getUserById(id: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        roles: true,
+        createdAt: true,
+        mfaEnabled: true,
+        active: true,
+        requestedRole: true,
+        roleStatus: true,
+        requestedAt: true,
+        lastRoleSource: true,
+        lastRoleGrantedById: true,
+      },
+    });
+
+    const lastRoleGrantedBy = user.lastRoleGrantedById
+      ? await this.prisma.user.findUnique({
+          where: { id: user.lastRoleGrantedById },
+          select: { id: true, email: true, name: true },
+        })
+      : null;
+
+    return {
+      ...user,
+      lastRoleGrantedBy,
+    };
+  }
+
+  async getUserGovernanceHistory(userId: string) {
+    const history = await this.prisma.governanceAuditEntry.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        actor: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    return history.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      role: entry.role ?? null,
+      source: entry.source ?? null,
+      metadata: entry.metadata ?? null,
+      createdAt: entry.createdAt,
+      actorId: entry.actor?.id ?? null,
+      actorEmail: entry.actor?.email ?? null,
+      actorName: entry.actor?.name ?? null,
+    }));
+  }
+
   async grantRole(id: string, role: Role, currentAdminId: string) {
     if (id === currentAdminId && role === Role.ADMIN) {
       // It's technically safe to grant admin to yourself if you already are, but we'll allow it or skip.
@@ -42,7 +104,7 @@ export class AdminService {
     }
 
     return this.roleAssignmentService.withLockedUser(id, async (tx, user) => {
-      return this.roleAssignmentService.assignRoleInTx(
+      const updated = await this.roleAssignmentService.assignRoleInTx(
         tx,
         user,
         role,
@@ -65,6 +127,16 @@ export class AdminService {
               onExisting: 'returnCurrent',
             },
       );
+
+      await recordGovernanceAudit(tx, {
+        userId: updated.id,
+        actorId: currentAdminId,
+        action: GovernanceAuditAction.ROLE_GRANTED,
+        role,
+        source: RoleGrantSource.ADMIN,
+      });
+
+      return updated;
     });
   }
 
@@ -74,7 +146,21 @@ export class AdminService {
     }
 
     return this.roleAssignmentService.withLockedUser(id, async (tx, user) => {
-      return this.roleAssignmentService.revokeRoleInTx(tx, user, role);
+      const updated = await this.roleAssignmentService.revokeRoleInTx(
+        tx,
+        user,
+        role,
+      );
+
+      await recordGovernanceAudit(tx, {
+        userId: updated.id,
+        actorId: currentAdminId,
+        action: GovernanceAuditAction.ROLE_REVOKED,
+        role,
+        source: RoleGrantSource.ADMIN,
+      });
+
+      return updated;
     });
   }
 
@@ -82,10 +168,20 @@ export class AdminService {
     if (id === currentAdminId) {
       throw new ForbiddenException('Cannot activate yourself');
     }
-    return this.prisma.user.update({
-      where: { id },
-      data: { active: true },
-      select: { id: true, active: true },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data: { active: true },
+        select: { id: true, active: true },
+      });
+
+      await recordGovernanceAudit(tx, {
+        userId: id,
+        actorId: currentAdminId,
+        action: GovernanceAuditAction.USER_ACTIVATED,
+      });
+
+      return updated;
     });
   }
 
@@ -93,41 +189,29 @@ export class AdminService {
     if (id === currentAdminId) {
       throw new ForbiddenException('Cannot block yourself');
     }
-    return this.prisma.user.update({
-      where: { id },
-      data: { active: false },
-      select: { id: true, active: true },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data: { active: false },
+        select: { id: true, active: true },
+      });
+
+      await recordGovernanceAudit(tx, {
+        userId: id,
+        actorId: currentAdminId,
+        action: GovernanceAuditAction.USER_BLOCKED,
+      });
+
+      return updated;
     });
   }
 
   async grantProvider(userId: string, currentAdminId: string) {
-    return this.roleAssignmentService.withLockedUser(userId, async (tx, user) =>
-      this.roleAssignmentService.assignRoleInTx(tx, user, Role.PROVIDER, {
-        snapshot: {
-          requestedAt: new Date(),
-        },
-        audit: {
-          source: RoleGrantSource.ADMIN,
-          grantedById: currentAdminId,
-        },
-        onExisting: 'returnCurrent',
-      }),
-    );
+    return this.grantRole(userId, Role.PROVIDER, currentAdminId);
   }
 
   async grantRunner(userId: string, currentAdminId: string) {
-    return this.roleAssignmentService.withLockedUser(userId, async (tx, user) =>
-      this.roleAssignmentService.assignRoleInTx(tx, user, Role.RUNNER, {
-        snapshot: {
-          requestedAt: new Date(),
-        },
-        audit: {
-          source: RoleGrantSource.ADMIN,
-          grantedById: currentAdminId,
-        },
-        onExisting: 'returnCurrent',
-      }),
-    );
+    return this.grantRole(userId, Role.RUNNER, currentAdminId);
   }
 
   // --- Master Data: Cities ---

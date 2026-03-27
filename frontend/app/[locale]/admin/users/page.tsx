@@ -10,6 +10,7 @@ import {
     UserX,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { Link } from "@/lib/navigation"
 import { BackendAdminUser, Role } from "@/lib/types"
 import { adminService } from "@/lib/services/admin-service"
 import { Badge } from "@/components/ui/badge"
@@ -271,7 +272,14 @@ export default function UsersPage() {
                         {filteredUsers.map((user) => (
                             <TableRow key={user.id}>
                                 <TableCell className="font-medium">{user.name}</TableCell>
-                                <TableCell>{user.email}</TableCell>
+                                <TableCell>
+                                    <div className="space-y-1">
+                                        <p>{user.email}</p>
+                                        <Link href={`/admin/users/${user.id}`} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
+                                            Abrir detalle
+                                        </Link>
+                                    </div>
+                                </TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1">
                                         {user.roles.map((role) => (

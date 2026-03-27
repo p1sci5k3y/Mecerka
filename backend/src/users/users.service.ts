@@ -4,12 +4,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role, RoleGrantSource, RoleRequestStatus } from '@prisma/client';
+import {
+  GovernanceAuditAction,
+  Role,
+  RoleGrantSource,
+  RoleRequestStatus,
+} from '@prisma/client';
 import * as argon2 from 'argon2';
 import * as crypto from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequestRoleDto, RequestableRole } from './dto/request-role.dto';
 import { RoleAssignmentService } from './role-assignment.service';
+import { recordGovernanceAudit } from './governance-audit.util';
 import {
   isValidSpanishFiscalId,
   normalizeSpanishFiscalId,
@@ -103,7 +109,7 @@ export class UsersService {
           );
         }
 
-        return this.roleAssignmentService.assignRoleInTx(
+        const updated = await this.roleAssignmentService.assignRoleInTx(
           tx,
           user,
           requestedRole,
@@ -120,6 +126,19 @@ export class UsersService {
             },
           },
         );
+
+        await recordGovernanceAudit(tx, {
+          userId: user.id,
+          actorId: user.id,
+          action: GovernanceAuditAction.ROLE_REQUESTED,
+          role: requestedRole,
+          source: RoleGrantSource.SELF_SERVICE,
+          metadata: {
+            roleStatus: RoleRequestStatus.APPROVED,
+          },
+        });
+
+        return updated;
       },
     );
 

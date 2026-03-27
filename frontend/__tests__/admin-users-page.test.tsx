@@ -36,6 +36,14 @@ vi.mock("@/components/ui/use-toast", () => ({
   }),
 }))
 
+vi.mock("@/lib/navigation", () => ({
+  Link: ({ children, href, ...rest }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, asChild, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { asChild?: boolean }) =>
     asChild ? <>{children}</> : <button {...rest}>{children}</button>,

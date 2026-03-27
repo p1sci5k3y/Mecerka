@@ -117,10 +117,10 @@ export default function AdminRoleRequestsPage() {
                   <p className="mt-3 text-sm text-muted-foreground">{governanceOriginLabel(user)}</p>
                 </div>
                 <Link
-                  href="/admin/users"
+                  href={`/admin/users/${user.id}`}
                   className="inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-medium"
                 >
-                  Gestionar usuario
+                  Abrir detalle
                 </Link>
               </div>
             </div>

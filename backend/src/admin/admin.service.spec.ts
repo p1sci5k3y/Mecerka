@@ -4,13 +4,14 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Role, RoleRequestStatus } from '@prisma/client';
+import { GovernanceAuditAction, Role, RoleRequestStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleAssignmentService } from '../users/role-assignment.service';
 import { AdminService } from './admin.service';
 
 describe('AdminService role grants', () => {
   let service: AdminService;
+  let txMock: { governanceAuditEntry: { create: jest.Mock } };
   let roleAssignmentServiceMock: {
     withLockedUser: jest.Mock;
     assignRoleInTx: jest.Mock;
@@ -18,6 +19,12 @@ describe('AdminService role grants', () => {
   };
 
   beforeEach(async () => {
+    txMock = {
+      governanceAuditEntry: {
+        create: jest.fn(),
+      },
+    };
+
     roleAssignmentServiceMock = {
       withLockedUser: jest.fn(),
       assignRoleInTx: jest.fn(),
@@ -30,7 +37,13 @@ describe('AdminService role grants', () => {
         {
           provide: PrismaService,
           useValue: {
-            user: { count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+            user: {
+              count: jest.fn(),
+              findMany: jest.fn(),
+              findUnique: jest.fn(),
+              findUniqueOrThrow: jest.fn(),
+              update: jest.fn(),
+            },
             city: {
               findMany: jest.fn(),
               findUnique: jest.fn(),
@@ -51,6 +64,10 @@ describe('AdminService role grants', () => {
             },
             deliveryIncident: { findMany: jest.fn() },
             refundRequest: { findMany: jest.fn() },
+            governanceAuditEntry: { create: jest.fn(), findMany: jest.fn() },
+            $transaction: jest.fn(async (callback) =>
+              callback((service as any)?.prisma),
+            ),
           },
         },
         {
@@ -66,16 +83,13 @@ describe('AdminService role grants', () => {
   it('routes generic RUNNER grants through the shared role assignment flow', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
-        callback(
-          {},
-          {
-            id: 'runner-1',
-            roles: [Role.CLIENT],
-            requestedRole: null,
-            roleStatus: null,
-            requestedAt: null,
-          },
-        ),
+        callback(txMock, {
+          id: 'runner-1',
+          roles: [Role.CLIENT],
+          requestedRole: null,
+          roleStatus: null,
+          requestedAt: null,
+        }),
     );
     roleAssignmentServiceMock.assignRoleInTx.mockResolvedValue({
       id: 'runner-1',
@@ -102,16 +116,13 @@ describe('AdminService role grants', () => {
   it('routes revoke through the shared role revocation flow', async () => {
     roleAssignmentServiceMock.withLockedUser.mockImplementation(
       async (_userId, callback) =>
-        callback(
-          {},
-          {
-            id: 'provider-1',
-            roles: [Role.CLIENT, Role.PROVIDER],
-            requestedRole: Role.PROVIDER,
-            roleStatus: RoleRequestStatus.APPROVED,
-            requestedAt: new Date('2026-03-17T00:00:00.000Z'),
-          },
-        ),
+        callback(txMock, {
+          id: 'provider-1',
+          roles: [Role.CLIENT, Role.PROVIDER],
+          requestedRole: Role.PROVIDER,
+          roleStatus: RoleRequestStatus.APPROVED,
+          requestedAt: new Date('2026-03-17T00:00:00.000Z'),
+        }),
     );
     roleAssignmentServiceMock.revokeRoleInTx.mockResolvedValue({
       id: 'provider-1',
@@ -143,7 +154,7 @@ describe('AdminService role grants', () => {
       it('routes PROVIDER grant with snapshot options', async () => {
         roleAssignmentServiceMock.withLockedUser.mockImplementation(
           async (_userId, callback) =>
-            callback({}, { id: 'user-1', roles: [Role.CLIENT] }),
+            callback(txMock, { id: 'user-1', roles: [Role.CLIENT] }),
         );
         roleAssignmentServiceMock.assignRoleInTx.mockResolvedValue({});
 
@@ -164,7 +175,7 @@ describe('AdminService role grants', () => {
       it('routes CLIENT grant without snapshot options', async () => {
         roleAssignmentServiceMock.withLockedUser.mockImplementation(
           async (_userId, callback) =>
-            callback({}, { id: 'user-1', roles: [] }),
+            callback(txMock, { id: 'user-1', roles: [] }),
         );
         roleAssignmentServiceMock.assignRoleInTx.mockResolvedValue({});
 
@@ -199,6 +210,13 @@ describe('AdminService role grants', () => {
 
         const result = await service.activateUser('user-1', 'admin-1');
         expect(result.active).toBe(true);
+        expect(prismaMock.governanceAuditEntry.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            actorId: 'admin-1',
+            action: GovernanceAuditAction.USER_ACTIVATED,
+          }),
+        });
       });
     });
 
@@ -217,6 +235,13 @@ describe('AdminService role grants', () => {
 
         const result = await service.blockUser('user-1', 'admin-1');
         expect(result.active).toBe(false);
+        expect(prismaMock.governanceAuditEntry.create).toHaveBeenCalledWith({
+          data: expect.objectContaining({
+            userId: 'user-1',
+            actorId: 'admin-1',
+            action: GovernanceAuditAction.USER_BLOCKED,
+          }),
+        });
       });
     });
 
@@ -482,6 +507,64 @@ describe('AdminService role grants', () => {
         prismaMock.user.findMany.mockResolvedValue([{ id: 'u-1' }]);
         const result = await service.getAllUsers();
         expect(result).toHaveLength(1);
+      });
+
+      it('returns a detailed user with last grant actor metadata', async () => {
+        prismaMock.user.findUniqueOrThrow.mockResolvedValue({
+          id: 'u-1',
+          email: 'user@example.com',
+          name: 'User Demo',
+          roles: [Role.CLIENT],
+          createdAt: new Date('2026-03-27T10:00:00.000Z'),
+          mfaEnabled: false,
+          active: true,
+          requestedRole: Role.PROVIDER,
+          roleStatus: RoleRequestStatus.APPROVED,
+          requestedAt: new Date('2026-03-27T10:00:00.000Z'),
+          lastRoleSource: 'ADMIN',
+          lastRoleGrantedById: 'admin-1',
+        });
+        prismaMock.user.findUnique.mockResolvedValue({
+          id: 'admin-1',
+          email: 'admin@example.com',
+          name: 'Admin Demo',
+        });
+
+        const result = await service.getUserById('u-1');
+
+        expect(result.lastRoleGrantedBy).toEqual({
+          id: 'admin-1',
+          email: 'admin@example.com',
+          name: 'Admin Demo',
+        });
+      });
+
+      it('returns governance history entries with actor metadata', async () => {
+        prismaMock.governanceAuditEntry.findMany.mockResolvedValue([
+          {
+            id: 'audit-1',
+            action: GovernanceAuditAction.ROLE_GRANTED,
+            role: Role.PROVIDER,
+            source: 'ADMIN',
+            metadata: { reason: 'manual-review' },
+            createdAt: new Date('2026-03-27T11:00:00.000Z'),
+            actor: {
+              id: 'admin-1',
+              email: 'admin@example.com',
+              name: 'Admin Demo',
+            },
+          },
+        ]);
+
+        const result = await service.getUserGovernanceHistory('u-1');
+
+        expect(result).toEqual([
+          expect.objectContaining({
+            id: 'audit-1',
+            action: GovernanceAuditAction.ROLE_GRANTED,
+            actorEmail: 'admin@example.com',
+          }),
+        ]);
       });
 
       it('returns all cities', async () => {
