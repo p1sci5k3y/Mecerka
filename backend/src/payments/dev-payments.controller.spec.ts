@@ -9,10 +9,9 @@ describe('DevPaymentsController', () => {
   };
 
   beforeEach(() => {
-    jest.restoreAllMocks();
     process.env = { ...env };
     paymentsServiceMock = {
-      confirmPayment: jest.fn().mockResolvedValue({ status: 'CONFIRMED' }),
+      confirmPayment: jest.fn().mockResolvedValue({ ok: true }),
     };
     controller = new DevPaymentsController(paymentsServiceMock as never);
   });
@@ -21,60 +20,52 @@ describe('DevPaymentsController', () => {
     process.env = env;
   });
 
-  it('rejects fake pay outside fake mode', async () => {
+  it('rejects dev payments outside fake mode or in production', async () => {
     process.env.PAYMENT_PROVIDER = 'stripe';
     process.env.NODE_ENV = 'development';
-    process.env.DEV_PAYMENT_SECRET = 'secret';
 
     await expect(
-      controller.fakePay('4d1f0d46-1d89-4a80-81f8-3f909cbfcb7a', 'secret'),
-    ).rejects.toThrow(
-      new ForbiddenException(
-        'Dev payment only available in fake mode outside production',
-      ),
-    );
-  });
+      controller.fakePay('9c1fc56f-d632-4cb0-b01e-e907c3e54eb4', 'secret'),
+    ).rejects.toThrow(ForbiddenException);
 
-  it('rejects fake pay in production even in fake mode', async () => {
     process.env.PAYMENT_PROVIDER = 'fake';
     process.env.NODE_ENV = 'production';
-    process.env.DEV_PAYMENT_SECRET = 'secret';
 
     await expect(
-      controller.fakePay('4d1f0d46-1d89-4a80-81f8-3f909cbfcb7a', 'secret'),
+      controller.fakePay('9c1fc56f-d632-4cb0-b01e-e907c3e54eb4', 'secret'),
     ).rejects.toThrow(
-      new ForbiddenException(
-        'Dev payment only available in fake mode outside production',
-      ),
+      'Dev payment only available in fake mode outside production',
     );
   });
 
-  it('rejects missing or invalid dev secret', async () => {
+  it('rejects missing or invalid shared secrets', async () => {
     process.env.PAYMENT_PROVIDER = 'fake';
     process.env.NODE_ENV = 'development';
-    process.env.DEV_PAYMENT_SECRET = 'expected';
+    process.env.DEV_PAYMENT_SECRET = 'expected-secret';
 
     await expect(
-      controller.fakePay('4d1f0d46-1d89-4a80-81f8-3f909cbfcb7a', 'wrong'),
-    ).rejects.toThrow(new ForbiddenException('Missing/invalid dev secret'));
+      controller.fakePay(
+        '9c1fc56f-d632-4cb0-b01e-e907c3e54eb4',
+        'wrong-secret',
+      ),
+    ).rejects.toThrow('Missing/invalid dev secret');
   });
 
-  it('confirms payment when fake mode and secret are valid', async () => {
-    jest.spyOn(Date, 'now').mockReturnValueOnce(101).mockReturnValueOnce(202);
+  it('confirms the payment in fake mode when the secret matches', async () => {
     process.env.PAYMENT_PROVIDER = 'fake';
     process.env.NODE_ENV = 'development';
-    process.env.DEV_PAYMENT_SECRET = 'expected';
+    process.env.DEV_PAYMENT_SECRET = 'expected-secret';
 
     const result = await controller.fakePay(
-      '4d1f0d46-1d89-4a80-81f8-3f909cbfcb7a',
-      'expected',
+      '9c1fc56f-d632-4cb0-b01e-e907c3e54eb4',
+      'expected-secret',
     );
 
     expect(paymentsServiceMock.confirmPayment).toHaveBeenCalledWith(
-      '4d1f0d46-1d89-4a80-81f8-3f909cbfcb7a',
-      'fake_101',
-      'dev_evt_202',
+      '9c1fc56f-d632-4cb0-b01e-e907c3e54eb4',
+      expect.stringMatching(/^fake_/),
+      expect.stringMatching(/^dev_evt_/),
     );
-    expect(result).toEqual({ status: 'CONFIRMED' });
+    expect(result).toEqual({ ok: true });
   });
 });

@@ -67,6 +67,16 @@ describe('OnboardingController', () => {
   it('falls back to localhost and redirects with failure when verification throws', async () => {
     const req = { user: { userId: 'provider-1' } };
     const res = { redirect: jest.fn() };
+    const loggerSpy = jest
+      .spyOn(
+        (
+          controller as unknown as {
+            logger: { error: (...args: unknown[]) => void };
+          }
+        ).logger,
+        'error',
+      )
+      .mockImplementation(() => undefined);
     paymentsServiceMock.verifyAndSaveConnectedAccount.mockRejectedValueOnce(
       new Error('stripe verification failed'),
     );
@@ -80,5 +90,6 @@ describe('OnboardingController', () => {
     expect(res.redirect).toHaveBeenCalledWith(
       'http://localhost:3001/dashboard?stripe_connected=false&error=verification_failed',
     );
+    expect(loggerSpy).toHaveBeenCalled();
   });
 });

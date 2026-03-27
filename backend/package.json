@@ -99,6 +99,7 @@
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s",
+      "!**/*.d.ts",
       "!**/coverage/**"
     ],
     "coveragePathIgnorePatterns": [

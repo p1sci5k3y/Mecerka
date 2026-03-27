@@ -3,55 +3,49 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { E2eAwareThrottlerGuard } from './e2e-throttler.guard';
 
 describe('E2eAwareThrottlerGuard', () => {
-  const originalEnv = { ...process.env };
+  const env = process.env;
+  const context = {} as ExecutionContext;
 
-  afterEach(() => {
-    process.env = { ...originalEnv };
-    jest.restoreAllMocks();
+  beforeEach(() => {
+    process.env = { ...env };
   });
 
-  it('bypasses throttling during e2e runs', async () => {
+  afterAll(() => {
+    process.env = env;
+  });
+
+  it('bypasses throttling in E2E and test environments', async () => {
+    const guard = new E2eAwareThrottlerGuard(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+    );
+
     process.env.E2E = 'true';
-    const guard = new E2eAwareThrottlerGuard(
-      {} as never,
-      {} as never,
-      {} as never,
-    );
+    await expect(guard.canActivate(context)).resolves.toBe(true);
 
-    await expect(
-      guard.canActivate({} as unknown as ExecutionContext),
-    ).resolves.toBe(true);
-  });
-
-  it('bypasses throttling in test mode', async () => {
-    process.env.NODE_ENV = 'test';
     delete process.env.E2E;
-    const guard = new E2eAwareThrottlerGuard(
-      {} as never,
-      {} as never,
-      {} as never,
-    );
-
-    await expect(
-      guard.canActivate({} as unknown as ExecutionContext),
-    ).resolves.toBe(true);
+    process.env.NODE_ENV = 'test';
+    await expect(guard.canActivate(context)).resolves.toBe(true);
   });
 
-  it('delegates to the parent guard outside test modes', async () => {
+  it('delegates to the Nest throttler guard outside test contexts', async () => {
+    const parentPrototype = Object.getPrototypeOf(
+      E2eAwareThrottlerGuard.prototype,
+    ) as ThrottlerGuard;
+    const parentSpy = jest
+      .spyOn(parentPrototype, 'canActivate')
+      .mockResolvedValue(true);
+    const guard = new E2eAwareThrottlerGuard(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+    );
+
     process.env.NODE_ENV = 'production';
     delete process.env.E2E;
-    const parentSpy = jest
-      .spyOn(ThrottlerGuard.prototype, 'canActivate')
-      .mockResolvedValueOnce(false);
-    const guard = new E2eAwareThrottlerGuard(
-      {} as never,
-      {} as never,
-      {} as never,
-    );
 
-    await expect(
-      guard.canActivate({} as unknown as ExecutionContext),
-    ).resolves.toBe(false);
-    expect(parentSpy).toHaveBeenCalled();
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(parentSpy).toHaveBeenCalledWith(context);
   });
 });

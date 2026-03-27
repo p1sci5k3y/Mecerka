@@ -30,6 +30,10 @@ describe('AppService', () => {
     expect(result.services.database).toBe('ok');
   });
 
+  it('returns the root greeting for smoke endpoints', () => {
+    expect(service.getHello()).toBe('Hello World!');
+  });
+
   it('returns an error status when the database probe fails', async () => {
     prismaMock.$queryRaw.mockRejectedValueOnce(new Error('db down'));
 
@@ -62,6 +66,38 @@ describe('AppService', () => {
       },
       deliveriesActive: 5,
       products: 11,
+    });
+    expect(prismaMock.user.count).toHaveBeenNthCalledWith(1);
+    expect(prismaMock.user.count).toHaveBeenNthCalledWith(2, {
+      where: { roles: { has: 'PROVIDER' } },
+    });
+    expect(prismaMock.order.count).toHaveBeenNthCalledWith(1);
+    expect(prismaMock.order.count).toHaveBeenNthCalledWith(2, {
+      where: {
+        status: {
+          in: ['PENDING', 'CONFIRMED', 'READY_FOR_ASSIGNMENT'],
+        },
+      },
+    });
+    expect(prismaMock.order.count).toHaveBeenNthCalledWith(3, {
+      where: {
+        status: {
+          in: ['ASSIGNED', 'IN_TRANSIT'],
+        },
+      },
+    });
+    expect(prismaMock.order.count).toHaveBeenNthCalledWith(4, {
+      where: { status: 'DELIVERED' },
+    });
+    expect(prismaMock.deliveryOrder.count).toHaveBeenCalledWith({
+      where: {
+        status: {
+          in: ['RUNNER_ASSIGNED', 'PICKUP_PENDING', 'PICKED_UP', 'IN_TRANSIT'],
+        },
+      },
+    });
+    expect(prismaMock.product.count).toHaveBeenCalledWith({
+      where: { isActive: true },
     });
   });
 });
