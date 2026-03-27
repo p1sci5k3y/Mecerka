@@ -164,6 +164,11 @@ describe("Provider finance page", () => {
     expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
     expect(screen.getAllByText("Cuenco artesanal")).toHaveLength(2)
     expect(screen.getByText(/Estado:\s*UNDER_REVIEW\s*· Tipo:\s*PROVIDER_PARTIAL/i)).toBeInTheDocument()
+    expect(screen.getAllByRole("link", { name: /Ver detalle/i })).toHaveLength(2)
+    expect(screen.getAllByRole("link", { name: /Ver detalle/i })[0]).toHaveAttribute(
+      "href",
+      "/provider/sales/provider-order-1",
+    )
     expect(
       screen.getByText(/La revisión y ejecución siguen siendo flujos de backoffice\/admin/i),
     ).toBeInTheDocument()

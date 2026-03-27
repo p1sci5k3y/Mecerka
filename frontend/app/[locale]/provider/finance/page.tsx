@@ -302,6 +302,13 @@ function ProviderFinanceContent() {
                         </p>
                       </div>
                     </div>
+                    <div className="mt-4 flex justify-end">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/provider/sales/${providerOrder.id}`}>
+                          Ver detalle
+                        </Link>
+                      </Button>
+                    </div>
                   </article>
                 ))
               )}
@@ -351,6 +358,13 @@ function ProviderFinanceContent() {
                           {formatCurrency(refund.amount)}
                         </p>
                       </div>
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/provider/sales/${refund.providerOrderId}`}>
+                          Ver detalle
+                        </Link>
+                      </Button>
                     </div>
                   </article>
                 ))

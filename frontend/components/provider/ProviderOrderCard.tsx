@@ -1,8 +1,9 @@
 import { Order } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Store, Package } from "lucide-react"
+import { Clock, Store, Package, ArrowRight } from "lucide-react"
 import { useState } from "react"
+import { Link } from "@/lib/navigation"
 
 interface Props {
     order: Order
@@ -83,6 +84,12 @@ export function ProviderOrderCard({ order, providerOrderId, now, onStatusChange,
 
             {/* ACTION BUTTONS */}
             <div className="mt-2 flex items-center justify-end gap-2">
+                <Button size="sm" variant="outline" asChild>
+                    <Link href={`/provider/sales/${po.id}`}>
+                        Ver detalle
+                        <ArrowRight className="h-4 w-4" />
+                    </Link>
+                </Button>
                 {po.status === "PENDING" && (
                     <Button
                         size="sm"
