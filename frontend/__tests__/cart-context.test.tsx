@@ -89,6 +89,9 @@ function CartProbe() {
       <button type="button" onClick={() => void ctx.removeItem("prod-1")}>
         remove
       </button>
+      <button type="button" onClick={() => void ctx.clearCart()}>
+        clear
+      </button>
     </div>
   )
 }
@@ -225,5 +228,213 @@ describe("CartProvider", () => {
     })
 
     expect(getMyCartMock).not.toHaveBeenCalled()
+  })
+
+  it("updates, removes and clears the guest cart locally", async () => {
+    useAuthMock.mockReturnValue({ isAuthenticated: false })
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "add-madrid" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("items:1")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("items:3")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "remove" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("items:0")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "add-madrid" }))
+    await waitFor(() => {
+      expect(screen.getByText("items:1")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "clear" }))
+
+    await waitFor(() => {
+      expect(window.localStorage.getItem("mecerka-guest-cart-v1")).toBeNull()
+    })
+  })
+
+  it("surfaces server-cart add errors for authenticated clients", async () => {
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
+    getMyCartMock.mockResolvedValue(buildServerCart())
+    addItemMock.mockRejectedValueOnce(new Error("server cart offline"))
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    await waitFor(() => {
+      expect(getMyCartMock).toHaveBeenCalled()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "add-madrid" }))
+
+    await waitFor(() => {
+      expect(screen.getByText("conflict:server cart offline")).toBeInTheDocument()
+    })
+  })
+
+  it("keeps the guest cart and emits a toast when sync to backend fails", async () => {
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
+    window.localStorage.setItem(
+      "mecerka-guest-cart-v1",
+      JSON.stringify([{ product: madridProduct, quantity: 1 }]),
+    )
+    addItemMock.mockRejectedValueOnce(new Error("sync failed"))
+    getMyCartMock.mockResolvedValue(buildServerCart())
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("sync failed")
+    })
+
+    expect(addItemMock).toHaveBeenCalledWith("prod-1", 1)
+    expect(getMyCartMock).toHaveBeenCalled()
+  })
+
+  it("updates and removes the official backend cart for authenticated clients", async () => {
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
+
+    const serverCart = buildServerCart({
+      providerGroups: [
+        {
+          id: "group-1",
+          providerId: "provider-1",
+          providerName: "Cerámica Norte",
+          subtotalAmount: 12,
+          originalSubtotalAmount: 12,
+          discountAmount: 0,
+          itemCount: 1,
+          items: [
+            {
+              id: "server-item-1",
+              productId: "prod-1",
+              quantity: 1,
+              unitPrice: 12,
+              baseUnitPrice: 12,
+              appliedDiscountUnitPrice: null,
+              discountAmount: 0,
+              subtotal: 12,
+              originalSubtotal: 12,
+              product: madridProduct,
+              source: "server",
+            },
+          ],
+        },
+      ],
+      totalItems: 1,
+      totalPrice: 12,
+    })
+
+    getMyCartMock.mockResolvedValue(serverCart)
+    updateItemMock.mockResolvedValue(serverCart)
+    removeItemMock.mockResolvedValue(buildServerCart())
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    await waitFor(() => {
+      expect(getMyCartMock).toHaveBeenCalled()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "update" }))
+    await waitFor(() => {
+      expect(updateItemMock).toHaveBeenCalledWith("prod-1", 3)
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "remove" }))
+    await waitFor(() => {
+      expect(removeItemMock).toHaveBeenCalledWith("prod-1")
+    })
+  })
+
+  it("clears the official backend cart item by item for authenticated clients", async () => {
+    useAuthMock.mockReturnValue({
+      isAuthenticated: true,
+      user: { roles: ["CLIENT"] },
+    })
+
+    const serverCart = buildServerCart({
+      providerGroups: [
+        {
+          id: "group-1",
+          providerId: "provider-1",
+          providerName: "Cerámica Norte",
+          subtotalAmount: 12,
+          originalSubtotalAmount: 12,
+          discountAmount: 0,
+          itemCount: 1,
+          items: [
+            {
+              id: "server-item-1",
+              productId: "prod-1",
+              quantity: 1,
+              unitPrice: 12,
+              baseUnitPrice: 12,
+              appliedDiscountUnitPrice: null,
+              discountAmount: 0,
+              subtotal: 12,
+              originalSubtotal: 12,
+              product: madridProduct,
+              source: "server",
+            },
+          ],
+        },
+      ],
+      totalItems: 1,
+      totalPrice: 12,
+    })
+
+    getMyCartMock.mockResolvedValue(serverCart)
+    removeItemMock.mockResolvedValue(buildServerCart())
+
+    render(
+      <CartProvider>
+        <CartProbe />
+      </CartProvider>,
+    )
+
+    await waitFor(() => {
+      expect(getMyCartMock).toHaveBeenCalled()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "clear" }))
+    await waitFor(() => {
+      expect(removeItemMock).toHaveBeenCalledWith("server-item-1")
+    })
   })
 })

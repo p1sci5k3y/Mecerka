@@ -5,6 +5,7 @@ const useAuthMock = vi.fn()
 const requestRoleMock = vi.fn()
 const toastSuccessMock = vi.fn()
 const toastErrorMock = vi.fn()
+const apiPostMock = vi.fn()
 
 vi.mock("@/contexts/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -86,7 +87,7 @@ vi.mock("@/lib/navigation", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    post: vi.fn(),
+    post: (...args: unknown[]) => apiPostMock(...args),
   },
 }))
 
@@ -95,6 +96,7 @@ describe("Profile role request experience", () => {
     requestRoleMock.mockReset()
     toastSuccessMock.mockReset()
     toastErrorMock.mockReset()
+    apiPostMock.mockReset()
   })
 
   it("shows only the missing requestable role and submits it with fiscal metadata", async () => {
@@ -203,6 +205,107 @@ describe("Profile role request experience", () => {
       expect(toastErrorMock).toHaveBeenCalledWith(
         "Debes completar la verificación MFA de esta sesión antes de solicitar un rol.",
       )
+    })
+  })
+
+  it("configures the transaction pin and links MFA setup when the account is not protected yet", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "client-2",
+        name: "Mario Doe",
+        email: "mario@example.com",
+        roles: ["CLIENT"],
+        mfaEnabled: false,
+        hasPin: false,
+      },
+    })
+    apiPostMock.mockResolvedValueOnce({ message: "ok" })
+
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { reload: reloadSpy },
+    })
+
+    const Page = (await import("@/app/[locale]/profile/page")).default
+    render(<Page />)
+
+    expect(screen.getByRole("link", { name: "Configurar" })).toHaveAttribute(
+      "href",
+      "/mfa/setup",
+    )
+
+    fireEvent.change(screen.getByLabelText("Nuevo PIN Transaccional"), {
+      target: { value: "1234" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar PIN" }))
+
+    await waitFor(() => {
+      expect(apiPostMock).toHaveBeenCalledWith("/users/pin", { pin: "1234" })
+      expect(toastSuccessMock).toHaveBeenCalledWith(
+        "PIN transaccional configurado correctamente. Ya puedes realizar pedidos.",
+        { icon: "🔐" },
+      )
+    })
+  })
+
+  it("validates short pins and surfaces request-role API errors by status", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "client-3",
+        name: "Marta Doe",
+        email: "marta@example.com",
+        roles: ["CLIENT"],
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+
+    const Page = (await import("@/app/[locale]/profile/page")).default
+    const { rerender } = render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Cifrar Nuevo PIN"), {
+      target: { value: "12" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar PIN" }))
+    expect(toastErrorMock).toHaveBeenCalledWith("El PIN debe tener entre 4 y 6 números.")
+    expect(apiPostMock).not.toHaveBeenCalled()
+
+    requestRoleMock.mockRejectedValueOnce({
+      message: "Sesion caducada",
+      statusCode: 401,
+    })
+    fireEvent.change(screen.getByLabelText("Identificador fiscal"), {
+      target: { value: "12345678Z" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar alta como proveedor" }))
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+      )
+    })
+
+    requestRoleMock.mockRejectedValueOnce({
+      message: "Fiscal inválido",
+      statusCode: 400,
+    })
+    rerender(<Page />)
+    fireEvent.change(screen.getByLabelText("Identificador fiscal"), {
+      target: { value: "BAD" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar alta como proveedor" }))
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("Fiscal inválido")
+    })
+
+    requestRoleMock.mockRejectedValueOnce(new Error("offline"))
+    rerender(<Page />)
+    fireEvent.change(screen.getByLabelText("Identificador fiscal"), {
+      target: { value: "12345678Z" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Solicitar alta como proveedor" }))
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("No se pudo tramitar la solicitud de rol.")
     })
   })
 })

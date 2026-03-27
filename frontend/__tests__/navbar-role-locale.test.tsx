@@ -184,4 +184,119 @@ describe("Navbar role and locale experience", () => {
     expect(screen.getByRole("button", { name: "Logout" })).toBeInTheDocument()
     expect(screen.getByText("Alex Rivera")).toBeInTheDocument()
   })
+
+  it("opens the mobile menu, switches locale and logs out from the authenticated drawer", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            dashboard: "Panel",
+            profile: "Perfil",
+            logout: "Salir",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+            userFallback: "Usuario",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "client-1",
+        name: "Lucia",
+        roles: ["CLIENT"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 2 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+
+    expect(screen.getByRole("link", { name: "Carrito" })).toHaveAttribute("href", "/cart")
+    fireEvent.click(screen.getByRole("button", { name: "EN" }))
+    expect(routerReplaceMock).toHaveBeenCalledWith("/products", { locale: "en" })
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Salir" })[1])
+    expect(logoutMock).toHaveBeenCalled()
+  })
+
+  it("uses the user fallback label and points runner-only users to the runner dashboard", async () => {
+    useLocaleMock.mockReturnValue("en")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalog",
+            dashboard: "Dashboard",
+            deliveries: "Deliveries",
+            profile: "Profile",
+            logout: "Logout",
+            cart: "Cart",
+            switchLanguage: "Switch language",
+            toggleMenu: "Toggle menu",
+            userFallback: "Fallback User",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "runner-1",
+        name: "",
+        roles: ["RUNNER"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/runner")
+    expect(screen.getByRole("link", { name: "Deliveries" })).toHaveAttribute("href", "/runner")
+    expect(screen.getByText("Fallback User")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Cart")).not.toBeInTheDocument()
+  })
+
+  it("shows guest actions in the mobile drawer and closes it after navigating", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            login: "Entrar",
+            register: "Registrarse",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+
+    const loginLink = screen.getAllByRole("link", { name: "Entrar" })[1]
+    expect(loginLink).toHaveAttribute("href", "/login")
+    expect(screen.getAllByRole("link", { name: "Registrarse" })[1]).toHaveAttribute(
+      "href",
+      "/register",
+    )
+    expect(screen.getAllByRole("link", { name: "Carrito" })[1]).toHaveAttribute("href", "/cart")
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    expect(screen.queryAllByRole("link", { name: "Registrarse" })).toHaveLength(1)
+  })
 })

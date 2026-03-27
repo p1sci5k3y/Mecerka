@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Order } from "@/lib/types"
 
 const getAllMock = vi.fn()
 const getProviderOrderRefundsMock = vi.fn()
 const useAuthMock = vi.fn()
+const toastErrorMock = vi.fn()
+const fetchMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
@@ -57,7 +59,7 @@ vi.mock("@/lib/runtime-config", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
+    error: (...args: unknown[]) => toastErrorMock(...args),
   },
 }))
 
@@ -114,6 +116,9 @@ describe("Provider finance page", () => {
   beforeEach(() => {
     getAllMock.mockReset()
     getProviderOrderRefundsMock.mockReset()
+    toastErrorMock.mockReset()
+    fetchMock.mockReset()
+    vi.stubGlobal("fetch", fetchMock)
     useAuthMock.mockReturnValue({
       user: {
         userId: "provider-1",
@@ -185,5 +190,96 @@ describe("Provider finance page", () => {
     })
 
     expect(screen.getByRole("button", { name: /Conectar con Stripe/i })).toBeInTheDocument()
+  })
+
+  it("starts Stripe Connect only with a safe URL and rejects unsafe links", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-1",
+        name: "Taller Sevilla",
+        roles: ["PROVIDER"],
+        stripeAccountId: null,
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+    getAllMock.mockResolvedValue([])
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://connect.stripe.com/setup/s/provider-demo" }),
+    })
+
+    const locationValue = { href: "" }
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: locationValue,
+    })
+
+    const Page = (await import("@/app/[locale]/provider/finance/page")).default
+    const { rerender } = render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Conectar con Stripe/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://api.mecerka.test/payments/connect/link",
+        { credentials: "include" },
+      )
+      expect(locationValue.href).toBe("https://connect.stripe.com/setup/s/provider-demo")
+    })
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://evil.example/phish" }),
+    })
+    rerender(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Conectar con Stripe/i })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "No se pudo iniciar la conexión con Stripe.",
+      )
+    })
+  })
+
+  it("shows empty operational states when there are no paid orders or refunds", async () => {
+    getAllMock.mockResolvedValueOnce([
+      makeOrder({
+        providerOrders: [
+          {
+            id: "provider-order-pending",
+            providerId: "provider-1",
+            providerName: "Cerámica Norte",
+            status: "PENDING",
+            paymentStatus: "PAYMENT_PENDING",
+            subtotal: 18,
+            originalSubtotal: 18,
+            discountAmount: 0,
+            items: [],
+          },
+        ],
+      }),
+    ])
+    getProviderOrderRefundsMock.mockResolvedValueOnce([])
+
+    const Page = (await import("@/app/[locale]/provider/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Todavía no tienes provider orders cobrados/i)).toBeInTheDocument()
+    })
+
+    expect(
+      screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i),
+    ).toBeInTheDocument()
   })
 })

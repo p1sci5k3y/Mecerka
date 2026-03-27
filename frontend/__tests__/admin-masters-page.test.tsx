@@ -132,10 +132,6 @@ vi.mock("@/components/ui/table", () => ({
   ),
 }))
 
-function clickTab(label: RegExp) {
-  fireEvent.click(screen.getByRole("button", { name: label }))
-}
-
 describe("Admin masters page", () => {
   beforeEach(() => {
     currentTab = "cities"
@@ -291,6 +287,58 @@ describe("Admin masters page", () => {
         title: "Error al eliminar",
         variant: "destructive",
       })
+    })
+  })
+
+  it("pushes the router when switching tabs and supports city edit/delete flows", async () => {
+    getCitiesMock.mockImplementation(() =>
+      Promise.resolve([{ id: "city-1", name: "Madrid", slug: "madrid", active: true }]),
+    )
+    updateCityMock.mockImplementation(async () => {
+      getCitiesMock.mockResolvedValueOnce([
+        { id: "city-1", name: "Madrid Norte", slug: "madrid-norte", active: true },
+      ])
+      return {}
+    })
+    deleteCityMock.mockImplementation(async () => {
+      getCitiesMock.mockResolvedValueOnce([])
+      return {}
+    })
+
+    const Page = (await import("@/app/[locale]/admin/masters/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Listado de Ciudades")).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "Categorías" }))
+    expect(routerPushMock).toHaveBeenCalledWith("/admin/masters?tab=categories")
+
+    const iconButtons = screen.getAllByRole("button").filter((button) => button.textContent === "")
+    fireEvent.click(iconButtons[0])
+    fireEvent.change(screen.getByLabelText("Nombre"), {
+      target: { value: "Madrid Norte" },
+    })
+    fireEvent.change(screen.getByLabelText("Slug"), {
+      target: { value: "madrid-norte" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }))
+
+    await waitFor(() => {
+      expect(updateCityMock).toHaveBeenCalledWith("city-1", {
+        name: "Madrid Norte",
+        slug: "madrid-norte",
+        active: true,
+      })
+      expect(toastMock).toHaveBeenCalledWith({ title: "Ciudad actualizada" })
+    })
+
+    fireEvent.click(screen.getAllByRole("button").filter((button) => button.textContent === "")[1])
+
+    await waitFor(() => {
+      expect(deleteCityMock).toHaveBeenCalledWith("city-1")
+      expect(toastMock).toHaveBeenCalledWith({ title: "Ciudad eliminada" })
     })
   })
 })

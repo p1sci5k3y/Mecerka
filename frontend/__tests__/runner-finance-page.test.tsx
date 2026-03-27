@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Order } from "@/lib/types"
 
 const getAllMock = vi.fn()
 const useAuthMock = vi.fn()
+const fetchMock = vi.fn()
+const toastErrorMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
@@ -50,7 +52,7 @@ vi.mock("@/lib/runtime-config", () => ({
 
 vi.mock("sonner", () => ({
   toast: {
-    error: vi.fn(),
+    error: (...args: unknown[]) => toastErrorMock(...args),
   },
 }))
 
@@ -78,6 +80,9 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
 describe("Runner finance page", () => {
   beforeEach(() => {
     getAllMock.mockReset()
+    fetchMock.mockReset()
+    toastErrorMock.mockReset()
+    vi.stubGlobal("fetch", fetchMock)
     useAuthMock.mockReturnValue({
       user: {
         userId: "runner-1",
@@ -145,5 +150,56 @@ describe("Runner finance page", () => {
     })
 
     expect(screen.getByRole("button", { name: /Conectar con Stripe/i })).toBeInTheDocument()
+  })
+
+  it("opens Stripe Connect only for a safe URL, and keeps the empty-state visible", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "runner-1",
+        name: "Rider Local",
+        roles: ["RUNNER"],
+        stripeAccountId: null,
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+    getAllMock.mockResolvedValueOnce([])
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://connect.stripe.com/setup/s/demo" }),
+    })
+
+    const locationValue = { href: "" }
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: locationValue,
+    })
+
+    const Page = (await import("@/app/[locale]/runner/finance/page")).default
+    const { rerender } = render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Aun no tienes repartos con datos de cobro visibles/i)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("https://api.mecerka.test/payments/connect/link", {
+        credentials: "include",
+      })
+      expect(locationValue.href).toBe("https://connect.stripe.com/setup/s/demo")
+    })
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ url: "https://evil.example/phish" }),
+    })
+    rerender(<Page />)
+    fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("No se pudo iniciar la conexión con Stripe.")
+    })
   })
 })

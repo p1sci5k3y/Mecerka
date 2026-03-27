@@ -162,6 +162,24 @@ describe("CartPage – empty guest cart", () => {
 
     expect(screen.getByText("Mini-cesta temporal")).toBeInTheDocument()
   })
+
+  it("surfaces city conflicts and sync banners when the guest cart is constrained", async () => {
+    mockUseCart.mockReturnValue({
+      ...emptyGuestCart(),
+      cityConflict: "Solo puedes comprar productos de la misma ciudad.",
+      isSyncing: true,
+    })
+
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    expect(
+      screen.getByText("Solo puedes comprar productos de la misma ciudad."),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Estamos sincronizando tu mini-cesta con el carrito oficial/i),
+    ).toBeInTheDocument()
+  })
 })
 
 describe("CartPage – cart with items (guest)", () => {
@@ -194,6 +212,15 @@ describe("CartPage – cart with items (guest)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Iniciar sesión y continuar" }))
 
     expect(pushMock).toHaveBeenCalledWith("/login?returnTo=%2Fcart")
+  })
+
+  it("redirects guests to register preserving the cart return path", async () => {
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear cuenta cliente" }))
+
+    expect(pushMock).toHaveBeenCalledWith("/register?returnTo=%2Fcart")
   })
 })
 
@@ -233,6 +260,49 @@ describe("CartPage – authenticated user with server cart", () => {
     fireEvent.click(checkoutBtn)
 
     expect(toast.error).toHaveBeenCalledWith("La dirección de entrega es obligatoria.")
+  })
+
+  it("requires postal code and a city id before checkout", async () => {
+    const { toast } = await import("sonner")
+    mockUseCart.mockReturnValue({
+      ...cartWithItem(),
+      source: "server",
+      cart: {
+        ...cartWithItem().cart,
+        source: "server",
+        cityId: undefined,
+      },
+    })
+
+    const { default: Page } = await import("@/app/[locale]/cart/page")
+    const { rerender } = render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "El carrito oficial todavía no tiene ciudad operativa.",
+    )
+
+    mockUseCart.mockReturnValue({
+      ...cartWithItem(),
+      source: "server",
+      cart: {
+        ...cartWithItem().cart,
+        source: "server",
+        cityId: "city-1",
+      },
+    })
+
+    rerender(<Page />)
+    fireEvent.change(screen.getByLabelText("Dirección de entrega"), {
+      target: { value: "Calle Feria 12" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: /Crear pedido oficial/i }))
+
+    expect(toast.error).toHaveBeenCalledWith("El código postal es obligatorio.")
   })
 
   it("blocks checkout for authenticated users without CLIENT role", async () => {

@@ -1,14 +1,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import type { Order, ProviderOrder } from "@/lib/types"
 
 const getAllMock = vi.fn()
 const useAuthMock = vi.fn()
+const updateProviderOrderStatusMock = vi.fn()
+const toastSuccessMock = vi.fn()
+const toastErrorMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
     getAll: (...args: unknown[]) => getAllMock(...args),
-    updateProviderOrderStatus: vi.fn(),
+    updateProviderOrderStatus: (...args: unknown[]) => updateProviderOrderStatusMock(...args),
   },
 }))
 
@@ -18,8 +21,8 @@ vi.mock("@/contexts/auth-context", () => ({
 
 vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), {
-    error: vi.fn(),
-    success: vi.fn(),
+    error: (...args: unknown[]) => toastErrorMock(...args),
+    success: (...args: unknown[]) => toastSuccessMock(...args),
   }),
 }))
 
@@ -53,21 +56,44 @@ vi.mock("@/components/provider/OrderKanbanColumn", () => ({
     providerId,
     validStatuses,
     orders,
+    onStatusChange,
+    onReject,
   }: {
     title: string
     providerId: string
     validStatuses: string[]
     orders: Order[]
+    onStatusChange: (providerOrderId: string, currentStatus: string, nextStatus: string) => void
+    onReject: (providerOrderId: string) => void
   }) => {
-    const count = orders.filter((order) =>
-      order.providerOrders?.some(
+    const visibleProviderOrders = orders.flatMap((order) =>
+      (order.providerOrders ?? []).filter(
         (po) => po.providerId === providerId && validStatuses.includes(po.status),
       ),
-    ).length
+    )
 
     return (
       <div data-testid={`kanban-${title}`}>
-        {title}:{count}
+        {title}:{visibleProviderOrders.length}
+        {visibleProviderOrders[0] ? (
+          <>
+            <button
+              type="button"
+              onClick={() =>
+                onStatusChange(
+                  visibleProviderOrders[0].id,
+                  visibleProviderOrders[0].status,
+                  "PREPARING",
+                )
+              }
+            >
+              advance-{title}
+            </button>
+            <button type="button" onClick={() => onReject(visibleProviderOrders[0].id)}>
+              reject-{title}
+            </button>
+          </>
+        ) : null}
       </div>
     )
   },
@@ -109,6 +135,9 @@ function makeOrder(overrides: Partial<Order>): Order {
 describe("Provider sales experience", () => {
   beforeEach(() => {
     getAllMock.mockReset()
+    updateProviderOrderStatusMock.mockReset()
+    toastSuccessMock.mockReset()
+    toastErrorMock.mockReset()
     useAuthMock.mockReturnValue({
       user: {
         userId: "provider-1",
@@ -159,5 +188,49 @@ describe("Provider sales experience", () => {
       "En Preparación:1",
     )
     expect(screen.getByTestId("kanban-Listos")).toHaveTextContent("Listos:1")
+  })
+
+  it("updates provider-order status, handles conflicts and allows rejecting an order", async () => {
+    getAllMock.mockResolvedValue([
+      makeOrder({
+        id: "order-pending",
+        providerOrders: [makeProviderOrder("provider-1", "PENDING", 30)],
+      }),
+    ])
+    updateProviderOrderStatusMock
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce({ response: { status: 409 } })
+      .mockResolvedValueOnce({})
+
+    const Page = (await import("@/app/[locale]/provider/sales/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId("kanban-Nuevos")).toHaveTextContent("Nuevos:1")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "advance-Nuevos" }))
+    await waitFor(() => {
+      expect(updateProviderOrderStatusMock).toHaveBeenCalledWith(
+        "provider-1-PENDING",
+        "PREPARING",
+      )
+      expect(toastSuccessMock).toHaveBeenCalledWith("Pedido actualizado correctamente")
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "advance-Nuevos" }))
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith(
+        "El estado del pedido cambió hace unos segundos. Reiniciando vista...",
+      )
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: "reject-Nuevos" }))
+    await waitFor(() => {
+      expect(updateProviderOrderStatusMock).toHaveBeenCalledWith(
+        "provider-1-PENDING",
+        "REJECTED_BY_STORE",
+      )
+    })
   })
 })
