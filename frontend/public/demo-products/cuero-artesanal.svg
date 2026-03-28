@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Cuero artesanal</title>
+  <desc id="desc">Ilustracion de marroquineria local.</desc>
+  <rect width="640" height="640" fill="#f8f1e7"/>
+  <path d="M194 206h252c30 0 54 24 54 54v168c0 30-24 54-54 54H194c-30 0-54-24-54-54V260c0-30 24-54 54-54Z" fill="#9b623f"/>
+  <path d="M240 206c0-46 36-82 80-82s80 36 80 82" fill="none" stroke="#734729" stroke-width="22" stroke-linecap="round"/>
+  <rect x="286" y="312" width="68" height="58" rx="14" fill="#f0d0b6"/>
+  <circle cx="320" cy="340" r="12" fill="#734729"/>
+  <text x="320" y="554" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#5f3c28">Cuero local</text>
+</svg>

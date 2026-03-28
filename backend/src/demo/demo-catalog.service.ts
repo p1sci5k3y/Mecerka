@@ -3,7 +3,7 @@ import { BaseSeedService } from '../seed/base-seed.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import type { DemoSeededProduct } from './demo-order-scenario.service';
-import { DEMO_CATEGORIES, DEMO_CITY, DEMO_PRODUCTS } from './demo.seed-data';
+import { DEMO_CATEGORIES, DEMO_CITIES, DEMO_PRODUCTS } from './demo.seed-data';
 
 @Injectable()
 export class DemoCatalogService {
@@ -18,13 +18,21 @@ export class DemoCatalogService {
   ) {
     await this.baseSeedService.ensureBaseData();
 
-    const city = await this.prisma.city.findUnique({
-      where: { slug: DEMO_CITY.slug },
+    const seededCities = await this.prisma.city.findMany({
+      where: {
+        slug: {
+          in: DEMO_CITIES.map((city) => city.slug),
+        },
+      },
       select: { id: true, name: true, slug: true },
     });
 
-    if (!city) {
-      throw new ConflictException('Base city not found for demo seed');
+    const cities = new Map(
+      seededCities.map((city) => [city.slug, city] as const),
+    );
+
+    if (cities.size !== DEMO_CITIES.length) {
+      throw new ConflictException('Base cities not found for demo seed');
     }
 
     const categories = new Map<string, string>();
@@ -45,10 +53,9 @@ export class DemoCatalogService {
     }
 
     const usersByEmail = new Map<string, string>();
-    for (const email of [
-      'provider.demo@local.test',
-      'provider2.demo@local.test',
-    ]) {
+    for (const email of new Set(
+      DEMO_PRODUCTS.map((product) => product.providerEmail),
+    )) {
       const user = await findUserByEmail(email);
       usersByEmail.set(email, user.id);
     }
@@ -57,8 +64,9 @@ export class DemoCatalogService {
     for (const product of DEMO_PRODUCTS) {
       const providerId = usersByEmail.get(product.providerEmail);
       const categoryId = categories.get(product.categorySlug);
+      const city = cities.get(product.citySlug);
 
-      if (!providerId || !categoryId) {
+      if (!providerId || !categoryId || !city) {
         throw new ConflictException(
           `Demo product dependencies missing for ${product.name}`,
         );
@@ -77,11 +85,14 @@ export class DemoCatalogService {
         providerId,
       );
 
-      products.push(created);
+      products.push({
+        citySlug: product.citySlug,
+        ...created,
+      });
     }
 
     return {
-      city,
+      cities: seededCities,
       products,
     };
   }

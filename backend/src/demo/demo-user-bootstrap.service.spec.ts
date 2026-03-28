@@ -6,6 +6,7 @@ import { AdminService } from '../admin/admin.service';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DemoUserBootstrapService } from './demo-user-bootstrap.service';
+import { DEMO_PROVIDER_SEEDS, DEMO_RUNNER_SEEDS } from './demo.seed-data';
 
 describe('DemoUserBootstrapService', () => {
   let service: DemoUserBootstrapService;
@@ -14,6 +15,9 @@ describe('DemoUserBootstrapService', () => {
     user: {
       findUnique: jest.Mock;
       update: jest.Mock;
+    };
+    runnerProfile: {
+      upsert: jest.Mock;
     };
   };
   let authService: {
@@ -35,6 +39,9 @@ describe('DemoUserBootstrapService', () => {
       user: {
         findUnique: jest.fn(),
         update: jest.fn(),
+      },
+      runnerProfile: {
+        upsert: jest.fn(),
       },
     };
     authService = {
@@ -119,48 +126,42 @@ describe('DemoUserBootstrapService', () => {
   });
 
   it('bootstraps demo payment accounts and provider coordinates', async () => {
-    prismaMock.user.findUnique
-      .mockResolvedValueOnce({
-        id: 'provider-1',
-        email: 'provider.demo@local.test',
-        name: 'Provider Demo',
-        roles: [Role.PROVIDER],
-        verificationToken: null,
-        stripeAccountId: null,
-      })
-      .mockResolvedValueOnce({
-        id: 'provider-2',
-        email: 'provider2.demo@local.test',
-        name: 'Provider Demo 2',
-        roles: [Role.PROVIDER],
-        verificationToken: null,
-        stripeAccountId: null,
-      })
-      .mockResolvedValueOnce({
-        id: 'runner-1',
-        email: 'runner.demo@local.test',
-        name: 'Runner Demo',
-        roles: [Role.RUNNER],
-        verificationToken: null,
-        stripeAccountId: null,
-      })
-      .mockResolvedValueOnce({
-        id: 'runner-2',
-        email: 'runner2.demo@local.test',
-        name: 'Runner Demo 2',
-        roles: [Role.RUNNER],
-        verificationToken: null,
-        stripeAccountId: null,
-      });
+    const users = new Map(
+      [...DEMO_PROVIDER_SEEDS, ...DEMO_RUNNER_SEEDS].map((seed, index) => [
+        seed.email,
+        {
+          id: `user-${index + 1}`,
+          email: seed.email,
+          name: seed.name,
+          roles: [
+            DEMO_PROVIDER_SEEDS.some(
+              (provider) => provider.email === seed.email,
+            )
+              ? Role.PROVIDER
+              : Role.RUNNER,
+          ],
+          verificationToken: null,
+          stripeAccountId: null,
+        },
+      ]),
+    );
+    prismaMock.user.findUnique.mockImplementation(({ where: { email } }) =>
+      Promise.resolve(users.get(email) ?? null),
+    );
 
     await service.bootstrapDemoPaymentAccounts();
 
-    expect(prismaMock.user.update).toHaveBeenCalledTimes(4);
+    expect(prismaMock.user.update).toHaveBeenCalledTimes(
+      DEMO_PROVIDER_SEEDS.length + DEMO_RUNNER_SEEDS.length,
+    );
+    expect(prismaMock.runnerProfile.upsert).toHaveBeenCalledTimes(
+      DEMO_RUNNER_SEEDS.length,
+    );
     expect(prismaMock.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'provider-1' },
+        where: { id: 'user-1' },
         data: expect.objectContaining({
-          stripeAccountId: 'acct_demo_provider_1',
+          stripeAccountId: DEMO_PROVIDER_SEEDS[0]?.paymentAccountId,
           providerServiceRadiusKm: 8,
         }),
       }),

@@ -4,11 +4,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { BaseSeedService } from '../seed/base-seed.service';
 import { DemoCatalogService } from './demo-catalog.service';
+import { DEMO_CATEGORIES, DEMO_CITIES, DEMO_PRODUCTS } from './demo.seed-data';
 
 describe('DemoCatalogService', () => {
   let service: DemoCatalogService;
   let prismaMock: {
-    city: { findUnique: jest.Mock };
+    city: { findMany: jest.Mock };
     category: { findMany: jest.Mock };
   };
   let productsService: { create: jest.Mock };
@@ -16,7 +17,7 @@ describe('DemoCatalogService', () => {
 
   beforeEach(async () => {
     prismaMock = {
-      city: { findUnique: jest.fn() },
+      city: { findMany: jest.fn() },
       category: { findMany: jest.fn() },
     };
     productsService = {
@@ -39,30 +40,36 @@ describe('DemoCatalogService', () => {
   });
 
   it('creates the demo catalog with resolved providers and categories', async () => {
-    prismaMock.city.findUnique.mockResolvedValue({
-      id: 'city-1',
-      name: 'Toledo',
-      slug: 'toledo',
-    });
-    prismaMock.category.findMany.mockResolvedValue([
-      { id: 'cat-pan', slug: 'panaderia' },
-      { id: 'cat-ver', slug: 'verduras' },
-      { id: 'cat-des', slug: 'despensa' },
-    ]);
+    prismaMock.city.findMany.mockResolvedValue(
+      DEMO_CITIES.map((city, index) => ({
+        id: `city-${index + 1}`,
+        name: city.name,
+        slug: city.slug,
+      })),
+    );
+    prismaMock.category.findMany.mockResolvedValue(
+      DEMO_CATEGORIES.map((category, index) => ({
+        id: `cat-${index + 1}`,
+        slug: category.slug,
+      })),
+    );
     productsService.create.mockResolvedValue({ id: 'product-1' });
 
     const result = await service.createDemoCatalog(async (email) => ({
-      id: email.includes('provider2') ? 'provider-2' : 'provider-1',
+      id: `provider-${email}`,
     }));
 
     expect(baseSeedService.ensureBaseData).toHaveBeenCalled();
-    expect(productsService.create).toHaveBeenCalledTimes(6);
-    expect(result.city.slug).toBe('toledo');
-    expect(result.products).toHaveLength(6);
+    expect(productsService.create).toHaveBeenCalledTimes(DEMO_PRODUCTS.length);
+    expect(result.cities).toHaveLength(DEMO_CITIES.length);
+    expect(result.products).toHaveLength(DEMO_PRODUCTS.length);
+    expect(result.products[0]).toHaveProperty('citySlug');
   });
 
-  it('fails when the base city is missing', async () => {
-    prismaMock.city.findUnique.mockResolvedValue(null);
+  it('fails when one of the base cities is missing', async () => {
+    prismaMock.city.findMany.mockResolvedValue([
+      { id: 'city-1', name: 'Toledo', slug: 'toledo' },
+    ]);
 
     await expect(
       service.createDemoCatalog(async () => ({ id: 'provider-1' })),

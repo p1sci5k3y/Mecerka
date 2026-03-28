@@ -16,11 +16,13 @@ import { DeliveryService } from '../delivery/delivery.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEMO_ORDER_SCENARIOS } from './demo.seed-data';
 
 export type DemoSeededProduct = {
   id: string;
   name: string;
   cityId: string;
+  citySlug?: string;
 };
 
 @Injectable()
@@ -216,6 +218,12 @@ export class DemoOrderScenarioService {
     const productsByName = new Map<string, DemoSeededProduct>(
       products.map((product) => [product.name, product]),
     );
+    const cityIdsBySlug = new Map<string, string>();
+    for (const product of products) {
+      if (product.citySlug && !cityIdsBySlug.has(product.citySlug)) {
+        cityIdsBySlug.set(product.citySlug, product.cityId);
+      }
+    }
     const requireDemoProduct = (name: string) => {
       const product = productsByName.get(name);
       if (!product) {
@@ -223,208 +231,107 @@ export class DemoOrderScenarioService {
       }
       return product;
     };
-    const cityId = products[0]?.cityId;
-    if (!cityId) {
-      throw new ConflictException('Demo products are missing a cityId');
+    if (cityIdsBySlug.size === 0) {
+      throw new ConflictException('Demo products are missing city mappings');
     }
-    const user1 = await this.findUserByEmail('user.demo@local.test');
-    const user2 = await this.findUserByEmail('user2.demo@local.test');
-    const runner1 = await this.findUserByEmail('runner.demo@local.test');
-    const runner2 = await this.findUserByEmail('runner2.demo@local.test');
 
-    const pendingOrder = await this.createCheckoutOrder(
-      user1.id,
-      [
-        {
-          productId: requireDemoProduct('Pan artesano').id,
-          quantity: 2,
-        },
-        {
-          productId: requireDemoProduct('Empanada gallega').id,
-          quantity: 1,
-        },
-      ],
-      'demo-pending-order',
-      cityId,
-      'Calle Hombre de Palo, 7',
-      '45001',
-      'Portal azul',
-    );
+    const orders = [];
 
-    const deliveringOrder = await this.createCheckoutOrder(
-      user1.id,
-      [
-        {
-          productId: requireDemoProduct('Tomates ecológicos').id,
-          quantity: 3,
-        },
-        {
-          productId: requireDemoProduct('Huevos camperos').id,
-          quantity: 1,
-        },
-      ],
-      'demo-delivering-order',
-      cityId,
-      'Calle Sixto Ramon Parro, 9',
-      '45001',
-    );
-    await this.confirmDemoProviderOrderPayment(deliveringOrder.id);
-    const deliveringDelivery = await this.deliveryService.createDeliveryOrder(
-      {
-        orderId: deliveringOrder.id,
-        deliveryFee: Number(deliveringOrder.deliveryFee ?? 0),
-        currency: 'EUR',
-      },
-      user1.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.assignRunner(
-      deliveringDelivery.id,
-      { runnerId: runner1.id },
-      user1.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.markPickupPending(
-      deliveringDelivery.id,
-      runner1.id,
-      [Role.RUNNER],
-    );
-    await this.deliveryService.confirmPickup(
-      deliveringDelivery.id,
-      runner1.id,
-      [Role.RUNNER],
-    );
-    await this.deliveryService.startTransit(deliveringDelivery.id, runner1.id, [
-      Role.RUNNER,
-    ]);
-    await this.deliveryService.updateRunnerLocation(
-      deliveringDelivery.id,
-      runner1.id,
-      [Role.RUNNER],
-      {
-        latitude: 40.417,
-        longitude: -3.703,
-      },
-    );
+    for (const scenario of DEMO_ORDER_SCENARIOS) {
+      const cityId = cityIdsBySlug.get(scenario.citySlug);
+      if (!cityId) {
+        throw new ConflictException(
+          `Missing demo city '${scenario.citySlug}' for scenario '${scenario.key}'`,
+        );
+      }
 
-    const deliveredOrder = await this.createCheckoutOrder(
-      user2.id,
-      [
-        {
-          productId: requireDemoProduct('Queso manchego').id,
-          quantity: 1,
-        },
-        {
-          productId: requireDemoProduct('Aceite de oliva').id,
-          quantity: 1,
-        },
-      ],
-      'demo-delivered-order',
-      cityId,
-      'Cuesta Carlos V, 3',
-      '45001',
-    );
-    await this.confirmDemoProviderOrderPayment(deliveredOrder.id);
-    const deliveredDelivery = await this.deliveryService.createDeliveryOrder(
-      {
-        orderId: deliveredOrder.id,
-        deliveryFee: Number(deliveredOrder.deliveryFee ?? 0),
-        currency: 'EUR',
-      },
-      user2.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.assignRunner(
-      deliveredDelivery.id,
-      { runnerId: runner2.id },
-      user2.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.markPickupPending(
-      deliveredDelivery.id,
-      runner2.id,
-      [Role.RUNNER],
-    );
-    await this.deliveryService.confirmPickup(deliveredDelivery.id, runner2.id, [
-      Role.RUNNER,
-    ]);
-    await this.deliveryService.startTransit(deliveredDelivery.id, runner2.id, [
-      Role.RUNNER,
-    ]);
-    await this.deliveryService.updateRunnerLocation(
-      deliveredDelivery.id,
-      runner2.id,
-      [Role.RUNNER],
-      {
-        latitude: 40.418,
-        longitude: -3.702,
-      },
-    );
-    await this.deliveryService.confirmDelivery(
-      deliveredDelivery.id,
-      runner2.id,
-      [Role.RUNNER],
-      {
-        deliveryNotes: 'Entrega demo completada',
-      },
-    );
+      const client = await this.findUserByEmail(scenario.clientEmail);
+      const order = await this.createCheckoutOrder(
+        client.id,
+        scenario.items.map((item) => ({
+          productId: requireDemoProduct(item.productName).id,
+          quantity: item.quantity,
+        })),
+        `demo-${scenario.key}`,
+        cityId,
+        scenario.deliveryAddress,
+        scenario.postalCode,
+        scenario.addressReference,
+      );
 
-    const supportOrder = await this.createCheckoutOrder(
-      user2.id,
-      [
-        {
-          productId: requireDemoProduct('Pan artesano').id,
-          quantity: 1,
-        },
-        {
-          productId: requireDemoProduct('Empanada gallega').id,
-          quantity: 1,
-        },
-      ],
-      'demo-support-order',
-      cityId,
-      'Plaza de Zocodover, 5',
-      '45001',
-      'Escalera interior',
-    );
-    await this.confirmDemoProviderOrderPayment(supportOrder.id);
-    const supportDelivery = await this.deliveryService.createDeliveryOrder(
-      {
-        orderId: supportOrder.id,
-        deliveryFee: Number(supportOrder.deliveryFee ?? 0),
-        currency: 'EUR',
-      },
-      user2.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.assignRunner(
-      supportDelivery.id,
-      { runnerId: runner1.id },
-      user2.id,
-      [Role.CLIENT],
-    );
-    await this.deliveryService.markPickupPending(
-      supportDelivery.id,
-      runner1.id,
-      [Role.RUNNER],
-    );
-    await this.deliveryService.confirmPickup(supportDelivery.id, runner1.id, [
-      Role.RUNNER,
-    ]);
-    await this.deliveryService.startTransit(supportDelivery.id, runner1.id, [
-      Role.RUNNER,
-    ]);
-    await this.deliveryService.updateRunnerLocation(
-      supportDelivery.id,
-      runner1.id,
-      [Role.RUNNER],
-      {
-        latitude: 40.416,
-        longitude: -3.704,
-      },
-    );
-    await this.seedSupportArtifacts(supportOrder.id, user2.id);
+      if (scenario.lifecycle === 'PENDING') {
+        orders.push(order);
+        continue;
+      }
 
-    return [pendingOrder, deliveringOrder, deliveredOrder, supportOrder];
+      await this.confirmDemoProviderOrderPayment(order.id);
+      const delivery = await this.deliveryService.createDeliveryOrder(
+        {
+          orderId: order.id,
+          deliveryFee: Number(order.deliveryFee ?? 0),
+          currency: 'EUR',
+        },
+        client.id,
+        [Role.CLIENT],
+      );
+
+      const runnerEmail = scenario.runnerEmail;
+      if (!runnerEmail) {
+        throw new ConflictException(
+          `Scenario '${scenario.key}' requires a runnerEmail`,
+        );
+      }
+
+      const runner = await this.findUserByEmail(runnerEmail);
+      await this.deliveryService.assignRunner(
+        delivery.id,
+        { runnerId: runner.id },
+        client.id,
+        [Role.CLIENT],
+      );
+
+      if (scenario.lifecycle === 'ASSIGNED') {
+        orders.push(order);
+        continue;
+      }
+
+      await this.deliveryService.markPickupPending(delivery.id, runner.id, [
+        Role.RUNNER,
+      ]);
+      await this.deliveryService.confirmPickup(delivery.id, runner.id, [
+        Role.RUNNER,
+      ]);
+      await this.deliveryService.startTransit(delivery.id, runner.id, [
+        Role.RUNNER,
+      ]);
+
+      if (scenario.location) {
+        await this.deliveryService.updateRunnerLocation(
+          delivery.id,
+          runner.id,
+          [Role.RUNNER],
+          scenario.location,
+        );
+      }
+
+      if (scenario.lifecycle === 'DELIVERED') {
+        await this.deliveryService.confirmDelivery(
+          delivery.id,
+          runner.id,
+          [Role.RUNNER],
+          {
+            deliveryNotes: scenario.deliveryNotes ?? 'Entrega demo completada',
+          },
+        );
+      }
+
+      if (scenario.lifecycle === 'SUPPORT') {
+        await this.seedSupportArtifacts(order.id, client.id);
+      }
+
+      orders.push(order);
+    }
+
+    return orders;
   }
 }

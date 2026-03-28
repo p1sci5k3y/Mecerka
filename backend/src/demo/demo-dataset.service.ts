@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   DEMO_EMAIL_DOMAIN,
+  DEMO_EXPECTED_DELIVERY_COUNT,
+  DEMO_EXPECTED_ORDER_COUNT,
   DEMO_PRODUCTS,
   type DemoDatasetStatus,
 } from './demo.seed-data';
@@ -59,8 +61,8 @@ export class DemoDatasetService {
     return (
       status.users >= demoUsers.length &&
       status.products >= DEMO_PRODUCTS.length &&
-      status.orders >= 3 &&
-      status.deliveries >= 2
+      status.orders >= DEMO_EXPECTED_ORDER_COUNT &&
+      status.deliveries >= DEMO_EXPECTED_DELIVERY_COUNT
     );
   }
 }

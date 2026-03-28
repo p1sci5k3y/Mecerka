@@ -12,6 +12,12 @@ import { DeliveryService } from '../delivery/delivery.service';
 import { CartService } from '../cart/cart.service';
 import { PaymentsService } from '../payments/payments.service';
 import { BaseSeedService } from '../seed/base-seed.service';
+import {
+  DEMO_EXPECTED_DELIVERY_COUNT,
+  DEMO_EXPECTED_ORDER_COUNT,
+  DEMO_PRODUCTS,
+  DEMO_USERS,
+} from './demo.seed-data';
 
 describe('DemoService', () => {
   let service: DemoService;
@@ -309,10 +315,12 @@ describe('DemoService', () => {
       if (key === 'DEMO_MODE') return 'true';
       return undefined;
     });
-    prismaMock.user.count.mockResolvedValue(10);
-    prismaMock.product.count.mockResolvedValue(10);
-    prismaMock.order.count.mockResolvedValue(5);
-    prismaMock.deliveryOrder.count.mockResolvedValue(3);
+    prismaMock.user.count.mockResolvedValue(DEMO_USERS.length);
+    prismaMock.product.count.mockResolvedValue(DEMO_PRODUCTS.length);
+    prismaMock.order.count.mockResolvedValue(DEMO_EXPECTED_ORDER_COUNT);
+    prismaMock.deliveryOrder.count.mockResolvedValue(
+      DEMO_EXPECTED_DELIVERY_COUNT,
+    );
     prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
     jest
       .spyOn<any, any>(service as any, 'areDemoCredentialsCurrent')
@@ -336,10 +344,12 @@ describe('DemoService', () => {
       if (key === 'DEMO_MODE') return 'true';
       return undefined;
     });
-    prismaMock.user.count.mockResolvedValue(10);
-    prismaMock.product.count.mockResolvedValue(10);
-    prismaMock.order.count.mockResolvedValue(5);
-    prismaMock.deliveryOrder.count.mockResolvedValue(3);
+    prismaMock.user.count.mockResolvedValue(DEMO_USERS.length);
+    prismaMock.product.count.mockResolvedValue(DEMO_PRODUCTS.length);
+    prismaMock.order.count.mockResolvedValue(DEMO_EXPECTED_ORDER_COUNT);
+    prismaMock.deliveryOrder.count.mockResolvedValue(
+      DEMO_EXPECTED_DELIVERY_COUNT,
+    );
     prismaMock.user.findUnique.mockResolvedValue({ id: 'admin-1' });
     jest
       .spyOn<any, any>(service as any, 'areDemoCredentialsCurrent')
@@ -488,31 +498,56 @@ describe('DemoService', () => {
 
   describe('getDemoDatasetStatus branch coverage', () => {
     it('isDemoDatasetComplete returns true when all counts meet thresholds', () => {
-      const status = { users: 7, products: 6, orders: 3, deliveries: 2 };
+      const status = {
+        users: DEMO_USERS.length,
+        products: DEMO_PRODUCTS.length,
+        orders: DEMO_EXPECTED_ORDER_COUNT,
+        deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
+      };
       const result = (service as any).isDemoDatasetComplete(status);
       expect(result).toBe(true);
     });
 
-    it('isDemoDatasetComplete returns false when orders < 3', () => {
-      const status = { users: 7, products: 6, orders: 2, deliveries: 2 };
+    it('isDemoDatasetComplete returns false when orders are below the expected scenario count', () => {
+      const status = {
+        users: DEMO_USERS.length,
+        products: DEMO_PRODUCTS.length,
+        orders: DEMO_EXPECTED_ORDER_COUNT - 1,
+        deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
+      };
       const result = (service as any).isDemoDatasetComplete(status);
       expect(result).toBe(false);
     });
 
-    it('isDemoDatasetComplete returns false when deliveries < 2', () => {
-      const status = { users: 7, products: 6, orders: 3, deliveries: 1 };
+    it('isDemoDatasetComplete returns false when deliveries are below the expected active delivery count', () => {
+      const status = {
+        users: DEMO_USERS.length,
+        products: DEMO_PRODUCTS.length,
+        orders: DEMO_EXPECTED_ORDER_COUNT,
+        deliveries: DEMO_EXPECTED_DELIVERY_COUNT - 1,
+      };
       const result = (service as any).isDemoDatasetComplete(status);
       expect(result).toBe(false);
     });
 
     it('isDemoDatasetComplete returns false when users < DEMO_USERS.length', () => {
-      const status = { users: 3, products: 6, orders: 3, deliveries: 2 };
+      const status = {
+        users: DEMO_USERS.length - 1,
+        products: DEMO_PRODUCTS.length,
+        orders: DEMO_EXPECTED_ORDER_COUNT,
+        deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
+      };
       const result = (service as any).isDemoDatasetComplete(status);
       expect(result).toBe(false);
     });
 
     it('isDemoDatasetComplete returns false when products < DEMO_PRODUCTS.length', () => {
-      const status = { users: 7, products: 3, orders: 3, deliveries: 2 };
+      const status = {
+        users: DEMO_USERS.length,
+        products: DEMO_PRODUCTS.length - 1,
+        orders: DEMO_EXPECTED_ORDER_COUNT,
+        deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
+      };
       const result = (service as any).isDemoDatasetComplete(status);
       expect(result).toBe(false);
     });

@@ -4,12 +4,17 @@ import { Role } from '@prisma/client';
 import { AdminService } from '../admin/admin.service';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEMO_SHARED_PASSWORD } from './demo.seed-data';
+import {
+  DEMO_PROVIDER_SEEDS,
+  DEMO_RUNNER_SEEDS,
+  DEMO_SHARED_PASSWORD,
+} from './demo.seed-data';
 
 export type DemoUserSeed = {
   email: string;
   name: string;
   kind: 'ADMIN' | 'PROVIDER' | 'RUNNER' | 'USER';
+  citySlug?: string;
 };
 
 @Injectable()
@@ -78,16 +83,13 @@ export class DemoUserBootstrapService {
     await this.adminService.grantRole(admin.id, Role.ADMIN, adminId);
     await this.adminService.revokeRole(admin.id, Role.CLIENT, adminId);
 
-    for (const email of [
-      'provider.demo@local.test',
-      'provider2.demo@local.test',
-    ]) {
+    for (const { email } of DEMO_PROVIDER_SEEDS) {
       const provider = await this.findUserByEmail(email);
       await this.adminService.grantProvider(provider.id, adminId);
       await this.adminService.revokeRole(provider.id, Role.CLIENT, adminId);
     }
 
-    for (const email of ['runner.demo@local.test', 'runner2.demo@local.test']) {
+    for (const { email } of DEMO_RUNNER_SEEDS) {
       const runner = await this.findUserByEmail(email);
       await this.adminService.grantRunner(runner.id, adminId);
       await this.adminService.revokeRole(runner.id, Role.CLIENT, adminId);
@@ -95,35 +97,49 @@ export class DemoUserBootstrapService {
   }
 
   async bootstrapDemoPaymentAccounts() {
-    const accountIds = new Map<string, string>([
-      ['provider.demo@local.test', 'acct_demo_provider_1'],
-      ['provider2.demo@local.test', 'acct_demo_provider_2'],
-      ['runner.demo@local.test', 'acct_demo_runner_1'],
-      ['runner2.demo@local.test', 'acct_demo_runner_2'],
-    ]);
-
-    for (const [email, accountId] of accountIds.entries()) {
-      const user = await this.findUserByEmail(email);
+    for (const providerSeed of DEMO_PROVIDER_SEEDS) {
+      const user = await this.findUserByEmail(providerSeed.email);
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          stripeAccountId: accountId,
-          ...(email === 'provider.demo@local.test'
-            ? {
-                address: 'Plaza de Zocodover, 1, Toledo',
-                latitude: 39.8569,
-                longitude: -4.0245,
-                providerServiceRadiusKm: 8,
-              }
-            : {}),
-          ...(email === 'provider2.demo@local.test'
-            ? {
-                address: 'Calle Comercio, 4, Toledo',
-                latitude: 39.8586,
-                longitude: -4.0226,
-                providerServiceRadiusKm: 8,
-              }
-            : {}),
+          stripeAccountId: providerSeed.paymentAccountId,
+          address: providerSeed.address,
+          latitude: providerSeed.latitude,
+          longitude: providerSeed.longitude,
+          providerServiceRadiusKm: providerSeed.providerServiceRadiusKm,
+        },
+      });
+    }
+
+    for (const runnerSeed of DEMO_RUNNER_SEEDS) {
+      const user = await this.findUserByEmail(runnerSeed.email);
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          stripeAccountId: runnerSeed.paymentAccountId,
+        },
+      });
+
+      await this.prisma.runnerProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          baseLat: runnerSeed.baseLat,
+          baseLng: runnerSeed.baseLng,
+          maxDistanceKm: runnerSeed.maxDistanceKm,
+          priceBase: runnerSeed.priceBase,
+          pricePerKm: runnerSeed.pricePerKm,
+          minFee: runnerSeed.minFee,
+          isActive: true,
+        },
+        create: {
+          userId: user.id,
+          baseLat: runnerSeed.baseLat,
+          baseLng: runnerSeed.baseLng,
+          maxDistanceKm: runnerSeed.maxDistanceKm,
+          priceBase: runnerSeed.priceBase,
+          pricePerKm: runnerSeed.pricePerKm,
+          minFee: runnerSeed.minFee,
+          isActive: true,
         },
       });
     }

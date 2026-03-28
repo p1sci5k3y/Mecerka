@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Cuadernos artesanales</title>
+  <desc id="desc">Ilustracion de papeleria artesanal para la demo.</desc>
+  <rect width="640" height="640" fill="#f7f0e4"/>
+  <rect x="132" y="146" width="180" height="330" rx="18" fill="#d76f4a"/>
+  <rect x="174" y="146" width="20" height="330" fill="#f8d1b4"/>
+  <rect x="328" y="180" width="180" height="296" rx="18" fill="#5e7a65"/>
+  <rect x="370" y="180" width="20" height="296" fill="#dbe9df"/>
+  <path d="M212 232h56M212 276h68M212 320h70M212 364h62" stroke="#fff5ef" stroke-width="10" stroke-linecap="round"/>
+  <path d="M406 252h56M406 296h72M406 340h68M406 384h60" stroke="#eef6f0" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="492" cy="122" r="62" fill="#f2c94c"/>
+  <text x="320" y="564" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#5b4336">Papeleria local</text>
+</svg>

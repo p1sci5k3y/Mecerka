@@ -1,6 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
-import { DEMO_USERS } from './demo.seed-data';
+import {
+  DEMO_EXPECTED_DELIVERY_COUNT,
+  DEMO_EXPECTED_ORDER_COUNT,
+  DEMO_PRODUCTS,
+  DEMO_USERS,
+} from './demo.seed-data';
 import { DemoDatasetService } from './demo-dataset.service';
 
 describe('DemoDatasetService', () => {
@@ -31,16 +36,18 @@ describe('DemoDatasetService', () => {
   });
 
   it('returns aggregated demo dataset counts', async () => {
-    prismaMock.user.count.mockResolvedValue(7);
-    prismaMock.product.count.mockResolvedValue(6);
-    prismaMock.order.count.mockResolvedValue(3);
-    prismaMock.deliveryOrder.count.mockResolvedValue(2);
+    prismaMock.user.count.mockResolvedValue(DEMO_USERS.length);
+    prismaMock.product.count.mockResolvedValue(DEMO_PRODUCTS.length);
+    prismaMock.order.count.mockResolvedValue(DEMO_EXPECTED_ORDER_COUNT);
+    prismaMock.deliveryOrder.count.mockResolvedValue(
+      DEMO_EXPECTED_DELIVERY_COUNT,
+    );
 
     await expect(service.getDemoDatasetStatus()).resolves.toEqual({
-      users: 7,
-      products: 6,
-      orders: 3,
-      deliveries: 2,
+      users: DEMO_USERS.length,
+      products: DEMO_PRODUCTS.length,
+      orders: DEMO_EXPECTED_ORDER_COUNT,
+      deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
     });
   });
 
@@ -59,10 +66,10 @@ describe('DemoDatasetService', () => {
     expect(
       service.isDemoDatasetComplete(
         {
-          users: 7,
-          products: 6,
-          orders: 3,
-          deliveries: 2,
+          users: DEMO_USERS.length,
+          products: DEMO_PRODUCTS.length,
+          orders: DEMO_EXPECTED_ORDER_COUNT,
+          deliveries: DEMO_EXPECTED_DELIVERY_COUNT,
         },
         DEMO_USERS,
       ),

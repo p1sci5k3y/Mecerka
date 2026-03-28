@@ -41,6 +41,46 @@ export class NominatimGeocodingService implements GeocodingPort {
         formattedAddress: 'Cuesta Carlos V, 3, 45001 Toledo, Spain',
       },
     ],
+    [
+      'plaza de zocodover, 5|45001|toledo',
+      {
+        latitude: 39.8571,
+        longitude: -4.0243,
+        formattedAddress: 'Plaza de Zocodover, 5, 45001 Toledo, Spain',
+      },
+    ],
+    [
+      'calle mayor, 12|28013|madrid',
+      {
+        latitude: 40.4167,
+        longitude: -3.7061,
+        formattedAddress: 'Calle Mayor, 12, 28013 Madrid, Spain',
+      },
+    ],
+    [
+      'carrer de la pau, 21|46003|valencia',
+      {
+        latitude: 39.4739,
+        longitude: -0.3731,
+        formattedAddress: 'Carrer de la Pau, 21, 46003 Valencia, Spain',
+      },
+    ],
+    [
+      'calle francos, 33|41004|sevilla',
+      {
+        latitude: 37.3893,
+        longitude: -5.9921,
+        formattedAddress: 'Calle Francos, 33, 41004 Sevilla, Spain',
+      },
+    ],
+    [
+      'calle somera, 24|48005|bilbao',
+      {
+        latitude: 43.2592,
+        longitude: -2.9231,
+        formattedAddress: 'Calle Somera, 24, 48005 Bilbao, Spain',
+      },
+    ],
   ]);
 
   constructor(private readonly configService: ConfigService) {}

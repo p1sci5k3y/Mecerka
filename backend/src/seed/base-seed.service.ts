@@ -21,6 +21,8 @@ export class BaseSeedService implements OnApplicationBootstrap {
     { name: 'Madrid', slug: 'madrid' },
     { name: 'Valencia', slug: 'valencia' },
     { name: 'Toledo', slug: 'toledo' },
+    { name: 'Sevilla', slug: 'sevilla' },
+    { name: 'Bilbao', slug: 'bilbao' },
   ];
 
   private static readonly STRUCTURAL_CATEGORIES: BaseCategorySeed[] = [
@@ -43,6 +45,41 @@ export class BaseSeedService implements OnApplicationBootstrap {
       name: 'Lácteos',
       slug: 'lacteos',
       image_url: '/demo-products/cheese.jpg',
+    },
+    {
+      name: 'Cerámica',
+      slug: 'ceramica',
+      image_url: '/demo-products/ceramica-artesanal.svg',
+    },
+    {
+      name: 'Papelería',
+      slug: 'papeleria',
+      image_url: '/demo-products/cuadernos-artesanales.svg',
+    },
+    {
+      name: 'Textil',
+      slug: 'textil',
+      image_url: '/demo-products/textil-artesanal.svg',
+    },
+    {
+      name: 'Cuero',
+      slug: 'cuero',
+      image_url: '/demo-products/cuero-artesanal.svg',
+    },
+    {
+      name: 'Velas',
+      slug: 'velas',
+      image_url: '/demo-products/velas-artesanales.svg',
+    },
+    {
+      name: 'Flores',
+      slug: 'flores',
+      image_url: '/demo-products/flores-locales.svg',
+    },
+    {
+      name: 'Café',
+      slug: 'cafe',
+      image_url: '/demo-products/cafe-local.svg',
     },
   ];
 

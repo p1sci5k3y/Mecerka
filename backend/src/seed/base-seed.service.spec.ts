@@ -26,9 +26,9 @@ describe('BaseSeedService', () => {
 
     await service.onApplicationBootstrap();
 
-    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(3);
-    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(4);
-    expect(loggerSpy).toHaveBeenCalledWith('seed.base cities=3 categories=4');
+    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(5);
+    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(11);
+    expect(loggerSpy).toHaveBeenCalledWith('seed.base cities=5 categories=11');
   });
 
   it('reuses the in-flight seed promise for concurrent callers', async () => {
@@ -47,8 +47,8 @@ describe('BaseSeedService', () => {
 
     release();
     await Promise.all([first, second]);
-    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(3);
-    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(4);
+    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(5);
+    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(11);
   });
 
   it('resets the cached promise when seeding fails so later retries can succeed', async () => {
@@ -64,8 +64,8 @@ describe('BaseSeedService', () => {
     prismaMock.city.upsert.mockResolvedValue(undefined);
 
     await expect(service.ensureBaseData()).resolves.toBeUndefined();
-    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(4);
-    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(4);
-    expect(loggerSpy).toHaveBeenCalledWith('seed.base cities=3 categories=4');
+    expect(prismaMock.city.upsert).toHaveBeenCalledTimes(6);
+    expect(prismaMock.category.upsert).toHaveBeenCalledTimes(11);
+    expect(loggerSpy).toHaveBeenCalledWith('seed.base cities=5 categories=11');
   });
 });

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Flores locales</title>
+  <desc id="desc">Ilustracion floral para el mercado local demo.</desc>
+  <rect width="640" height="640" fill="#fbf3ef"/>
+  <path d="M320 512c-74-68-124-134-124-214 0-50 34-86 80-86 25 0 41 9 56 27 15-18 31-27 56-27 46 0 80 36 80 86 0 80-50 146-124 214h-24Z" fill="#f2b3b6"/>
+  <path d="M320 512 274 350M320 512 362 338" stroke="#6ea66e" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="252" cy="232" r="42" fill="#f7cf6d"/>
+  <circle cx="394" cy="224" r="42" fill="#e98a8d"/>
+  <circle cx="320" cy="170" r="42" fill="#b9d98c"/>
+  <text x="320" y="584" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#70564a">Flores de barrio</text>
+</svg>

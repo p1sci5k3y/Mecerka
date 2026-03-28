@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Textil artesanal</title>
+  <desc id="desc">Ilustracion textil para productos de tela y hogar.</desc>
+  <rect width="640" height="640" fill="#fbf4eb"/>
+  <rect x="108" y="126" width="424" height="312" rx="32" fill="#7d9fb5"/>
+  <path d="M108 214h424M108 302h424" stroke="#d9e7ef" stroke-width="14"/>
+  <path d="M214 126v312M320 126v312M426 126v312" stroke="#d9e7ef" stroke-width="14"/>
+  <rect x="160" y="472" width="320" height="72" rx="26" fill="#dcb28d"/>
+  <path d="M208 508h224" stroke="#8f6b4f" stroke-width="14" stroke-linecap="round"/>
+  <text x="320" y="88" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#5a4d45">Textil artesanal</text>
+</svg>

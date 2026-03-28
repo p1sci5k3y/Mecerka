@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Velas artesanales</title>
+  <desc id="desc">Ilustracion de velas aromaticas locales.</desc>
+  <rect width="640" height="640" fill="#fbf3ea"/>
+  <ellipse cx="226" cy="488" rx="88" ry="32" fill="#e9cfb8"/>
+  <ellipse cx="414" cy="488" rx="88" ry="32" fill="#e1c2a2"/>
+  <rect x="152" y="248" width="148" height="228" rx="28" fill="#f4e2c8"/>
+  <rect x="340" y="212" width="148" height="264" rx="28" fill="#e6b98d"/>
+  <path d="M226 212c-10-22 6-48 6-48s16 22 10 42c-2 8-8 13-16 16Z" fill="#ffb347"/>
+  <path d="M414 176c-12-26 8-56 8-56s18 26 11 49c-3 10-9 16-19 19Z" fill="#ff9d2e"/>
+  <text x="320" y="92" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#6a4b3a">Velas artesanales</text>
+</svg>

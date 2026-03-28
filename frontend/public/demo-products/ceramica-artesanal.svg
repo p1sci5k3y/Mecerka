@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Ceramica artesanal</title>
+  <desc id="desc">Ilustracion simple de piezas de ceramica local.</desc>
+  <rect width="640" height="640" fill="#f6efe6"/>
+  <circle cx="148" cy="136" r="86" fill="#f0dcc8"/>
+  <circle cx="548" cy="520" r="96" fill="#ead2bb"/>
+  <ellipse cx="320" cy="496" rx="186" ry="58" fill="#d7b48d"/>
+  <path d="M248 216h144c18 0 32 14 32 32v24c0 36-12 69-33 95l-27 33c-10 12-15 27-15 43v21h-58v-21c0-16-5-31-15-43l-27-33c-21-26-33-59-33-95v-24c0-18 14-32 32-32Z" fill="#b87953"/>
+  <path d="M228 256h184" stroke="#8c5638" stroke-width="18" stroke-linecap="round"/>
+  <path d="M250 314h140" stroke="#dcb28d" stroke-width="12" stroke-linecap="round"/>
+  <path d="M258 364h124" stroke="#dcb28d" stroke-width="12" stroke-linecap="round"/>
+  <text x="320" y="92" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#6c4029">Ceramica local</text>
+</svg>

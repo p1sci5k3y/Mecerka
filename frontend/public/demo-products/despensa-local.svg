@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Despensa local</title>
+  <desc id="desc">Ilustracion de productos de despensa de comercio local.</desc>
+  <rect width="640" height="640" fill="#f8f1e8"/>
+  <rect x="152" y="180" width="116" height="290" rx="28" fill="#c98d57"/>
+  <rect x="186" y="126" width="48" height="54" rx="16" fill="#8d5d37"/>
+  <rect x="308" y="232" width="172" height="238" rx="26" fill="#88a36b"/>
+  <path d="M332 288h124M332 334h124M332 380h124" stroke="#eaf2e2" stroke-width="12" stroke-linecap="round"/>
+  <text x="320" y="556" text-anchor="middle" font-size="34" font-family="Georgia, serif" fill="#604636">Despensa local</text>
+</svg>

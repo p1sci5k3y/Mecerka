@@ -1,6 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { DemoOrderScenarioService } from './demo-order-scenario.service';
+import { DEMO_ORDER_SCENARIOS } from './demo.seed-data';
 
 describe('DemoOrderScenarioService', () => {
   let service: DemoOrderScenarioService;
@@ -108,19 +109,40 @@ describe('DemoOrderScenarioService', () => {
 
     await expect(
       service.createDemoOrders([
-        { id: 'prod-1', name: 'Pan artesano', cityId: 'city-1' },
+        {
+          id: 'prod-1',
+          name: 'Pan artesano',
+          cityId: 'city-toledo',
+          citySlug: 'toledo',
+        },
       ]),
     ).rejects.toThrow(
-      new ConflictException("Missing demo product 'Empanada gallega'"),
+      new ConflictException(
+        "Missing demo product 'Cuenco de cerámica toledana'",
+      ),
     );
   });
 
-  it('creates the three demo order scenarios on the happy path', async () => {
+  it('creates the demo order scenarios on the happy path', async () => {
     const users = new Map([
       ['user.demo@local.test', { id: 'user-1', roles: [Role.CLIENT] }],
       ['user2.demo@local.test', { id: 'user-2', roles: [Role.CLIENT] }],
-      ['runner.demo@local.test', { id: 'runner-1', roles: [Role.RUNNER] }],
-      ['runner2.demo@local.test', { id: 'runner-2', roles: [Role.RUNNER] }],
+      [
+        'madrid.runner.demo@local.test',
+        { id: 'runner-madrid', roles: [Role.RUNNER] },
+      ],
+      [
+        'valencia.runner.demo@local.test',
+        { id: 'runner-valencia', roles: [Role.RUNNER] },
+      ],
+      [
+        'sevilla.runner.demo@local.test',
+        { id: 'runner-sevilla', roles: [Role.RUNNER] },
+      ],
+      [
+        'bilbao.runner.demo@local.test',
+        { id: 'runner-bilbao', roles: [Role.RUNNER] },
+      ],
     ]);
     prismaMock.user.findUnique.mockImplementation(({ where: { email } }: any) =>
       Promise.resolve(users.get(email) ?? null),
@@ -128,22 +150,25 @@ describe('DemoOrderScenarioService', () => {
 
     const orders = [
       { id: 'order-pending', deliveryFee: 4.5 },
-      { id: 'order-delivering', deliveryFee: 5.1 },
+      { id: 'order-in-transit', deliveryFee: 5.1 },
       { id: 'order-delivered', deliveryFee: 5.4 },
+      { id: 'order-assigned', deliveryFee: 4.2 },
       { id: 'order-support', deliveryFee: 4.8 },
     ];
     ordersServiceMock.checkoutFromCart
       .mockResolvedValueOnce(orders[0])
       .mockResolvedValueOnce(orders[1])
       .mockResolvedValueOnce(orders[2])
-      .mockResolvedValueOnce(orders[3]);
+      .mockResolvedValueOnce(orders[3])
+      .mockResolvedValueOnce(orders[4]);
     jest
       .spyOn(service as any, 'confirmDemoProviderOrderPayment')
       .mockResolvedValue(undefined);
     deliveryServiceMock.createDeliveryOrder
       .mockResolvedValueOnce({ id: 'delivery-1' })
       .mockResolvedValueOnce({ id: 'delivery-2' })
-      .mockResolvedValueOnce({ id: 'delivery-3' });
+      .mockResolvedValueOnce({ id: 'delivery-3' })
+      .mockResolvedValueOnce({ id: 'delivery-4' });
     deliveryServiceMock.assignRunner.mockResolvedValue({});
     deliveryServiceMock.markPickupPending.mockResolvedValue({});
     deliveryServiceMock.confirmPickup.mockResolvedValue({});
@@ -152,43 +177,104 @@ describe('DemoOrderScenarioService', () => {
     deliveryServiceMock.confirmDelivery.mockResolvedValue({});
     prismaMock.order.findUnique.mockResolvedValue({
       providerOrders: [{ id: 'provider-order-support' }],
-      deliveryOrder: { id: 'delivery-3' },
+      deliveryOrder: { id: 'delivery-4' },
     });
     prismaMock.deliveryIncident.create.mockResolvedValue({ id: 'incident-1' });
     prismaMock.refundRequest.create.mockResolvedValue({});
 
     const result = await service.createDemoOrders([
-      { id: 'prod-1', name: 'Pan artesano', cityId: 'city-1' },
-      { id: 'prod-2', name: 'Empanada gallega', cityId: 'city-1' },
-      { id: 'prod-3', name: 'Tomates ecológicos', cityId: 'city-1' },
-      { id: 'prod-4', name: 'Huevos camperos', cityId: 'city-1' },
-      { id: 'prod-5', name: 'Queso manchego', cityId: 'city-1' },
-      { id: 'prod-6', name: 'Aceite de oliva', cityId: 'city-1' },
+      {
+        id: 'prod-1',
+        name: 'Pan artesano',
+        cityId: 'city-toledo',
+        citySlug: 'toledo',
+      },
+      {
+        id: 'prod-2',
+        name: 'Cuenco de cerámica toledana',
+        cityId: 'city-toledo',
+        citySlug: 'toledo',
+      },
+      {
+        id: 'prod-3',
+        name: 'Ramo de temporada',
+        cityId: 'city-madrid',
+        citySlug: 'madrid',
+      },
+      {
+        id: 'prod-4',
+        name: 'Planta aromática',
+        cityId: 'city-madrid',
+        citySlug: 'madrid',
+      },
+      {
+        id: 'prod-5',
+        name: 'Naranjas dulces',
+        cityId: 'city-valencia',
+        citySlug: 'valencia',
+      },
+      {
+        id: 'prod-6',
+        name: 'Arroz de la Albufera',
+        cityId: 'city-valencia',
+        citySlug: 'valencia',
+      },
+      {
+        id: 'prod-7',
+        name: 'Cartera de piel',
+        cityId: 'city-sevilla',
+        citySlug: 'sevilla',
+      },
+      {
+        id: 'prod-8',
+        name: 'Café de tueste local',
+        cityId: 'city-bilbao',
+        citySlug: 'bilbao',
+      },
+      {
+        id: 'prod-9',
+        name: 'Chocolate artesano',
+        cityId: 'city-bilbao',
+        citySlug: 'bilbao',
+      },
     ]);
 
-    expect(ordersServiceMock.checkoutFromCart).toHaveBeenCalledTimes(4);
+    expect(ordersServiceMock.checkoutFromCart).toHaveBeenCalledTimes(
+      DEMO_ORDER_SCENARIOS.length,
+    );
     expect(
       (service as any).confirmDemoProviderOrderPayment,
-    ).toHaveBeenCalledTimes(3);
-    expect(deliveryServiceMock.createDeliveryOrder).toHaveBeenCalledTimes(3);
+    ).toHaveBeenCalledTimes(4);
+    expect(deliveryServiceMock.createDeliveryOrder).toHaveBeenCalledTimes(4);
     expect(deliveryServiceMock.assignRunner).toHaveBeenNthCalledWith(
       1,
       'delivery-1',
-      { runnerId: 'runner-1' },
+      { runnerId: 'runner-madrid' },
       'user-1',
+      [Role.CLIENT],
+    );
+    expect(deliveryServiceMock.assignRunner).toHaveBeenNthCalledWith(
+      2,
+      'delivery-2',
+      { runnerId: 'runner-valencia' },
+      'user-2',
       [Role.CLIENT],
     );
     expect(deliveryServiceMock.confirmDelivery).toHaveBeenCalledWith(
       'delivery-2',
-      'runner-2',
+      'runner-valencia',
       [Role.RUNNER],
-      { deliveryNotes: 'Entrega demo completada' },
+      { deliveryNotes: 'Entrega demo completada en Valencia' },
     );
+    expect(deliveryServiceMock.markPickupPending).toHaveBeenCalledTimes(3);
+    expect(deliveryServiceMock.confirmPickup).toHaveBeenCalledTimes(3);
+    expect(deliveryServiceMock.startTransit).toHaveBeenCalledTimes(3);
+    expect(deliveryServiceMock.updateRunnerLocation).toHaveBeenCalledTimes(3);
     expect(prismaMock.deliveryIncident.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          deliveryOrderId: 'delivery-3',
-          reporterId: 'user-2',
+          deliveryOrderId: 'delivery-4',
+          reporterId: 'user-1',
         }),
       }),
     );
