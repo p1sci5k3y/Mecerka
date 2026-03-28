@@ -126,7 +126,13 @@ function mapBackendItem(item: BackendOrderItem): OrderItem {
       stock: item.product.stock,
       city: item.product.city?.name || "N/A",
       category: item.product.category?.name || "N/A",
+      imageUrl: item.product.imageUrl ?? undefined,
       providerId: String(item.product.providerId),
+      provider: item.product.provider
+        ? {
+            name: item.product.provider.name,
+          }
+        : undefined,
       createdAt: item.product.createdAt
     } : undefined
   }

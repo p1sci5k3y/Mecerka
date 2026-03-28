@@ -38,6 +38,8 @@ El alcance real del MVP, verificable en frontend, backend, configuración y test
 - checkout oficial con dirección obligatoria, geocodificación backend y validación de cobertura;
 - pagos separados por `ProviderOrder`;
 - bloque separado de pago del runner;
+- tracking enriquecido con mapa, timeline, salud operativa y siguiente paso visible para cliente;
+- lectura de “siguiente acción” en superficies operativas y financieras de `RUNNER`, `PROVIDER` y `ADMIN`;
 - paneles operativos básicos para proveedor, runner y administración;
 - tests backend unitarios, de integración y end-to-end con infraestructura efímera.
 
@@ -70,6 +72,16 @@ La base documental del proyecto ya incluye diagramas alineados con el modelo rea
 - [Modelo de dominio resumido](docs/diagrams/domain-model-diagram.md)
 
 Los cuatro diagramas nuevos (`E/R`, `DFD nivel 0`, `DFD nivel 1` y `DFD checkout`) se han generado y revisado contra el schema Prisma actual, por lo que ya no describen una versión antigua o incompleta del modelo.
+
+## Superficie visible reciente
+
+Además del circuito base de compra y reparto, la versión actual ya deja visibles estas capas de operación:
+
+- tracking cliente con mapa, `ETA` orientativa, distancia restante, timeline e indicadores de salud operativa;
+- ficha operativa del runner con ruta embebida y bloque de siguiente acción;
+- centros financieros de `PROVIDER` y `RUNNER` con lectura explícita del siguiente paso financiero;
+- backoffice admin de incidencias y devoluciones con “siguiente acción de backoffice”;
+- panel admin de conectores de correo con `SMTP` y `AWS SES`, secretos cifrados y edición iniciada solo por acción explícita.
 
 ## Stack tecnológico
 

@@ -95,6 +95,7 @@ describe("ClientDashboard experience", () => {
               stock: 3,
               city: "Sevilla",
               category: "Cerámica",
+              imageUrl: "/demo-products/tomatoes.jpg",
               providerId: "prov-1",
               createdAt: "2026-03-20T10:00:00.000Z",
             },
@@ -122,6 +123,7 @@ describe("ClientDashboard experience", () => {
               stock: 2,
               city: "Madrid",
               category: "Cuero",
+              imageUrl: "/demo-products/olive-oil.jpg",
               providerId: "prov-2",
               createdAt: "2026-03-20T10:00:00.000Z",
             },
@@ -152,5 +154,8 @@ describe("ClientDashboard experience", () => {
       "href",
       "/orders/order-active/track",
     )
+    expect(
+      document.querySelector("[style*='/demo-products/tomatoes.jpg']"),
+    ).toBeInTheDocument()
   })
 })

@@ -49,7 +49,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - centro de `Mis pedidos`
 - centro de `Pagos y tarjetas`
 - centro de soporte del cliente
-- seguimiento de pedido por UUID real
+- seguimiento de pedido por UUID real con mapa, timeline, salud operativa y bloque de siguiente paso
 - flujo demo de pago fake cuando Stripe está en modo dummy
 
 ### Provider
@@ -67,7 +67,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - solicitud de rol
 - panel operativo con pedidos asignables y activos
 - aceptación de reparto y ciclo de reparto
-- tracking en tiempo real
+- tracking en tiempo real con ruta embebida y siguiente acción operativa
 - centro financiero con cobros y estado de Stripe Connect
 - soporte contextual ligado a la entrega
 
@@ -78,7 +78,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - gestión de usuarios y roles
 - backoffice de refunds e incidencias
 - historial de gobernanza por usuario
-- configuración SMTP visible y editable
+- configuración de conectores `SMTP` y `AWS SES` visible, cifrada y editable bajo acción explícita
 
 ### Sistema
 
@@ -117,11 +117,11 @@ Lectura honesta:
 - `Mis pedidos` con separación entre pendientes e histórico
 - navegación desde pagos a pedido y tracking
 - `Pagos y tarjetas` para cliente, dejando explícito que todavía no hay wallet persistente
-- finanzas de provider y runner con lectura honesta de Stripe Connect
+- finanzas de provider y runner con lectura honesta de Stripe Connect y siguiente acción priorizada
 - pago demo explícito para provider/runner cuando Stripe está en modo dummy
-- tracking soportando pedidos UUID reales
+- tracking soportando pedidos UUID reales con timeline, salud operativa, siguiente paso y ETA orientativa
 - soporte visible para cliente/provider/runner y admin
-- configuración SMTP desde admin
+- panel admin de correo con conectores `SMTP` / `AWS SES`, secretos cifrados y formulario oculto hasta iniciar nueva conexión o reconfiguración
 
 ## Limitaciones Reales Que Siguen Abiertas
 

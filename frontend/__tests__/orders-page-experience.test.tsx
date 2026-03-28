@@ -71,6 +71,7 @@ function makeOrder(overrides: Partial<Order> = {}): Order {
           stock: 5,
           city: "Madrid",
           category: "Cerámica",
+          imageUrl: "/demo-products/empanada.jpg",
           providerId: "provider-1",
           createdAt: "2026-03-20T10:00:00.000Z",
         },
@@ -155,6 +156,9 @@ describe("OrdersPage experience", () => {
       "href",
       "/orders/order-past",
     )
+    expect(
+      document.querySelector("[style*='/demo-products/empanada.jpg']"),
+    ).toBeInTheDocument()
   })
 
   it("shows only history cards when all orders are closed and keeps the total spent summary", async () => {

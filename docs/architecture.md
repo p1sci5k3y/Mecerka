@@ -83,7 +83,9 @@ El frontend se responsabiliza de:
 - navegación sensible al rol y rutas protegidas
 - exploración de catálogo
 - UX de carrito, checkout, pedidos, pagos y seguimiento
+- tracking enriquecido con mapa, timeline, salud operativa y siguiente paso
 - superficies de soporte, finanzas y backoffice admin
+- tarjetas de “siguiente acción” para runner, provider y admin en hubs operativos
 
 ### Controladores
 
@@ -189,9 +191,11 @@ En el estado actual, el panel admin soporta:
 
 Los secretos persistidos se almacenan cifrados y dependen de `SYSTEM_SETTINGS_MASTER_KEY` en producción. El despliegue dual inyecta esa clave compartida en ambos stacks renderizados.
 
-## Security-relevant architecture points
+La edición visible del conector no queda expuesta por defecto: el panel muestra primero el resumen operativo del conector activo y solo abre formularios de `SMTP` o `AWS SES` cuando el operador inicia una nueva conexión o una reconfiguración explícita.
 
-Security is enforced through:
+## Puntos Arquitectónicos Relevantes Para Seguridad
+
+La seguridad se hace cumplir mediante:
 
 - `JwtAuthGuard`
 - `MfaCompleteGuard`
@@ -201,7 +205,7 @@ Security is enforced through:
 - transactional role-assignment logic
 - structured logging with redaction
 
-The application does not rely on frontend-only checks for protection.
+La aplicación no depende de comprobaciones exclusivas de frontend para proteger recursos.
 
 ## Seeding architecture
 

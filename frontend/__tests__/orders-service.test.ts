@@ -47,6 +47,7 @@ function makeBackendOrder(): BackendOrder {
           price: "10.00",
           discountPrice: "8.50",
           stock: 3,
+          imageUrl: "/demo-products/bread.jpg",
           cityId: "city-1",
           providerId: "8",
           categoryId: "cat-1",
@@ -54,6 +55,7 @@ function makeBackendOrder(): BackendOrder {
           updatedAt: "2026-03-20T10:00:00.000Z",
           city: { id: "city-1", name: "Madrid", slug: "madrid" },
           category: { id: "cat-1", name: "Ceramica", slug: "ceramica" },
+          provider: { id: "8", name: "Taller Mar", email: "mar@example.com" },
         },
       },
     ],
@@ -129,6 +131,12 @@ describe("orders-service", () => {
       baseUnitPrice: 10,
       unitPrice: 8.5,
       discountAmount: 1.5,
+      product: {
+        imageUrl: "/demo-products/bread.jpg",
+        provider: {
+          name: "Taller Mar",
+        },
+      },
     })
     expect(order.providerOrders?.[0]).toMatchObject({
       id: "201",
