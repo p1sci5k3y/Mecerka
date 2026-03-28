@@ -216,6 +216,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       expect(result).toEqual({
         orderId: 'ord-1',
         status: 'ASSIGNED',
+        deliveryStatus: 'PICKUP_PENDING',
         runner: {
           id: 'runner-1',
           name: 'Runner Demo',
@@ -253,6 +254,7 @@ describe('OrdersService (Lifecycle Transitions & RBAC)', () => {
       expect(result).toEqual({
         orderId: 'ord-2',
         status: 'DELIVERING',
+        deliveryStatus: 'IN_TRANSIT',
         runner: {
           id: 'runner-1',
           name: 'Runner Demo',
