@@ -414,6 +414,9 @@ describe("Admin masters page", () => {
       expect(screen.getByText("Conectores de correo")).toBeInTheDocument()
     })
 
+    expect(screen.queryByLabelText("Host SMTP")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
+
     fireEvent.change(screen.getByLabelText("Host SMTP"), {
       target: { value: "email-smtp.eu-west-1.amazonaws.com" },
     })
@@ -463,6 +466,8 @@ describe("Admin masters page", () => {
     await waitFor(() => {
       expect(screen.getByText("Conectores de correo")).toBeInTheDocument()
     })
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
 
     fireEvent.change(screen.getByLabelText("Host SMTP"), {
       target: { value: "smtp.internal.local" },
@@ -514,6 +519,7 @@ describe("Admin masters page", () => {
 
     expect(screen.queryByDisplayValue("AKIA_TEST")).not.toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
     fireEvent.click(screen.getByRole("button", { name: "AWS SES" }))
     fireEvent.change(screen.getByLabelText("Region AWS"), {
       target: { value: "eu-west-1" },
@@ -549,6 +555,8 @@ describe("Admin masters page", () => {
       })
     })
 
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
+
     expect(screen.getByLabelText("Secret Access Key")).toHaveAttribute("placeholder", "Configurado")
     expect(screen.getByLabelText("Session Token (opcional)")).toHaveAttribute("placeholder", "Opcional")
   })
@@ -575,6 +583,7 @@ describe("Admin masters page", () => {
       expect(screen.getByText("Variables de entorno")).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole("button", { name: "Añadir conexión nueva" }))
     fireEvent.click(screen.getByRole("button", { name: "AWS SES" }))
     fireEvent.change(screen.getByLabelText("Region AWS"), {
       target: { value: "eu-west-1" },
@@ -607,8 +616,31 @@ describe("Admin masters page", () => {
       })
     })
 
-    fireEvent.click(screen.getByRole("button", { name: "SMTP" }))
+    fireEvent.click(screen.getByRole("button", { name: "Nueva conexión SMTP" }))
     expect(screen.getByLabelText("Host SMTP")).toBeInTheDocument()
+  })
+
+  it("keeps the connector form hidden until an operator explicitly starts a new setup", async () => {
+    currentTab = "email"
+
+    const Page = (await import("@/app/[locale]/admin/masters/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Conectores de correo")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Conector activo")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Host SMTP")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("Region AWS")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
+
+    expect(screen.getByLabelText("Host SMTP")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar edición" }))
+
+    expect(screen.queryByLabelText("Host SMTP")).not.toBeInTheDocument()
   })
 
   it("falls back to the cities tab by default and covers smtp status variants", async () => {
@@ -644,6 +676,8 @@ describe("Admin masters page", () => {
     expect(screen.getByText("Relay local de desarrollo")).toBeInTheDocument()
     expect(screen.getByText("No configuradas")).toBeInTheDocument()
     expect(screen.getByText(/^No$/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole("button", { name: "Añadir conexión nueva" }))
     expect(screen.getByLabelText("Secreto SMTP")).toHaveAttribute("placeholder", "")
   })
 
@@ -679,6 +713,8 @@ describe("Admin masters page", () => {
     await waitFor(() => {
       expect(screen.getByText("Conectores de correo")).toBeInTheDocument()
     })
+
+    fireEvent.click(screen.getByRole("button", { name: "Reconfigurar conexión" }))
 
     fireEvent.change(screen.getByLabelText("Host SMTP"), {
       target: { value: "email-smtp.eu-west-1.amazonaws.com" },
