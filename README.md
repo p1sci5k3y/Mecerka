@@ -243,22 +243,23 @@ Observaciones fieles al estado actual del repositorio:
 
 ## Estado Verificable Actual
 
-Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha **27 de marzo de 2026**:
+Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha **28 de marzo de 2026**:
 
 | Área | Resultado actual | Evidencia |
 | --- | --- | --- |
-| Frontend unitario | `59 files`, `228 tests`, OK | `cd frontend && npm run test:cov -- --reporter=dot` |
-| Frontend coverage | `92.17%` lines, `90.66%` statements, `81.85%` branches, `91.94%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
-| Backend unit/integration | `122 suites`, `1221 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
-| Backend coverage | `95.84%` lines, `95.99%` statements, `84.70%` branches, `93.55%` functions | `cd backend && npm run test:cov -- --runInBand` |
-| Demo pública | `runtime-config` correcto, login demo operativo y Stripe dummy activo | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
+| Frontend unitario | `73 files`, `274 tests`, OK | `cd frontend && npm run test:cov -- --maxWorkers=1` |
+| Frontend coverage | `86.28%` lines, `85.27%` statements, `74.50%` branches, `89.36%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
+| Backend unit/integration | `122 suites`, `1238 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
+| Backend coverage | `95.27%` lines, `95.41%` statements, `82.40%` branches, `92.88%` functions | `cd backend && npm run test:cov -- --runInBand` |
+| Demo pública | `runtime-config` correcto, login multirol operativo, Stripe dummy activo y SMTP admin visible | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
 
 Lectura honesta:
 
-- el frontend se mantiene ya por encima del `90%` y cubre bien los flujos críticos del circuito cliente/provider/runner/demo;
-- el backend vuelve a situarse por encima del frontend en cobertura global y amplitud de suites, y ya no deja ningún fichero real de código por debajo del `70%` de líneas;
+- el frontend sigue fuerte en cobertura, pero ya no está en el rango `>90%` documentado anteriormente;
+- el backend mantiene cobertura global muy alta y amplitud de suites;
 - el punto débil ya no es “falta de testing” en backend o frontend, sino seguir cerrando continuidad funcional y casos de uso visibles;
-- la demo pública ya usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend.
+- la demo pública usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend;
+- el correo ya no depende solo de variables de entorno: existe configuración SMTP visible desde `ADMIN -> Masters`.
 
 ## Estructuración
 

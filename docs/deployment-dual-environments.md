@@ -1,16 +1,16 @@
 # Dual Deployment: Demo and Production
 
-This repository is prepared to deploy the same build artifact to two isolated environments:
+This repository deploys the same application artifact into two isolated environments:
 
 - `mecerka.me` as production
 - `demo.mecerka.me` as demo
 
 ## Deployment model
 
-- Images are built once per commit in GitHub Actions.
-- The workflow publishes one backend image and one frontend image to GHCR, both tagged with the same commit SHA.
-- The deploy job checks out the same Git commit on the server and deploys that exact image tag to both stacks.
-- The frontend image is environment-agnostic: public runtime values are resolved at container runtime rather than baked into the image build.
+- Images are built from the same commit.
+- The workflow deploys one backend image and one frontend image.
+- The same codebase is used for both stacks.
+- Environment-specific behavior is controlled through secrets, runtime config, and data isolation.
 
 ## Isolation rules
 
@@ -20,31 +20,20 @@ Demo and production must not share:
 - persistent volume
 - Stripe credentials
 - mail configuration
-- JWT/FISCAL secrets
-- demo mode or demo password
+- JWT / fiscal secrets
+- demo mode
+- demo password
 
 Isolation is enforced by:
 
-- two environment files rendered on the server:
-  - `deploy/prod.env`
-  - `deploy/demo.env`
-- two Compose projects:
-  - `mecerka-prod`
-  - `mecerka-demo`
-- separate host ports for the reverse proxy:
-  - production: backend `3000`, frontend `3001`
-  - demo: backend `3010`, frontend `3011`
-- runtime-only frontend configuration:
-  - `API_BASE_URL=/api`
-  - `STRIPE_PUBLISHABLE_KEY` provided per environment
-  - browser requests must stay same-origin under `/{host}/api`; demo must never call `mecerka.me/api` from `demo.mecerka.me`
+- two environment files rendered on the server
+- two Compose projects
+- separate host ports behind Nginx
+- runtime-only frontend config under the same host using `"/api"`
 
 ## Required GitHub secrets / variables
 
-The deploy workflow expects separate values for demo and prod, using prefixes:
-
-- `PROD_*`
-- `DEMO_*`
+The deploy workflow expects split values with `PROD_*` and `DEMO_*` prefixes.
 
 Examples:
 
@@ -71,35 +60,44 @@ The workflow also needs:
 - `GHCR_TOKEN`
 - `LETSENCRYPT_EMAIL`
 
-## Reverse proxy
+## Reverse proxy and TLS
 
-`infrastructure/nginx.conf` is configured with two virtual hosts:
+`infrastructure/nginx.conf` routes:
 
 - `mecerka.me` and `www.mecerka.me`
 - `demo.mecerka.me`
 
-Each host proxies to its own frontend/backend localhost ports.
+TLS is managed by Certbot during deploy, followed by `nginx -t`, reload, and public smoke checks.
 
-TLS is managed during deploy with Certbot:
+## SMTP operational model
 
-- the deploy ensures `certbot` and DNS tooling are present on the host;
-- it checks that `mecerka.me`, `www.mecerka.me` and `demo.mecerka.me` resolve publicly to the same host before attempting certificate changes;
-- it issues or renews two certificates with Certbot standalone mode:
-  - `mecerka.me` covering `mecerka.me` and `www.mecerka.me`
-  - `demo.mecerka.me` covering `demo.mecerka.me`
-- after certificate issuance or renewal, the workflow installs the final Nginx config, runs `nginx -t` and reloads Nginx safely.
+Deployment still supports environment-driven SMTP through `PROD_MAIL_*` and `DEMO_MAIL_*`.
+
+In addition, the app now exposes admin-managed SMTP configuration:
+
+- infrastructure can keep mail fully secret-managed through environment
+- self-hosted operators can override SMTP from the admin UI
+- the effective source is visible as `environment`, `database`, or `default`
 
 ## Demo reset policy
 
-The GitHub Actions deploy recreates the demo stack from a clean volume on each deployment before bringing it back up.
+The demo stack is recreated from a clean volume on deploy so that the public demo does not accumulate stale business data between releases.
 
-This keeps `demo.mecerka.me` reproducible and prevents stale or mixed demo data from leaking across releases, while production keeps its own isolated persistent volume.
+## Validated current state
+
+At `28/03/2026`, the observable state is:
+
+- `https://mecerka.me/` and `https://mecerka.me/api/health` respond `200`
+- `https://demo.mecerka.me/` and `https://demo.mecerka.me/api/health` respond `200`
+- `https://demo.mecerka.me/runtime-config` serves `"/api"` and Stripe dummy
+- admin demo login reaches `/api/admin/email-settings`
+- the SMTP summary is visible and currently resolves from `environment` in the public demo
 
 ## Pending external infrastructure
 
-The repository leaves these points prepared but cannot provision them by itself:
+The repository does not provision by itself:
 
-- DNS records for `mecerka.me`, `www.mecerka.me` and `demo.mecerka.me`
-- GitHub secrets and variables with real environment values
-- GHCR credentials with permission to pull images on the server
-- optional `GHCR_USERNAME` secret if the pull token belongs to a different GitHub account than the repository owner
+- DNS
+- cloud secrets
+- GHCR access on the target host
+- SMTP provider accounts such as AWS SES

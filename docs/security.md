@@ -14,6 +14,7 @@ Implemented controls:
 - email verification before login;
 - token invalidation through `tokenVersion`;
 - MFA support with a dedicated completion guard.
+- cookie-based session handling with HttpOnly cookies in the app integration.
 
 ### JWT validation model
 
@@ -148,6 +149,14 @@ The backend uses a structured logger with recursive redaction for sensitive fiel
 - `fiscalIdLast4`
 
 The logger is therefore designed to reduce accidental disclosure in operational traces.
+
+## Operational email configuration
+
+The project now supports admin-managed SMTP configuration persisted in the database, in addition to environment-based configuration.
+
+This improves self-hosting ergonomics, but also creates a clear next hardening target:
+
+- persisted SMTP credentials should be treated as application secrets and strengthened with encryption at rest.
 
 ## Payment security
 

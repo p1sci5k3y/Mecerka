@@ -8,23 +8,25 @@ flowchart TB
 
     subgraph "Frontend Container"
       next["Next.js App"]
-      playwright["Playwright E2E"]
+      playwright["Playwright / Browser E2E"]
     end
 
     subgraph "Backend Container"
-      api["NestJS Controllers"]
-      services["Domain/Application Services"]
-      prisma["Prisma ORM / PrismaClient"]
-      obs["Observability + Risk + Demo"]
+      api["NestJS Controllers / WebSockets"]
+      services["Application Services"]
+      prisma["Prisma Client"]
+      support["Support / Refund / Demo / Risk"]
+      emailcfg["EmailSettingsService"]
     end
 
-    subgraph "Database Container / External DB"
+    subgraph "Database"
       postgres["PostgreSQL"]
     end
 
     subgraph "External Services"
-      stripe["Stripe Webhooks + Connected Accounts"]
-      mail["SMTP / Mailpit"]
+      stripe["Stripe / Connect"]
+      smtp["SMTP / SES / Mailpit"]
+      geo["Geocoding"]
     end
 
     browser --> next
@@ -32,9 +34,11 @@ flowchart TB
     next --> api
     api --> services
     services --> prisma
-    obs --> prisma
+    support --> prisma
+    emailcfg --> prisma
     prisma --> postgres
     services --> stripe
     stripe --> api
-    services --> mail
+    services --> smtp
+    services --> geo
 ```

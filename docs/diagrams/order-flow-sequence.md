@@ -4,39 +4,40 @@
 sequenceDiagram
     participant U as User
     participant F as Frontend
-    participant C as CartController
-    participant O as OrdersService
-    participant P as PaymentsService
-    participant D as DeliveryService
+    participant C as Cart / Orders API
+    participant O as Orders Services
+    participant P as Payments / Delivery
+    participant S as Support / Refunds
+    participant A as Admin Backoffice
     participant DB as PostgreSQL
-    participant S as Stripe
+    participant X as Stripe / SMTP
 
-    U->>F: Add products from marketplace
+    U->>F: Add products
     F->>C: POST /cart/items
-    C->>O: add/update cart state
-    O->>DB: persist cart groups and items
+    C->>O: update grouped cart
+    O->>DB: persist CartGroup / CartProvider / CartItem
 
     U->>F: Checkout
     F->>C: POST /cart/checkout
     C->>O: checkoutFromCart()
     O->>DB: create Order + ProviderOrders + StockReservations
 
-    F->>P: POST /payments/provider-order/:id/session
-    P->>DB: create ProviderPaymentSession
-    P->>S: create PaymentIntent on provider account
-    S-->>P: externalSessionId
-    P->>DB: activate session
+    F->>P: Create provider / runner payment sessions
+    P->>DB: persist payment sessions
+    P->>X: create Stripe sessions or demo payment flow
+    X-->>P: callbacks / completion
+    P->>DB: settle provider / runner payments
 
-    S-->>F: payment succeeds externally
-    S-->>P: webhook payment_intent.succeeded
-    P->>DB: claim webhook + lock inventory + consume reservations + mark ProviderOrder paid
-    P->>DB: recompute root Order state
+    F->>P: Delivery lifecycle
+    P->>DB: create / update DeliveryOrder
+    P->>DB: persist tracking
 
-    F->>D: POST /delivery/orders
-    D->>DB: create DeliveryOrder
-    D->>DB: assign or dispatch runner
+    U->>F: Open incident or refund
+    F->>S: POST /delivery/incidents or /refunds
+    S->>DB: persist support case
 
-    D->>DB: update delivery lifecycle
-    D->>DB: persist runner tracking updates
-    D->>DB: mark delivery completed
+    A->>F: Review case or SMTP config
+    F->>S: Admin actions
+    S->>DB: persist audit / resolution / settings
+    S->>X: optional SMTP test mail
 ```

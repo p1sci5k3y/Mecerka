@@ -1,6 +1,6 @@
 # Estado Del Proyecto
 
-Fecha de actualización: `27/03/2026`
+Fecha de actualización: `28/03/2026`
 
 ## Resumen Ejecutivo
 
@@ -14,27 +14,27 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - `Frontend`: funcional, con cobertura alta y defensa fuerte de flujos críticos.
 - `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
 - `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
-- `Documentación`: README y wiki actualizados; este documento queda alineado con ese estado.
+- `Documentación`: README, wiki y diagramas reajustados al modelo actual del sistema.
 
 ## Métricas Verificadas
 
 ### Backend
 
-- Cobertura statements: `95.99%`
-- Cobertura branches: `84.70%`
-- Cobertura functions: `93.55%`
-- Cobertura lines: `95.84%`
+- Cobertura statements: `95.41%`
+- Cobertura branches: `82.40%`
+- Cobertura functions: `92.88%`
+- Cobertura lines: `95.27%`
 - Suites: `122`
-- Tests: `1221`
+- Tests: `1238`
 
 ### Frontend
 
-- Cobertura statements: `90.66%`
-- Cobertura branches: `81.85%`
-- Cobertura functions: `91.94%`
-- Cobertura lines: `92.17%`
-- Archivos de test: `59`
-- Tests: `228`
+- Cobertura statements: `85.27%`
+- Cobertura branches: `74.50%`
+- Cobertura functions: `89.36%`
+- Cobertura lines: `86.28%`
+- Archivos de test: `73`
+- Tests: `274`
 
 ## Capacidades Cerradas
 
@@ -48,6 +48,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - pagos separados por provider y runner
 - centro de `Mis pedidos`
 - centro de `Pagos y tarjetas`
+- centro de soporte del cliente
 - seguimiento de pedido por UUID real
 - flujo demo de pago fake cuando Stripe está en modo dummy
 
@@ -59,6 +60,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - transición hasta `READY_FOR_PICKUP`
 - centro de `Cobros y devoluciones`
 - visibilidad de Stripe Connect y refunds ligados a `ProviderOrder`
+- soporte contextual ligado a `ProviderOrder` y entrega
 
 ### Runner
 
@@ -67,13 +69,16 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - aceptación de reparto y ciclo de reparto
 - tracking en tiempo real
 - centro financiero con cobros y estado de Stripe Connect
+- soporte contextual ligado a la entrega
 
 ### Admin
 
 - rutas protegidas
 - dashboard de métricas
 - gestión de usuarios y roles
-- visibilidad de refund requests y gobierno operativo base
+- backoffice de refunds e incidencias
+- historial de gobernanza por usuario
+- configuración SMTP visible y editable
 
 ### Sistema
 
@@ -84,6 +89,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - Stripe Connect / split payments
 - modo demo con dataset reseteable y credenciales compartidas
 - deploy dual con runtime config aislado por host
+- configuración SMTP persistible vía `SystemSetting`
 
 ## Casos De Uso Priorizados
 
@@ -113,12 +119,15 @@ Lectura honesta:
 - finanzas de provider y runner con lectura honesta de Stripe Connect
 - pago demo explícito para provider/runner cuando Stripe está en modo dummy
 - tracking soportando pedidos UUID reales
+- soporte visible para cliente/provider/runner y admin
+- configuración SMTP desde admin
 
 ## Limitaciones Reales Que Siguen Abiertas
 
 - no existe todavía una wallet persistente de tarjetas del cliente
 - la gestión de refunds sigue siendo más sólida en backend que en frontend
-- admin/backoffice aún necesita más recorrido visible para resolución completa de incidencias
+- `provider` y `runner` siguen sin inbox global propia de casos
+- la persistencia de secretos SMTP merece cifrado en reposo
 - faltan más flujos e2e públicos sobre demo para defensa integral por perfil
 
 ## Riesgos Actuales
@@ -130,15 +139,15 @@ Lectura honesta:
 
 ### Prioridad 1
 
-1. cerrar frontend/backoffice de cancelación y refund visible
-2. reforzar continuidad entre paneles operativos y financieros de provider/runner
+1. endurecer secretos SMTP persistidos
+2. crear inbox global de soporte para `PROVIDER` y `RUNNER`
 3. ampliar e2e públicos y demo multi-rol
 
 ### Prioridad 2
 
 1. tabla funcional formal de estados para defensa
-2. rematar hotspots frontend restantes (`navbar`, `runner`, `provider/finance`, `runtime-config`)
-3. consolidar backoffice visible de incidencias y refunds
+2. cerrar wallet/métodos de pago persistentes del cliente
+3. mantener documentación y métricas recalculadas tras bloques fuertes
 
 ## Conclusión
 

@@ -8,8 +8,10 @@ flowchart LR
     admin["Supervisor / ADMIN"] --> frontend
 
     frontend --> backend["NestJS Backend API"]
-    backend --> db["PostgreSQL (external runtime dependency)"]
-    backend --> stripe["Stripe Connected Accounts"]
-    backend --> mail["SMTP / Mailpit"]
+    backend --> db["PostgreSQL"]
+    backend --> stripe["Stripe / Connect"]
+    backend --> geo["Geocoding"]
+    backend --> ws["Socket.IO Tracking"]
+    backend --> mail["SMTP / SES / Mailpit"]
     stripe --> backend
 ```

@@ -18,19 +18,23 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 - documentación actualizada en README y wiki con métricas, credenciales demo y arquitectura vigente
 - cobertura frontend real con `@vitest/coverage-v8` y artifacts en CI
 - nuevo bloque de tests frontend sobre `login`, `cart`, `payments`, `orders`, `admin`, `runner`, `provider` y servicios asociados
+- centros de soporte para `CLIENT`, `PROVIDER` y `RUNNER`
+- backoffice admin de incidencias, refunds y gobierno con detalle de caso
+- configuración SMTP desde `ADMIN -> Masters -> Correo SMTP`
 
 ### Changed
 
 - la demo pública usa la misma app y el mismo circuito real que producción, aislando datos e integraciones por entorno
 - `runtime-config` queda forzado a `/api` bajo el mismo host para evitar cruces demo -> prod
-- la cobertura frontend queda en `92.17%` líneas (`228` tests, `59` archivos) y se mantiene en rango alto
-- el backend sube a `95.84%` líneas (`1221` tests, `122` suites) y deja `0` ficheros reales por debajo del `70%` de líneas
+- la cobertura frontend recalculada queda en `86.28%` líneas (`274` tests, `73` archivos)
+- el backend recalculado queda en `95.27%` líneas (`1238` tests, `122` suites)
 - la documentación principal se corrige de nuevo para reflejar el estado real actual de coverage entre frontend y backend
 - despliegue dual endurecido con preflight de secrets, limpieza de puertos, warmup de Nginx y smoke checks más robustos
 - `security.yml` ahora pasa `GITHUB_TOKEN` explícitamente a Gitleaks en PRs
 - `ci.yml` usa la CLI local de Prisma vía `npm exec -- prisma ...` para evitar incompatibilidades del runner con Prisma 7
 - dependencias `picomatch` fijadas a versiones seguras en lockfiles raíz, backend y frontend
 - demo seed alineada para que las cuentas compartan credenciales conocidas y el dataset pueda reseedearse de forma consistente
+- el correo admite configuración efectiva desde panel admin, con fallback a entorno
 
 ### Fixed
 
