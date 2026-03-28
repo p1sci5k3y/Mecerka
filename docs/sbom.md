@@ -53,17 +53,17 @@ Because the repository contains multiple Node.js workspaces, the practical recom
 - backend
 - frontend
 
-This avoids flattening unrelated component trees into a single ambiguous artifact.
+Esto evita aplanar árboles de componentes no relacionados en un único artefacto ambiguo.
 
 ## Integración con workflows
 
-SBOM generation can be used:
+La generación de SBOM puede usarse:
 
 - locally, before a release or audit;
 - in CI, as a generated artifact for each build;
 - during security review, to feed SCA tooling.
 
-Typical downstream uses:
+Usos típicos posteriores:
 
 - vulnerability scanning;
 - compliance review;
@@ -72,14 +72,14 @@ Typical downstream uses:
 
 ## Posicionamiento
 
-An SBOM does **not** replace:
+Una SBOM **no** sustituye a:
 
 - code review;
 - dependency updates;
 - patch management;
 - continuous security monitoring.
 
-It complements tooling such as:
+Complementa herramientas como:
 
 - Trivy
 - Dependabot

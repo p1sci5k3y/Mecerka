@@ -1,31 +1,31 @@
 # Entorno De Pruebas Demo
 
-## Propósito of Demo Mode
+## Propósito del Demo Mode
 
-Demo mode provides a reproducible marketplace dataset so examiners can exercise the platform without manual setup.
+El demo mode proporciona un dataset reproducible del marketplace para que evaluadores y tribunal puedan recorrer la plataforma sin preparación manual.
 
-It is designed to:
+Está diseñado para:
 
-- create coherent users for all core roles
-- create demo providers and products with images
-- generate sample orders in different lifecycle stages
-- allow repeated end-to-end test runs through reset + reseed
+- crear usuarios coherentes para todos los roles principales;
+- crear providers y productos demo con imágenes;
+- generar pedidos de ejemplo en distintas fases del ciclo de vida;
+- permitir ejecuciones repetidas de pruebas end-to-end mediante `reset + reseed`.
 
-The demo environment is isolated to test accounts using `@local.test`.
+El entorno demo queda aislado a cuentas de prueba bajo `@local.test`.
 
-When demo mode is explicitly enabled, the backend auto-seeds this dataset on startup if the demo records do not already exist.
+Cuando el demo mode se habilita explícitamente, el backend siembra este dataset al arrancar si los registros demo todavía no existen.
 
-Demo mode requires an explicit `DEMO_PASSWORD` value. The backend does not ship a built-in demo password.
+El demo mode exige una `DEMO_PASSWORD` explícita. El backend no entrega una contraseña demo embebida.
 
 ## Arranque rápido
 
-1. Start PostgreSQL.
-2. Run the backend.
-3. Run the frontend.
-4. Log in with the demo users below and explore the platform.
-5. If you need a clean baseline, authenticate as an admin user and call `POST /demo/reset`.
+1. Arrancar PostgreSQL.
+2. Arrancar el backend.
+3. Arrancar el frontend.
+4. Iniciar sesión con los usuarios demo y recorrer la plataforma.
+5. Si necesitas una línea base limpia, autenticarte como admin y llamar a `POST /demo/reset`.
 
-Example reset flow:
+Ejemplo de flujo de reset:
 
 ```bash
 curl -c cookies.txt -X POST http://127.0.0.1:3000/auth/login \
@@ -39,20 +39,20 @@ curl -b cookies.txt -X POST http://127.0.0.1:3000/demo/reset
 
 ## Cómo resetear el entorno
 
-Available endpoints:
+Endpoints disponibles:
 
 - `POST /demo/seed`
 - `POST /demo/reset`
 
-Behavior:
+Comportamiento:
 
 - `POST /demo/seed`
-  - creates the demo dataset
-  - if demo data already exists, it resets first
+  - crea el dataset demo
+  - si los datos demo ya existen, primero hace reset
 - `POST /demo/reset`
-  - removes demo-only data for `*@local.test`
-  - reseeds automatically
-  - returns:
+  - elimina datos exclusivos de demo para `*@local.test`
+  - vuelve a sembrar automáticamente
+  - devuelve:
 
 ```json
 {
@@ -60,11 +60,11 @@ Behavior:
 }
 ```
 
-This makes repeated manual testing and Playwright reruns deterministic.
+Esto hace deterministas las pruebas manuales repetidas y las reruns de Playwright.
 
 ## Usuarios de prueba
 
-Default demo accounts:
+Cuentas demo por defecto:
 
 - `admin.demo@local.test`
 - `provider.demo@local.test`
@@ -74,9 +74,9 @@ Default demo accounts:
 - `user.demo@local.test`
 - `user2.demo@local.test`
 
-All of these accounts use the password configured in `DEMO_PASSWORD`.
+Todas estas cuentas usan la contraseña configurada en `DEMO_PASSWORD`.
 
-The Playwright suite also supports reading these from [`frontend/.env.test`](../frontend/.env.test).
+La suite de Playwright también soporta leerlas desde [`frontend/.env.test`](../frontend/.env.test).
 
 Roles:
 
@@ -90,16 +90,16 @@ Roles:
 
 ## Providers demo
 
-The seeded provider-facing businesses are:
+Los negocios sembrados para provider son:
 
 - `Panadería San Isidro`
 - `Verduras del Tajo`
 
-These providers are created through existing domain services and receive demo payment-account bootstrap values so marketplace flows can run in local/demo mode.
+Estos providers se crean a través de los servicios de dominio existentes y reciben bootstrap de cuentas de pago demo para que los flujos del marketplace funcionen en local/demo mode.
 
 ## Productos demo
 
-The demo catalog includes:
+El catálogo demo incluye:
 
 - `Pan artesano`
 - `Empanada gallega`
@@ -108,11 +108,11 @@ The demo catalog includes:
 - `Queso manchego`
 - `Aceite de oliva`
 
-Images are served from:
+Las imágenes se sirven desde:
 
 - [`frontend/public/demo-products`](../frontend/public/demo-products)
 
-Each demo product includes:
+Cada producto demo incluye:
 
 - name
 - price
@@ -122,20 +122,20 @@ Each demo product includes:
 
 ## Lifecycle de pedido en demo
 
-The demo seed creates at least:
+El demo seed crea al menos:
 
 - 1 pending order
 - 1 delivering order
 - 1 delivered order
 
-Operational characteristics:
+Características operativas:
 
-- at least one order has a runner assigned
-- demo runner locations are seeded for tracking flows
-- provider orders are created consistently with existing order/payment logic
-- delivery state is represented through the existing delivery domain, not direct database writes to stable commerce flows
+- al menos un pedido tiene runner asignado
+- las ubicaciones demo del runner se siembran para los flujos de tracking
+- los provider orders se crean de forma consistente con la lógica existente de pedido y pago
+- el estado de entrega se representa a través del dominio real de delivery, no mediante escrituras directas a base de datos
 
-Typical states visible during testing:
+Estados típicos visibles durante las pruebas:
 
 - pending or payment-ready order
 - assigned / delivering order
@@ -143,12 +143,12 @@ Typical states visible during testing:
 
 ## Coverage Playwright
 
-Current Playwright coverage lives in:
+La cobertura actual de Playwright vive en:
 
 - [`frontend/e2e`](../frontend/e2e)
 - [`frontend/tests/e2e`](../frontend/tests/e2e)
 
-Covered journeys:
+Recorridos cubiertos:
 
 - Auth
   - demo login
@@ -171,12 +171,12 @@ Covered journeys:
   - list users/providers
   - inspect orders through admin-capable flows
 
-The E2E suite resets demo data before tests so each run starts from a known baseline.
+La suite E2E resetea los datos demo antes de las pruebas para que cada ejecución parta de una línea base conocida.
 
-Because the demo module writes real application data through existing services, both manual demo runs and Playwright runs require the backend to be connected to the same PostgreSQL-backed application stack used in normal execution.
+Como el módulo demo escribe datos reales de aplicación a través de servicios existentes, tanto las pruebas manuales como Playwright necesitan que el backend esté conectado al mismo stack con PostgreSQL usado en la ejecución normal.
 
 ## Notas
 
-- Demo data is intended for local testing and evaluation only.
-- Test identities must use `local.test` or `example.test` domains.
-- No real payment credentials, personal emails, or production user data should be used in demo mode.
+- Los datos demo están pensados solo para pruebas locales y evaluación.
+- Las identidades de prueba deben usar dominios `local.test` o `example.test`.
+- No deben usarse credenciales de pago reales, correos personales ni datos de producción en demo mode.

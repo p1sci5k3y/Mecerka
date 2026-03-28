@@ -14,11 +14,11 @@ No usar el `coverage` como métrica decorativa. La campaña busca que las specs 
 ## Snapshot actual
 
 - `73` files de test ejecutados
-- `352` tests
-- `91.02%` statements
-- `84.21%` branches
+- `356` tests
+- `91.13%` statements
+- `84.41%` branches
 - `93.20%` functions
-- `92.12%` lines
+- `92.20%` lines
 
 Referencia de salida:
 
@@ -238,7 +238,7 @@ Resultado:
 - `order detail` sube con matrices más completas de vocabulario de negocio, fallback de dirección, reparto y productos, además de la rama de `route param` ausente;
 - `ProviderOrderCard` y `RunnerActiveOrderView` pasan a cobertura prácticamente completa en ramas reales, con fallbacks de nombres, tiempos, estado desconocido y tramos sin ruta;
 - `runner order detail` queda en `100%` al eliminar defensas muertas y cubrir la matriz completa de estados visibles;
-- este bloque deja la foto global en `84.21%` de `branches`, con `352` tests y `92.12%` de líneas.
+- este bloque dejó la foto global en `84.21%` de `branches`, con `352` tests y `92.12%` de líneas.
 
 ## Bugs reales detectados y corregidos durante la campaña
 
@@ -295,6 +295,7 @@ Resultado:
 - suite global `frontend test:cov -- --maxWorkers=1`: `73 files`, `343 tests`, `OK`
 - bloque `masters + order detail + order cards`: `4 files`, `28 tests`, `OK`
 - suite global `frontend test:cov -- --maxWorkers=1`: `73 files`, `352 tests`, `OK`
+- snapshot actual recalculada tras el cierre documental: `73 files`, `356 tests`, `91.13%` statements, `84.41%` branches, `93.27%` functions, `92.20%` lines, `OK`
 
 ## Siguiente cola priorizada
 

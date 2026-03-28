@@ -2,35 +2,35 @@
 
 ## Propósito
 
-The demo environment allows evaluators to exercise the real platform with reproducible sample data. It is not a separate fake frontend: it is the same application and API, isolated by data and runtime config.
+El entorno demo permite a evaluadores y tribunal recorrer la plataforma real con datos reproducibles. No es un frontend fake separado: es la misma aplicación y la misma API, aisladas por datos y `runtime config`.
 
-## Demo mode is opt-in
+## Demo mode es opt-in
 
-`DEMO_MODE` is disabled by default in the shipped configuration.
+`DEMO_MODE` está desactivado por defecto en la configuración entregada.
 
-To enable demo mode locally:
+Para habilitar demo mode en local:
 
 ```env
 DEMO_MODE=true
 DEMO_PASSWORD=choose-a-demo-password
 ```
 
-`DEMO_PASSWORD` is mandatory when demo mode is enabled.
+`DEMO_PASSWORD` es obligatoria cuando el demo mode está activo.
 
-## Data seeding strategy
+## Estrategia de seeding
 
 ### Base seed
 
-Always runs and ensures structural data exists:
+Siempre corre y garantiza datos estructurales:
 
 - cities
 - categories
 
 ### Demo seed
 
-Runs only when `DEMO_MODE=true`.
+Solo corre cuando `DEMO_MODE=true`.
 
-It creates:
+Crea:
 
 - demo users
 - demo products
@@ -38,7 +38,7 @@ It creates:
 - demo deliveries
 - demo support/refund scenarios
 
-## Demo endpoints
+## Endpoints demo
 
 - `POST /demo/seed`
 - `POST /demo/reset`
@@ -50,9 +50,9 @@ These routes are protected by:
 - MFA completion
 - admin role
 
-## Demo users
+## Usuarios demo
 
-The demo dataset includes:
+El dataset demo incluye:
 
 - `admin.demo@local.test`
 - `provider.demo@local.test`
@@ -62,9 +62,9 @@ The demo dataset includes:
 - `user.demo@local.test`
 - `user2.demo@local.test`
 
-All demo users share `DEMO_PASSWORD`.
+Todos los usuarios demo comparten `DEMO_PASSWORD`.
 
-## Validated public-demo behavior
+## Comportamiento validado en la demo pública
 
 At `28/03/2026`, the public demo is observable with:
 
@@ -73,16 +73,16 @@ At `28/03/2026`, the public demo is observable with:
 - `PROVIDER` and `RUNNER` access to operational and finance hubs
 - `ADMIN` access to users, refunds, incidents, and email settings
 
-Important nuance:
+Matiz importante:
 
 - `PROVIDER` and `RUNNER` support is currently stronger in contextual hubs (`provider/support`, `runner/support`, order/delivery detail) than in role-global `/me` endpoints
-- this is a valid product state, but not yet a unified support inbox for those roles
+- este es un estado de producto válido, pero todavía no es una inbox global unificada de soporte para esos roles
 
-## Security considerations
+## Consideraciones de seguridad
 
 > [!CAUTION]
 > `DEMO_MODE` must never be enabled on a real production tenant with live users or live business data.
 
 - `DEMO_PASSWORD` is mandatory
-- demo passwords should still be strong
+- las contraseñas demo deben seguir siendo fuertes
 - in cloud deployments, `DEMO_PASSWORD` must come from secrets, never from committed source

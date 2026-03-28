@@ -147,17 +147,17 @@ Users can only read their own orders unless they are:
 
 Runners can only update deliveries assigned to them, unless an admin acts.
 
-### Payment Boundary
+### Frontera de pago
 
-Payments are scoped to `ProviderOrder` through `ProviderPaymentSession`.
+Los pagos quedan acotados a `ProviderOrder` a través de `ProviderPaymentSession`.
 
-The platform should never charge against the root `Order` as merchant-of-record logic.
+La plataforma no debe cobrar nunca contra la `Order` raíz como lógica de merchant of record.
 
-### Inventory Safety
+### Seguridad de inventario
 
-`StockReservation` is created at checkout and consumed when provider payment is confirmed.
+`StockReservation` se crea en checkout y se consume cuando el pago del provider queda confirmado.
 
-This protects the invariant:
+Esto protege la invariante:
 
 `reservation -> stock decrement -> provider order payment`
 
@@ -165,7 +165,7 @@ This protects the invariant:
 
 ### Lifecycle del pedido raíz
 
-Typical root order progression:
+Progresión típica del pedido raíz:
 
 - `PENDING`
 - `CONFIRMED`
@@ -176,11 +176,11 @@ Typical root order progression:
 
 ### Lifecycle del ProviderOrder
 
-Provider orders progress independently as merchants accept and prepare their own items.
+Los `ProviderOrder` progresan de forma independiente a medida que cada comercio acepta y prepara sus propios artículos.
 
-### Reparto Lifecycle
+### Lifecycle del reparto
 
-`DeliveryOrder` progresses through:
+`DeliveryOrder` progresa por:
 
 - `RUNNER_ASSIGNED`
 - `PICKUP_PENDING`
@@ -188,6 +188,6 @@ Provider orders progress independently as merchants accept and prepare their own
 - `IN_TRANSIT`
 - `DELIVERED`
 
-See:
+Ver también:
 
 - [Order Flow Sequence](diagrams/order-flow-sequence.md)

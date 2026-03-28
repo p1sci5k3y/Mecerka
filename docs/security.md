@@ -178,8 +178,8 @@ Demo y producción se aíslan por:
 A fecha `28/03/2026`:
 
 - `frontend npm audit --omit=dev` no reporta vulnerabilidades;
-- `backend npm audit --omit=dev` reporta una vulnerabilidad alta transitiva en `path-to-regexp` a través del stack de Nest 11;
-- el repositorio fija `path-to-regexp@8.4.0` por override para cerrar esa cadena en el lockfile.
+- `backend npm audit --omit=dev` no reporta vulnerabilidades;
+- el repositorio fija `path-to-regexp@8.4.0` por override para cerrar la cadena transitiva que aparecía en auditorías anteriores.
 
 ## Qué No Se Está Afirmando
 

@@ -103,23 +103,23 @@ The Playwright suite is intended to validate:
 - runner order lifecycle;
 - admin supervision flows.
 
-## Full-stack E2E execution
+## Ejecución E2E full-stack
 
-Recommended command:
+Comando recomendado:
 
 ```bash
 cd frontend
 npm run test:e2e:full
 ```
 
-This flow expects the real stack to be reachable and may rely on demo data only if demo mode has been explicitly enabled.
+Este flujo espera que el stack real esté accesible y puede apoyarse en datos demo solo si el demo mode se ha habilitado explícitamente.
 
-## What is intentionally not claimed
+## Qué no se está afirmando de forma intencional
 
-The repository should not claim:
+El repositorio no debe afirmar:
 
 - global idempotency across the entire platform;
 - perfect coverage of every route;
 - full zero-dependency E2E in the browser layer.
 
-The accurate claim is that the project has **strong automated validation of its critical backend security, privacy, and concurrency behavior**, and that these validations run in an isolated and reproducible environment.
+La afirmación correcta es que el proyecto tiene **validación automatizada fuerte sobre el comportamiento crítico de seguridad, privacidad y concurrencia del backend**, y que esas validaciones corren en un entorno aislado y reproducible.

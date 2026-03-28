@@ -70,7 +70,7 @@ Estado auditado sobre `main` a `28/03/2026`, con foco en los flujos que hoy mejo
 
 1. Formalizar `UC-003` con tabla funcional de estados.
 2. Cerrar `UC-004` y `UC-006` como experiencia visible completa por rol.
-3. Endurecer el circuito de correo y secretos operativos.
+3. Consolidar la experiencia operativa visible de soporte, cancelación y refund.
 
 ### Prioridad 2
 

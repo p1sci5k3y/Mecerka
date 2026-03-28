@@ -14,7 +14,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - `Frontend`: funcional, con cobertura alta y defensa fuerte de flujos críticos.
 - `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
 - `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
-- `Documentación`: README, wiki y diagramas reajustados al modelo actual del sistema.
+- `Documentación`: README, wiki y diagramas reajustados al modelo actual del sistema, incluyendo E/R y DFDs derivados del schema Prisma vigente.
 
 ## Métricas Verificadas
 
@@ -24,17 +24,17 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - Cobertura branches: `82.40%`
 - Cobertura functions: `92.88%`
 - Cobertura lines: `95.27%`
-- Suites: `122`
-- Tests: `1238`
+- Suites: `124`
+- Tests: `1274`
 
 ### Frontend
 
-- Cobertura statements: `85.27%`
-- Cobertura branches: `74.50%`
-- Cobertura functions: `89.36%`
-- Cobertura lines: `86.28%`
+- Cobertura statements: `91.13%`
+- Cobertura branches: `84.41%`
+- Cobertura functions: `93.27%`
+- Cobertura lines: `92.20%`
 - Archivos de test: `73`
-- Tests: `274`
+- Tests: `356`
 
 ## Capacidades Cerradas
 
@@ -89,7 +89,8 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - Stripe Connect / split payments
 - modo demo con dataset reseteable y credenciales compartidas
 - deploy dual con runtime config aislado por host
-- configuración SMTP persistible vía `SystemSetting`
+- configuración `SMTP` y `AWS SES` persistible vía `SystemSetting`, con secretos cifrados en reposo
+- clave maestra compartida `SYSTEM_SETTINGS_MASTER_KEY` inyectada en ambos stacks de despliegue
 
 ## Casos De Uso Priorizados
 
@@ -126,8 +127,7 @@ Lectura honesta:
 
 - no existe todavía una wallet persistente de tarjetas del cliente
 - la gestión de refunds sigue siendo más sólida en backend que en frontend
-- `provider` y `runner` siguen sin inbox global propia de casos
-- la persistencia de secretos SMTP merece cifrado en reposo
+- `provider` y `runner` siguen sin inbox global propia de soporte
 - faltan más flujos e2e públicos sobre demo para defensa integral por perfil
 
 ## Riesgos Actuales
@@ -139,15 +139,15 @@ Lectura honesta:
 
 ### Prioridad 1
 
-1. endurecer secretos SMTP persistidos
-2. crear inbox global de soporte para `PROVIDER` y `RUNNER`
-3. ampliar e2e públicos y demo multi-rol
+1. crear inbox global de soporte para `PROVIDER` y `RUNNER`
+2. ampliar e2e públicos y demo multi-rol
+3. seguir cerrando la UX visible de cancelación / refund
 
 ### Prioridad 2
 
 1. tabla funcional formal de estados para defensa
 2. cerrar wallet/métodos de pago persistentes del cliente
-3. mantener documentación y métricas recalculadas tras bloques fuertes
+3. mantener documentación, wiki y diagramas recalculados tras bloques fuertes
 
 ## Conclusión
 

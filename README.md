@@ -56,6 +56,21 @@ flowchart LR
     B --> M["Mailpit / correo"]
 ```
 
+## Diagramas técnicos actuales
+
+La base documental del proyecto ya incluye diagramas alineados con el modelo real del código y el schema Prisma actual:
+
+- [Contexto del sistema](docs/diagrams/system-context.md)
+- [Diagrama de contenedores](docs/diagrams/container-diagram.md)
+- [Diagrama entidad-relación completo](docs/diagrams/er-overview.md)
+- [DFD nivel 0](docs/diagrams/dfd-nivel-0.md)
+- [DFD nivel 1](docs/diagrams/dfd-nivel-1.md)
+- [DFD nivel 2 del checkout](docs/diagrams/dfd-checkout-detalle.md)
+- [Secuencia del flujo de pedido](docs/diagrams/order-flow-sequence.md)
+- [Modelo de dominio resumido](docs/diagrams/domain-model-diagram.md)
+
+Los cuatro diagramas nuevos (`E/R`, `DFD nivel 0`, `DFD nivel 1` y `DFD checkout`) se han generado y revisado contra el schema Prisma actual, por lo que ya no describen una versión antigua o incompleta del modelo.
+
 ## Stack tecnológico
 
 ### Tecnologías verificadas en el repositorio
@@ -247,19 +262,19 @@ Las siguientes cifras están recalculadas sobre este árbol de trabajo en fecha 
 
 | Área | Resultado actual | Evidencia |
 | --- | --- | --- |
-| Frontend unitario | `73 files`, `274 tests`, OK | `cd frontend && npm run test:cov -- --maxWorkers=1` |
-| Frontend coverage | `86.28%` lines, `85.27%` statements, `74.50%` branches, `89.36%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
-| Backend unit/integration | `122 suites`, `1238 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
+| Frontend unitario | `73 files`, `356 tests`, OK | `cd frontend && npm run test:cov -- --maxWorkers=1` |
+| Frontend coverage | `92.20%` lines, `91.13%` statements, `84.41%` branches, `93.27%` functions | [`frontend/coverage/coverage-summary.json`](frontend/coverage/coverage-summary.json) |
+| Backend unit/integration | `124 suites`, `1274 tests`, OK | `cd backend && npm run test:cov -- --runInBand` |
 | Backend coverage | `95.27%` lines, `95.41%` statements, `82.40%` branches, `92.88%` functions | `cd backend && npm run test:cov -- --runInBand` |
-| Demo pública | `runtime-config` correcto, login multirol operativo, Stripe dummy activo y SMTP admin visible | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
+| Demo pública | `runtime-config` correcto, login multirol operativo, Stripe dummy activo y conectores de correo visibles desde admin | [demo.mecerka.me](https://demo.mecerka.me), [runtime-config](https://demo.mecerka.me/runtime-config) |
 
 Lectura honesta:
 
-- el frontend sigue fuerte en cobertura, pero ya no está en el rango `>90%` documentado anteriormente;
+- el frontend vuelve a estar en un rango alto y homogéneo de cobertura real, ya con `branches > 84%`;
 - el backend mantiene cobertura global muy alta y amplitud de suites;
 - el punto débil ya no es “falta de testing” en backend o frontend, sino seguir cerrando continuidad funcional y casos de uso visibles;
 - la demo pública usa la misma app y la misma API del circuito real, con clave pública Stripe dummy y flujo demo de pago soportado por el backend;
-- el correo ya no depende solo de variables de entorno: existe configuración SMTP visible desde `ADMIN -> Masters`.
+- el correo ya no depende solo de variables de entorno: existen conectores `SMTP` y `AWS SES` visibles desde `ADMIN -> Masters`, con secretos persistidos cifrados y gobernados por `SYSTEM_SETTINGS_MASTER_KEY`.
 
 ## Estructuración
 

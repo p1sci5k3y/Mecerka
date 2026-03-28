@@ -6,6 +6,19 @@ Mecerka es una plataforma de comercio local acotada a una ciudad que conecta `CL
 
 La implementación actual no separa demo y producción en aplicaciones distintas. Existe una sola aplicación, una sola API y una sola base de código, desplegadas en entornos aislados con datos, secretos y configuración de ejecución diferentes.
 
+## Mapa de diagramas vigente
+
+La arquitectura actual se apoya ya en un paquete de diagramas coherente con el código y el schema Prisma:
+
+- [Contexto del sistema](./diagrams/system-context.md)
+- [Contenedores](./diagrams/container-diagram.md)
+- [Entidad-relación completa](./diagrams/er-overview.md)
+- [DFD nivel 0](./diagrams/dfd-nivel-0.md)
+- [DFD nivel 1](./diagrams/dfd-nivel-1.md)
+- [DFD nivel 2 del checkout](./diagrams/dfd-checkout-detalle.md)
+- [Secuencia de pedido](./diagrams/order-flow-sequence.md)
+- [Modelo de dominio resumido](./diagrams/domain-model-diagram.md)
+
 ## Stack real de implementación
 
 - frontend con Next.js App Router
@@ -126,30 +139,30 @@ Conceptos persistentes importantes del modelo actual:
 - `ProviderPaymentSession`
 - `StockReservation`
 
-## Request flow
+## Flujo de petición
 
-Typical request flow remains:
+El flujo dominante de una petición sigue siendo:
 
-1. browser sends request
-2. controller receives request
-3. guards validate authentication, MFA, and roles
-4. DTO validation constrains input
-5. service applies business rules
-6. Prisma reads or writes PostgreSQL state
-7. structured response is returned
+1. el navegador envía la petición
+2. el controlador recibe la petición
+3. los guards validan autenticación, MFA y roles
+4. la validación DTO constriñe la entrada
+5. el servicio aplica las reglas de negocio
+6. Prisma lee o escribe estado en PostgreSQL
+7. se devuelve una respuesta estructurada
 
-The dominant backend flow is still:
+Traducido al modelo real del backend:
 
 `browser -> controller -> service -> Prisma -> PostgreSQL`
 
-## Demo and production model
+## Modelo de demo y producción
 
-The deployed architecture uses the same application for:
+La arquitectura desplegada usa la misma aplicación para:
 
 - `https://mecerka.me`
 - `https://demo.mecerka.me`
 
-The correct differences are:
+Las diferencias correctas entre ambos entornos son:
 
 - database
 - secrets
@@ -157,19 +170,24 @@ The correct differences are:
 - demo dataset
 - Stripe mode
 
-The application logic is the same.
+La lógica de aplicación es la misma.
 
-## Email / SMTP configuration model
+## Modelo de correo y conectores
 
-The mail subsystem is no longer purely environment-driven.
+El subsistema de correo ya no está gobernado solo por variables de entorno.
 
-The effective transport configuration now resolves in this order:
+La configuración efectiva del transporte resuelve en este orden:
 
-1. persisted admin configuration in `SystemSetting`
-2. environment variables
-3. local default transport (`mailpit:1025`)
+1. configuración persistida desde admin en `SystemSetting`
+2. variables de entorno
+3. transporte local por defecto (`mailpit:1025`)
 
-This gives the project a better self-hosting/operator model while preserving infrastructure-managed configuration as fallback.
+En el estado actual, el panel admin soporta:
+
+- `SMTP`
+- `AWS SES`
+
+Los secretos persistidos se almacenan cifrados y dependen de `SYSTEM_SETTINGS_MASTER_KEY` en producción. El despliegue dual inyecta esa clave compartida en ambos stacks renderizados.
 
 ## Security-relevant architecture points
 
@@ -208,9 +226,9 @@ It creates demo-operational data such as:
 
 Demo mode is opt-in and disabled by default.
 
-## Real limitations
+## Limitaciones reales
 
-- the system is modular and domain-oriented, but not full tactical DDD
-- fiscal validation is local-format validation and minimization, not external fiscal verification
-- secrets are not backed by an external secret manager such as Vault
-- persisted SMTP secrets are operationally useful, but still a candidate for stronger encryption at rest
+- el sistema es modular y orientado a dominio, pero no DDD táctico completo
+- la validación fiscal es validación de formato y minimización local, no verificación fiscal externa
+- los secretos operativos siguen sin depender de un secret manager externo tipo Vault o AWS Secrets Manager
+- `PROVIDER` y `RUNNER` todavía no tienen inbox global propia de soporte
