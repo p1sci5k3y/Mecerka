@@ -93,7 +93,7 @@ jobs:
           require_secret PROD_POSTGRES_PASSWORD "${{ secrets.PROD_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}"
           require_secret PROD_JWT_SECRET "${{ secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}"
           require_secret PROD_JWT_SECRET_CURRENT "${{ secrets.PROD_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}"
-          require_secret PROD_SYSTEM_SETTINGS_MASTER_KEY "${{ secrets.PROD_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY }}"
+          require_secret PROD_SYSTEM_SETTINGS_MASTER_KEY "${{ secrets.PROD_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY || secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}"
           require_secret PROD_FISCAL_PEPPER "${{ secrets.PROD_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}"
           require_secret PROD_STRIPE_SECRET_KEY "${{ secrets.PROD_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}"
           require_secret PROD_STRIPE_WEBHOOK_SECRET "${{ secrets.PROD_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}"
@@ -105,7 +105,7 @@ jobs:
           require_secret DEMO_POSTGRES_PASSWORD "${{ secrets.DEMO_POSTGRES_PASSWORD || secrets.POSTGRES_PASSWORD }}"
           require_secret DEMO_JWT_SECRET "${{ secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}"
           require_secret DEMO_JWT_SECRET_CURRENT "${{ secrets.DEMO_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}"
-          require_secret DEMO_SYSTEM_SETTINGS_MASTER_KEY "${{ secrets.DEMO_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY }}"
+          require_secret DEMO_SYSTEM_SETTINGS_MASTER_KEY "${{ secrets.DEMO_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY || secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}"
           require_secret DEMO_FISCAL_PEPPER "${{ secrets.DEMO_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}"
           require_secret DEMO_STRIPE_SECRET_KEY "${{ secrets.DEMO_STRIPE_SECRET_KEY || secrets.STRIPE_SECRET_KEY }}"
           require_secret DEMO_STRIPE_WEBHOOK_SECRET "${{ secrets.DEMO_STRIPE_WEBHOOK_SECRET || secrets.STRIPE_WEBHOOK_SECRET }}"
@@ -295,7 +295,7 @@ jobs:
           PROD_POSTGRES_DB: ${{ vars.PROD_POSTGRES_DB || 'marketplace_prod' }}
           PROD_JWT_SECRET: ${{ secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}
           PROD_JWT_SECRET_CURRENT: ${{ secrets.PROD_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}
-          PROD_SYSTEM_SETTINGS_MASTER_KEY: ${{ secrets.PROD_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY }}
+          PROD_SYSTEM_SETTINGS_MASTER_KEY: ${{ secrets.PROD_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY || secrets.PROD_JWT_SECRET || secrets.JWT_SECRET }}
           PROD_FISCAL_PEPPER: ${{ secrets.PROD_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}
           PROD_NEXT_PUBLIC_API_URL: ${{ vars.PROD_NEXT_PUBLIC_API_URL || 'https://mecerka.me/api' }}
           PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.PROD_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
@@ -324,7 +324,7 @@ jobs:
           DEMO_POSTGRES_DB: ${{ vars.DEMO_POSTGRES_DB || 'marketplace_demo' }}
           DEMO_JWT_SECRET: ${{ secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}
           DEMO_JWT_SECRET_CURRENT: ${{ secrets.DEMO_JWT_SECRET_CURRENT || secrets.JWT_SECRET_CURRENT }}
-          DEMO_SYSTEM_SETTINGS_MASTER_KEY: ${{ secrets.DEMO_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY }}
+          DEMO_SYSTEM_SETTINGS_MASTER_KEY: ${{ secrets.DEMO_SYSTEM_SETTINGS_MASTER_KEY || secrets.SYSTEM_SETTINGS_MASTER_KEY || secrets.DEMO_JWT_SECRET || secrets.JWT_SECRET }}
           DEMO_FISCAL_PEPPER: ${{ secrets.DEMO_FISCAL_PEPPER || secrets.FISCAL_PEPPER }}
           DEMO_NEXT_PUBLIC_API_URL: ${{ vars.DEMO_NEXT_PUBLIC_API_URL || 'https://demo.mecerka.me/api' }}
           DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.DEMO_NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
