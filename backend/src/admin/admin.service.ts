@@ -323,10 +323,10 @@ export class AdminService {
   async sendEmailSettingsTest(recipient: string) {
     await this.emailService.sendEmail(
       recipient,
-      'Prueba SMTP de Mecerka',
+      'Prueba del conector de correo de Mecerka',
       `
-        <h1>SMTP configurado correctamente</h1>
-        <p>Este correo confirma que la configuración SMTP guardada en admin está funcionando.</p>
+        <h1>Conector de correo configurado correctamente</h1>
+        <p>Este correo confirma que la configuración activa guardada en admin está funcionando.</p>
       `,
     );
 

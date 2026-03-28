@@ -1,16 +1,47 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import { EmailService } from './email.service';
+
+jest.mock('nodemailer', () => ({
+  __esModule: true,
+  default: {
+    createTransport: jest.fn(),
+  },
+  createTransport: jest.fn(),
+}));
+
+jest.mock('@aws-sdk/client-sesv2', () => ({
+  SESv2Client: jest.fn().mockImplementation(() => ({
+    send: jest.fn().mockResolvedValue({ MessageId: 'ses-message-1' }),
+  })),
+  SendEmailCommand: jest.fn().mockImplementation((input) => ({ input })),
+}));
 
 describe('EmailService', () => {
   let service: EmailService;
+  const createTransportMock = (
+    jest.requireMock('nodemailer') as { createTransport: jest.Mock }
+  ).createTransport;
+  const originalEnv = { ...process.env };
 
   beforeEach(async () => {
+    createTransportMock.mockReset();
+    createTransportMock.mockReturnValue({
+      sendMail: jest.fn().mockResolvedValue({ messageId: 'smtp-message-1' }),
+    } as any);
+    (SESv2Client as jest.Mock).mockClear();
+    (SendEmailCommand as unknown as jest.Mock).mockClear();
+
     // NODE_ENV=test so jsonTransport is used — no real SMTP needed
     const module: TestingModule = await Test.createTestingModule({
       providers: [EmailService],
     }).compile();
 
     service = module.get<EmailService>(EmailService);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
   });
 
   describe('sendVerificationEmail', () => {
@@ -112,6 +143,95 @@ describe('EmailService', () => {
 
       process.env.MAIL_FROM = original;
     });
+
+    it('routes non-test delivery through SMTP when the active connector is SMTP', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+
+      const smtpSendMail = jest.fn().mockResolvedValue({ messageId: 'smtp-2' });
+      createTransportMock.mockReturnValueOnce({
+        sendMail: smtpSendMail,
+      } as any);
+
+      const smtpService = new EmailService({
+        getRuntimeSettings: jest.fn().mockResolvedValue({
+          connectorType: 'SMTP',
+          source: 'database',
+          host: 'smtp.example.com',
+          port: 587,
+          user: 'mailer',
+          pass: 'secret',
+          from: 'ops@example.com',
+        }),
+      } as any);
+
+      await expect(
+        smtpService.sendEmail(
+          'recipient@example.com',
+          'Subject',
+          '<p>Body</p>',
+        ),
+      ).resolves.toEqual({ messageId: 'smtp-2' });
+
+      expect(createTransportMock).toHaveBeenCalledWith({
+        host: 'smtp.example.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: { user: 'mailer', pass: 'secret' },
+        tls: {
+          rejectUnauthorized: true,
+          minVersion: 'TLSv1.2',
+          servername: 'smtp.example.com',
+        },
+        from: 'ops@example.com',
+      });
+      expect(smtpSendMail).toHaveBeenCalledWith({
+        from: 'ops@example.com',
+        to: 'recipient@example.com',
+        subject: 'Subject',
+        html: '<p>Body</p>',
+      });
+    });
+
+    it('routes non-test delivery through AWS SES and falls back to aws-ses message ids', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+
+      const sendMock = jest.fn().mockResolvedValue({});
+      (SESv2Client as jest.Mock).mockImplementationOnce(() => ({
+        send: sendMock,
+      }));
+
+      const sesService = new EmailService({
+        getRuntimeSettings: jest.fn().mockResolvedValue({
+          connectorType: 'AWS_SES',
+          source: 'database',
+          region: 'eu-west-1',
+          accessKeyId: 'AKIA123',
+          secretAccessKey: 'secret-123',
+          sessionToken: null,
+          endpoint: 'https://email.eu-west-1.amazonaws.com',
+          from: 'ses@example.com',
+        }),
+      } as any);
+
+      await expect(
+        sesService.sendEmail('recipient@example.com', 'Subject', '<p>Body</p>'),
+      ).resolves.toEqual({ messageId: 'aws-ses' });
+
+      expect(SESv2Client).toHaveBeenCalledWith({
+        region: 'eu-west-1',
+        endpoint: 'https://email.eu-west-1.amazonaws.com',
+        credentials: {
+          accessKeyId: 'AKIA123',
+          secretAccessKey: 'secret-123',
+          sessionToken: undefined,
+        },
+      });
+      expect(SendEmailCommand as unknown as jest.Mock).toHaveBeenCalled();
+      expect(sendMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('maskEmail edge cases (covered via sendEmail)', () => {
@@ -142,12 +262,6 @@ describe('EmailService', () => {
   });
 
   describe('constructor non-test transport', () => {
-    const originalEnv = { ...process.env };
-
-    afterEach(() => {
-      process.env = { ...originalEnv };
-    });
-
     it('configures secure authenticated SMTP in production when credentials exist', () => {
       process.env.NODE_ENV = 'production';
       delete process.env.E2E;
@@ -165,8 +279,13 @@ describe('EmailService', () => {
         host: 'smtp.example.com',
         port: 465,
         secure: true,
+        requireTLS: true,
         auth: { user: 'mailer', pass: 'secret' },
-        tls: { rejectUnauthorized: true },
+        tls: {
+          rejectUnauthorized: true,
+          minVersion: 'TLSv1.2',
+          servername: 'smtp.example.com',
+        },
         from: '"Prod" <prod@example.com>',
       });
     });
@@ -187,6 +306,7 @@ describe('EmailService', () => {
         host: 'mailpit',
         port: 1025,
         secure: false,
+        requireTLS: false,
         auth: undefined,
         tls: { rejectUnauthorized: false },
         from: '"Mecerka" <no-reply@mecerka.local>',
@@ -230,10 +350,105 @@ describe('EmailService', () => {
         host: 'email-smtp.eu-west-1.amazonaws.com',
         port: 465,
         secure: true,
+        requireTLS: true,
         auth: { user: 'db-user', pass: 'db-pass' },
-        tls: { rejectUnauthorized: true },
+        tls: {
+          rejectUnauthorized: true,
+          minVersion: 'TLSv1.2',
+          servername: 'email-smtp.eu-west-1.amazonaws.com',
+        },
         from: 'db@example.com',
       });
+    });
+
+    it('builds an AWS SES connector payload when the persisted connector is SES', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+
+      const serviceWithSes = new EmailService({
+        getRuntimeSettings: jest.fn().mockResolvedValue({
+          connectorType: 'AWS_SES',
+          region: 'eu-west-1',
+          accessKeyId: 'AKIA123',
+          secretAccessKey: 'secret-123',
+          sessionToken: 'session-123',
+          endpoint: null,
+          from: 'ses@example.com',
+          source: 'database',
+        }),
+      } as any);
+
+      return expect(
+        (serviceWithSes as any).buildTransportOptions(),
+      ).resolves.toEqual({
+        connectorType: 'AWS_SES',
+        region: 'eu-west-1',
+        endpoint: undefined,
+        credentials: {
+          accessKeyId: 'AKIA123',
+          secretAccessKey: 'secret-123',
+          sessionToken: 'session-123',
+        },
+        from: 'ses@example.com',
+      });
+    });
+
+    it('exposes environment SMTP settings when no injected settings service exists', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+      process.env.MAIL_HOST = 'smtp.env.example.com';
+      process.env.MAIL_PORT = '2525';
+      process.env.MAIL_USER = 'env-user';
+      process.env.MAIL_PASS = 'env-pass';
+      process.env.MAIL_FROM = 'env@example.com';
+
+      const envService = new EmailService();
+
+      await expect((envService as any).getRuntimeSettings()).resolves.toEqual({
+        connectorType: 'SMTP',
+        host: 'smtp.env.example.com',
+        port: 2525,
+        user: 'env-user',
+        pass: 'env-pass',
+        from: 'env@example.com',
+        source: 'environment',
+      });
+    });
+
+    it('exposes default SMTP settings when no mail environment exists', async () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+      delete process.env.MAIL_HOST;
+      delete process.env.MAIL_PORT;
+      delete process.env.MAIL_USER;
+      delete process.env.MAIL_PASS;
+      delete process.env.MAIL_FROM;
+
+      const defaultService = new EmailService();
+
+      await expect(
+        (defaultService as any).getRuntimeSettings(),
+      ).resolves.toEqual({
+        connectorType: 'SMTP',
+        host: 'mailpit',
+        port: 1025,
+        user: null,
+        pass: null,
+        from: '"Mecerka" <no-reply@mecerka.local>',
+        source: 'default',
+      });
+    });
+
+    it('masks valid email addresses and detects real non-test mode', () => {
+      process.env.NODE_ENV = 'production';
+      delete process.env.E2E;
+
+      const nonTestService = new EmailService();
+
+      expect((nonTestService as any).maskEmail('user@example.com')).toBe(
+        'u****@example.com',
+      );
+      expect((nonTestService as any).isTestTransport()).toBe(false);
     });
   });
 });

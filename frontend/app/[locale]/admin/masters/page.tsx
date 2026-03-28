@@ -52,7 +52,7 @@ export default function MastersPage() {
                     </TabsTrigger>
                     <TabsTrigger value="email" className="gap-2">
                         <Mail className="h-4 w-4" />
-                        Correo SMTP
+                        Correo y conectores
                     </TabsTrigger>
                 </TabsList>
                 <TabsContent value="cities" className="space-y-4">
@@ -351,27 +351,51 @@ function EmailSettingsManager() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [sendingTest, setSendingTest] = useState(false)
+    const [activeConnector, setActiveConnector] = useState<"SMTP" | "AWS_SES">("SMTP")
     const { toast } = useToast()
 
-    const [host, setHost] = useState("")
-    const [port, setPort] = useState("587")
-    const [user, setUser] = useState("")
-    const [password, setPassword] = useState("")
-    const [clearPassword, setClearPassword] = useState(false)
-    const [from, setFrom] = useState("")
+    const [smtpHost, setSmtpHost] = useState("")
+    const [smtpPort, setSmtpPort] = useState("587")
+    const [smtpUser, setSmtpUser] = useState("")
+    const [smtpPassword, setSmtpPassword] = useState("")
+    const [smtpClearSecret, setSmtpClearSecret] = useState(false)
+    const [smtpFrom, setSmtpFrom] = useState("")
+
+    const [sesRegion, setSesRegion] = useState("eu-west-1")
+    const [sesAccessKeyId, setSesAccessKeyId] = useState("")
+    const [sesSecretAccessKey, setSesSecretAccessKey] = useState("")
+    const [sesSessionToken, setSesSessionToken] = useState("")
+    const [sesEndpoint, setSesEndpoint] = useState("")
+    const [sesClearSecret, setSesClearSecret] = useState(false)
+    const [sesClearSessionToken, setSesClearSessionToken] = useState(false)
+    const [sesFrom, setSesFrom] = useState("")
     const [testRecipient, setTestRecipient] = useState("")
+
+    const resetConnectorDrafts = () => {
+        setSmtpHost("")
+        setSmtpPort("587")
+        setSmtpUser("")
+        setSmtpPassword("")
+        setSmtpClearSecret(false)
+        setSmtpFrom("")
+        setSesRegion("eu-west-1")
+        setSesAccessKeyId("")
+        setSesSecretAccessKey("")
+        setSesSessionToken("")
+        setSesEndpoint("")
+        setSesClearSecret(false)
+        setSesClearSessionToken(false)
+        setSesFrom("")
+    }
 
     useEffect(() => {
         const fetchSettings = async () => {
             try {
                 const data = await adminService.getEmailSettings()
                 setSettings(data)
-                setHost(data.host)
-                setPort(String(data.port))
-                setUser(data.user ?? "")
-                setFrom(data.from)
+                setActiveConnector(data.connectorType)
             } catch {
-                toast({ title: "Error al cargar la configuración SMTP", variant: "destructive" })
+                toast({ title: "Error al cargar la configuración de correo", variant: "destructive" })
             } finally {
                 setLoading(false)
             }
@@ -383,30 +407,51 @@ function EmailSettingsManager() {
     const refreshSettings = async () => {
         const data = await adminService.getEmailSettings()
         setSettings(data)
-        setHost(data.host)
-        setPort(String(data.port))
-        setUser(data.user ?? "")
-        setFrom(data.from)
-        setPassword("")
-        setClearPassword(false)
+        setActiveConnector(data.connectorType)
+        resetConnectorDrafts()
     }
 
-    const handleSave = async (event: React.FormEvent) => {
+    const handleSaveSmtp = async (event: React.FormEvent) => {
         event.preventDefault()
         setSaving(true)
         try {
             await adminService.updateEmailSettings({
-                host,
-                port: Number(port),
-                user,
-                password: password || undefined,
-                clearPassword,
-                from,
+                connectorType: "SMTP",
+                host: smtpHost,
+                port: Number(smtpPort),
+                user: smtpUser || undefined,
+                password: smtpPassword || undefined,
+                clearSecret: smtpClearSecret,
+                from: smtpFrom,
             })
             await refreshSettings()
-            toast({ title: "Configuración SMTP guardada" })
+            toast({ title: "Conector SMTP guardado" })
         } catch {
-            toast({ title: "Error al guardar la configuración SMTP", variant: "destructive" })
+            toast({ title: "Error al guardar el conector SMTP", variant: "destructive" })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleSaveSes = async (event: React.FormEvent) => {
+        event.preventDefault()
+        setSaving(true)
+        try {
+            await adminService.updateEmailSettings({
+                connectorType: "AWS_SES",
+                region: sesRegion,
+                accessKeyId: sesAccessKeyId,
+                secretAccessKey: sesSecretAccessKey || undefined,
+                sessionToken: sesSessionToken || undefined,
+                endpoint: sesEndpoint || undefined,
+                clearSecret: sesClearSecret,
+                clearSessionToken: sesClearSessionToken,
+                from: sesFrom,
+            })
+            await refreshSettings()
+            toast({ title: "Conector AWS SES guardado" })
+        } catch {
+            toast({ title: "Error al guardar el conector AWS SES", variant: "destructive" })
         } finally {
             setSaving(false)
         }
@@ -431,68 +476,132 @@ function EmailSettingsManager() {
         <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
             <div className="rounded-md border bg-card p-4">
                 <div className="mb-4">
-                    <h2 className="text-xl font-semibold">Servidor SMTP</h2>
+                    <h2 className="text-xl font-semibold">Conectores de correo</h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Esta configuración se guarda en base de datos y tiene prioridad sobre las variables de entorno. Úsala para SES, Mailgun, Resend SMTP o cualquier relay SMTP estándar.
+                        La configuración guardada se cifra en backend y no se reexpone en el panel después de persistirse. Para rotar o sustituir un conector, introduce una configuración completa y vuelve a guardarla.
                     </p>
                 </div>
+                <div className="mb-4 flex gap-2">
+                    <Button type="button" variant={activeConnector === "SMTP" ? "default" : "outline"} onClick={() => setActiveConnector("SMTP")}>
+                        SMTP
+                    </Button>
+                    <Button type="button" variant={activeConnector === "AWS_SES" ? "default" : "outline"} onClick={() => setActiveConnector("AWS_SES")}>
+                        AWS SES
+                    </Button>
+                </div>
 
-                <form onSubmit={handleSave} className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="smtp-host">Host</Label>
-                            <Input id="smtp-host" value={host} onChange={(e) => setHost(e.target.value)} required />
+                {activeConnector === "SMTP" ? (
+                    <form onSubmit={handleSaveSmtp} className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="smtp-host">Host SMTP</Label>
+                                <Input id="smtp-host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="smtp-port">Puerto SMTP</Label>
+                                <Input id="smtp-port" type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} required />
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="smtp-port">Puerto</Label>
-                            <Input id="smtp-port" type="number" value={port} onChange={(e) => setPort(e.target.value)} required />
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="smtp-user">Usuario SMTP</Label>
+                                <Input id="smtp-user" value={smtpUser} onChange={(e) => setSmtpUser(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="smtp-pass">Secreto SMTP</Label>
+                                <Input id="smtp-pass" type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} placeholder={settings?.connectorType === "SMTP" && settings.secretConfigured ? "Configurado" : ""} />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <Label htmlFor="smtp-user">Usuario SMTP</Label>
-                            <Input id="smtp-user" value={user} onChange={(e) => setUser(e.target.value)} />
+                            <Label htmlFor="smtp-from">Remitente</Label>
+                            <Input id="smtp-from" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} required />
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="smtp-pass">Contraseña SMTP</Label>
-                            <Input id="smtp-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={settings?.passwordConfigured ? "********" : ""} />
+
+                        <div className="flex items-center space-x-2">
+                            <Switch id="smtp-clear-secret" checked={smtpClearSecret} onCheckedChange={setSmtpClearSecret} />
+                            <Label htmlFor="smtp-clear-secret">Borrar el secreto SMTP guardado</Label>
                         </div>
-                    </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="smtp-from">Remitente</Label>
-                        <Input id="smtp-from" value={from} onChange={(e) => setFrom(e.target.value)} required />
-                    </div>
+                        <DialogFooter>
+                            <Button type="submit" disabled={saving}>
+                                {saving ? "Guardando..." : "Guardar conector SMTP"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                ) : (
+                    <form onSubmit={handleSaveSes} className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-region">Region AWS</Label>
+                                <Input id="ses-region" value={sesRegion} onChange={(e) => setSesRegion(e.target.value)} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-access-key">Access Key ID</Label>
+                                <Input id="ses-access-key" value={sesAccessKeyId} onChange={(e) => setSesAccessKeyId(e.target.value)} required />
+                            </div>
+                        </div>
 
-                    <div className="flex items-center space-x-2">
-                        <Switch id="smtp-clear-password" checked={clearPassword} onCheckedChange={setClearPassword} />
-                        <Label htmlFor="smtp-clear-password">Borrar la contraseña guardada</Label>
-                    </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-secret-access-key">Secret Access Key</Label>
+                                <Input id="ses-secret-access-key" type="password" value={sesSecretAccessKey} onChange={(e) => setSesSecretAccessKey(e.target.value)} placeholder={settings?.connectorType === "AWS_SES" && settings.secretConfigured ? "Configurado" : ""} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-session-token">Session Token (opcional)</Label>
+                                <Input id="ses-session-token" type="password" value={sesSessionToken} onChange={(e) => setSesSessionToken(e.target.value)} placeholder={settings?.connectorType === "AWS_SES" && settings.credentialsConfigured ? "Opcional" : ""} />
+                            </div>
+                        </div>
 
-                    <DialogFooter>
-                        <Button type="submit" disabled={saving}>
-                            {saving ? "Guardando..." : "Guardar SMTP"}
-                        </Button>
-                    </DialogFooter>
-                </form>
+                        <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-endpoint">Endpoint personalizado (opcional)</Label>
+                                <Input id="ses-endpoint" value={sesEndpoint} onChange={(e) => setSesEndpoint(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ses-from">Remitente verificado</Label>
+                                <Input id="ses-from" value={sesFrom} onChange={(e) => setSesFrom(e.target.value)} required />
+                            </div>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div className="flex items-center space-x-2">
+                                <Switch id="ses-clear-secret" checked={sesClearSecret} onCheckedChange={setSesClearSecret} />
+                                <Label htmlFor="ses-clear-secret">Borrar el secreto AWS guardado</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Switch id="ses-clear-session-token" checked={sesClearSessionToken} onCheckedChange={setSesClearSessionToken} />
+                                <Label htmlFor="ses-clear-session-token">Borrar el session token guardado</Label>
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button type="submit" disabled={saving}>
+                                {saving ? "Guardando..." : "Guardar conector AWS SES"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                )}
             </div>
 
             <div className="space-y-4">
                 <div className="rounded-md border bg-card p-4">
-                    <h3 className="font-semibold">Estado actual</h3>
+                    <h3 className="font-semibold">Conector activo</h3>
                     <div className="mt-3 space-y-2 text-sm">
-                        <p><strong>Origen:</strong> {settings?.source === "database" ? "Base de datos" : settings?.source === "environment" ? "Variables de entorno" : "Default local"}</p>
-                        <p><strong>Seguridad:</strong> {settings?.secure ? "SSL/TLS (465)" : "STARTTLS / no SSL implícito"}</p>
-                        <p><strong>Autenticación:</strong> {settings?.authConfigured ? "Configurada" : "No configurada"}</p>
-                        <p><strong>Password guardada:</strong> {settings?.passwordConfigured ? "Sí" : "No"}</p>
+                        <p><strong>Conector:</strong> {settings?.connectorLabel ?? "SMTP"}</p>
+                        <p><strong>Origen:</strong> {settings?.source === "database" ? "Base de datos cifrada" : settings?.source === "environment" ? "Variables de entorno" : "Default local"}</p>
+                        <p><strong>Canal:</strong> {settings?.transportSecurity === "TLS_VERIFIED" ? "TLS verificado" : "Relay local de desarrollo"}</p>
+                        <p><strong>Credenciales:</strong> {settings?.credentialsConfigured ? "Configuradas" : "No configuradas"}</p>
+                        <p><strong>Secreto persistido:</strong> {settings?.secretConfigured ? "Sí" : "No"}</p>
+                        <p><strong>Remitente:</strong> {settings?.senderConfigured ? "Configurado" : "No configurado"}</p>
                     </div>
                 </div>
 
                 <div className="rounded-md border bg-card p-4">
                     <h3 className="font-semibold">Enviar prueba</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Envía un correo con la configuración efectiva para validar que el relay responde.
+                        Envía un correo con el conector activo para validar que la integración responde sin exponer secretos en el panel.
                     </p>
                     <form onSubmit={handleSendTest} className="mt-4 space-y-3">
                         <div className="space-y-2">

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Patch,
@@ -10,6 +11,7 @@ import {
   Request,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import type { Request as ExpressRequest } from 'express';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -26,6 +28,7 @@ import {
   SendTestEmailDto,
   UpdateEmailSettingsDto,
 } from './dto/update-email-settings.dto';
+import type { SaveEmailSettingsInput } from '../email/email-settings.service';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
@@ -152,20 +155,29 @@ export class AdminController {
   }
 
   @Get('email-settings')
-  getEmailSettings() {
+  getEmailSettings(@Request() req: ExpressRequest) {
+    this.assertSecureEmailAdminRequest(req);
     return this.adminService.getEmailSettings();
   }
 
   @Patch('email-settings')
   updateEmailSettings(
     @Body() body: UpdateEmailSettingsDto,
-    @Request() req: { user: UserFromJwt },
+    @Request() req: ExpressRequest & { user: UserFromJwt },
   ) {
-    return this.adminService.updateEmailSettings(body, req.user.userId);
+    this.assertSecureEmailAdminRequest(req);
+    return this.adminService.updateEmailSettings(
+      body as SaveEmailSettingsInput,
+      req.user.userId,
+    );
   }
 
   @Post('email-settings/test')
-  sendEmailSettingsTest(@Body() body: SendTestEmailDto) {
+  sendEmailSettingsTest(
+    @Body() body: SendTestEmailDto,
+    @Request() req: ExpressRequest,
+  ) {
+    this.assertSecureEmailAdminRequest(req);
     return this.adminService.sendEmailSettingsTest(body.recipient);
   }
 
@@ -183,5 +195,23 @@ export class AdminController {
   @Get('metrics')
   getMetrics() {
     return this.adminService.getMetrics();
+  }
+
+  private assertSecureEmailAdminRequest(req: ExpressRequest) {
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
+    const forwardedProtoHeader = req.headers['x-forwarded-proto'];
+    const forwardedProto = Array.isArray(forwardedProtoHeader)
+      ? forwardedProtoHeader[0]
+      : forwardedProtoHeader;
+    const protocol = forwardedProto?.split(',')[0]?.trim() || req.protocol;
+
+    if (protocol !== 'https') {
+      throw new BadRequestException(
+        'Email connector settings require an HTTPS admin session',
+      );
+    }
   }
 }

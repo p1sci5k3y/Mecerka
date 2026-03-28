@@ -198,14 +198,14 @@ export interface AdminIncidentSummary {
 }
 
 export interface AdminEmailSettings {
-  host: string
-  port: number
-  user: string | null
-  from: string
-  secure: boolean
-  authConfigured: boolean
-  passwordConfigured: boolean
+  connectorType: "SMTP" | "AWS_SES"
+  connectorLabel: string
   source: "database" | "environment" | "default"
+  configured: boolean
+  senderConfigured: boolean
+  credentialsConfigured: boolean
+  secretConfigured: boolean
+  transportSecurity: "TLS_VERIFIED" | "LOCAL_DEFAULT"
 }
 
 export interface OrderProviderPaymentsAggregate {

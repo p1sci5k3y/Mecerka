@@ -179,14 +179,14 @@ describe('AdminService role grants', () => {
     describe('email settings', () => {
       it('returns the effective email settings summary', async () => {
         emailSettingsServiceMock.getEffectiveSettings.mockResolvedValue({
-          host: 'email-smtp.eu-west-1.amazonaws.com',
-          port: 587,
-          user: 'smtp-user',
-          from: 'no-reply@example.com',
-          secure: false,
-          authConfigured: true,
-          passwordConfigured: true,
+          connectorType: 'SMTP',
+          connectorLabel: 'SMTP',
           source: 'database',
+          configured: true,
+          senderConfigured: true,
+          credentialsConfigured: true,
+          secretConfigured: true,
+          transportSecurity: 'TLS_VERIFIED',
         });
 
         const result = await service.getEmailSettings();
@@ -194,16 +194,17 @@ describe('AdminService role grants', () => {
         expect(
           emailSettingsServiceMock.getEffectiveSettings,
         ).toHaveBeenCalled();
-        expect(result.host).toBe('email-smtp.eu-west-1.amazonaws.com');
+        expect(result.connectorType).toBe('SMTP');
       });
 
       it('persists email settings through the settings service', async () => {
         emailSettingsServiceMock.saveSettings.mockResolvedValue({
-          host: 'email-smtp.eu-west-1.amazonaws.com',
+          connectorType: 'SMTP',
         });
 
         await service.updateEmailSettings(
           {
+            connectorType: 'SMTP',
             host: 'email-smtp.eu-west-1.amazonaws.com',
             port: 587,
             user: 'smtp-user',
@@ -215,6 +216,7 @@ describe('AdminService role grants', () => {
 
         expect(emailSettingsServiceMock.saveSettings).toHaveBeenCalledWith(
           {
+            connectorType: 'SMTP',
             host: 'email-smtp.eu-west-1.amazonaws.com',
             port: 587,
             user: 'smtp-user',
@@ -232,8 +234,10 @@ describe('AdminService role grants', () => {
 
         expect(emailServiceMock.sendEmail).toHaveBeenCalledWith(
           'ops@example.com',
-          'Prueba SMTP de Mecerka',
-          expect.stringContaining('SMTP configurado correctamente'),
+          'Prueba del conector de correo de Mecerka',
+          expect.stringContaining(
+            'Conector de correo configurado correctamente',
+          ),
         );
         expect(result).toEqual({ ok: true });
       });

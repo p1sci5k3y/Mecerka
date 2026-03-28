@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -6,9 +7,12 @@ import { Role } from '@prisma/client';
 describe('AdminController', () => {
   let controller: AdminController;
   let adminServiceMock: jest.Mocked<Partial<AdminService>>;
+  const originalNodeEnv = process.env.NODE_ENV;
 
-  const mockReq = (userId = 'admin-1') => ({
+  const mockReq = (userId = 'admin-1', protocol = 'https') => ({
     user: { userId, roles: [Role.ADMIN] },
+    protocol,
+    headers: { 'x-forwarded-proto': protocol },
   });
 
   beforeEach(async () => {
@@ -48,6 +52,7 @@ describe('AdminController', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    process.env.NODE_ENV = originalNodeEnv;
   });
 
   it('getUsers delegates to adminService.getAllUsers', async () => {
@@ -223,21 +228,22 @@ describe('AdminController', () => {
 
   it('getEmailSettings delegates to adminService.getEmailSettings', async () => {
     (adminServiceMock.getEmailSettings as jest.Mock).mockResolvedValue({
-      host: 'email-smtp.eu-west-1.amazonaws.com',
+      connectorType: 'SMTP',
     });
 
-    const result = await controller.getEmailSettings();
+    const result = await controller.getEmailSettings(mockReq() as any);
 
     expect(adminServiceMock.getEmailSettings).toHaveBeenCalled();
-    expect(result).toEqual({ host: 'email-smtp.eu-west-1.amazonaws.com' });
+    expect(result).toEqual({ connectorType: 'SMTP' });
   });
 
   it('updateEmailSettings delegates to adminService.updateEmailSettings', async () => {
     (adminServiceMock.updateEmailSettings as jest.Mock).mockResolvedValue({
-      host: 'email-smtp.eu-west-1.amazonaws.com',
+      connectorType: 'SMTP',
     });
 
     const body = {
+      connectorType: 'SMTP',
       host: 'email-smtp.eu-west-1.amazonaws.com',
       port: 587,
       user: 'smtp-user',
@@ -257,14 +263,25 @@ describe('AdminController', () => {
       ok: true,
     });
 
-    const result = await controller.sendEmailSettingsTest({
-      recipient: 'ops@example.com',
-    });
+    const result = await controller.sendEmailSettingsTest(
+      {
+        recipient: 'ops@example.com',
+      },
+      mockReq() as any,
+    );
 
     expect(adminServiceMock.sendEmailSettingsTest).toHaveBeenCalledWith(
       'ops@example.com',
     );
     expect(result).toEqual({ ok: true });
+  });
+
+  it('rejects insecure email settings access in production', async () => {
+    process.env.NODE_ENV = 'production';
+
+    expect(() =>
+      controller.getEmailSettings(mockReq('admin-1', 'http') as any),
+    ).toThrow(BadRequestException);
   });
 
   it('getRefunds delegates to adminService.getRecentRefunds', async () => {

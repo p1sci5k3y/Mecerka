@@ -154,14 +154,27 @@ export const adminService = {
         return api.get<AdminEmailSettings>("/admin/email-settings")
     },
 
-    updateEmailSettings: async (data: {
-        host: string
-        port: number
-        user?: string
-        password?: string
-        clearPassword?: boolean
-        from: string
-    }) => {
+    updateEmailSettings: async (data:
+        | {
+            connectorType: "SMTP"
+            host: string
+            port: number
+            user?: string
+            password?: string
+            clearSecret?: boolean
+            from: string
+        }
+        | {
+            connectorType: "AWS_SES"
+            region: string
+            accessKeyId: string
+            secretAccessKey?: string
+            sessionToken?: string
+            endpoint?: string
+            clearSecret?: boolean
+            clearSessionToken?: boolean
+            from: string
+        }) => {
         return api.patch<AdminEmailSettings>("/admin/email-settings", data)
     },
 

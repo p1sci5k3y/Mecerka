@@ -9,7 +9,8 @@
     "test:e2e": "npm run test:e2e --prefix backend -- --runInBand",
     "test:ci": "npm run lint && npm run type-check && npm run test && npm run test:e2e",
     "lint:all": "npm run lint --prefix backend && npm run lint --prefix frontend",
-    "type-check:all": "npm run type-check --prefix backend && npm run type-check --prefix frontend"
+    "type-check:all": "npm run type-check --prefix backend && npm run type-check --prefix frontend",
+    "coverage:email-connectors": "npm run test:cov --prefix backend -- --runInBand && npm run test:cov --prefix frontend -- --maxWorkers=1 && node scripts/assert-email-connectors-coverage.mjs"
   },
   "devDependencies": {
     "husky": "^9.1.7",

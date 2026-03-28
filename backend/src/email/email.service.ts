@@ -1,6 +1,16 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import { EmailSettingsService } from './email-settings.service';
+import {
+  SESv2Client,
+  SendEmailCommand,
+  SendEmailCommandOutput,
+} from '@aws-sdk/client-sesv2';
+import {
+  AwsSesRuntimeSettings,
+  EmailSettingsService,
+  RuntimeEmailSettings,
+  SmtpRuntimeSettings,
+} from './email-settings.service';
 
 @Injectable()
 export class EmailService {
@@ -12,7 +22,6 @@ export class EmailService {
   ) {}
 
   async sendEmail(to: string, subject: string, html: string) {
-    // Send asynchronously without blocking the main flow
     return this.sendMailAsync(to, subject, html);
   }
 
@@ -65,35 +74,185 @@ export class EmailService {
   }
 
   private async sendMailAsync(to: string, subject: string, html: string) {
-    const transportOptions = await this.buildTransportOptions();
-    const transporter = nodemailer.createTransport(
-      transportOptions as nodemailer.TransportOptions,
-    );
-    const from =
-      'jsonTransport' in transportOptions
-        ? process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>'
-        : transportOptions.from;
+    if (this.isTestTransport()) {
+      const transporter = nodemailer.createTransport({
+        jsonTransport: true,
+      } as nodemailer.TransportOptions);
+      return transporter.sendMail({
+        from: process.env.MAIL_FROM || '"Mecerka" <no-reply@mecerka.local>',
+        to,
+        subject,
+        html,
+      }) as Promise<{ messageId: string }>;
+    }
+
+    const settings = await this.getRuntimeSettings();
     const maskedTo = this.maskEmail(to);
     this.logger.debug(`Sending email to ${maskedTo}`);
+    this.logger.log(
+      JSON.stringify({
+        event: 'email.transport.configured',
+        message: 'Email transport configured',
+        source: settings.source,
+        connectorType: settings.connectorType,
+      }),
+    );
 
+    if (settings.connectorType === 'AWS_SES') {
+      return this.sendWithAwsSes(settings, to, subject, html);
+    }
+
+    return this.sendWithSmtp(settings, to, subject, html);
+  }
+
+  private async sendWithSmtp(
+    settings: SmtpRuntimeSettings,
+    to: string,
+    subject: string,
+    html: string,
+  ) {
+    const transporter = nodemailer.createTransport(
+      this.buildSmtpTransportOptions(settings) as nodemailer.TransportOptions,
+    );
     const info = (await transporter.sendMail({
-      from,
+      from: settings.from,
       to,
       subject,
       html,
     })) as { messageId: string };
+
     this.logger.log(
       JSON.stringify({
         event: 'email.sent',
         message: 'Email sent successfully',
+        connectorType: settings.connectorType,
       }),
     );
+
     return info;
+  }
+
+  private async sendWithAwsSes(
+    settings: AwsSesRuntimeSettings,
+    to: string,
+    subject: string,
+    html: string,
+  ) {
+    const client = this.createAwsSesClient(settings);
+    const result: SendEmailCommandOutput = await client.send(
+      new SendEmailCommand({
+        FromEmailAddress: settings.from,
+        Destination: {
+          ToAddresses: [to],
+        },
+        Content: {
+          Simple: {
+            Subject: {
+              Data: subject,
+              Charset: 'UTF-8',
+            },
+            Body: {
+              Html: {
+                Data: html,
+                Charset: 'UTF-8',
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    this.logger.log(
+      JSON.stringify({
+        event: 'email.sent',
+        message: 'Email sent successfully',
+        connectorType: settings.connectorType,
+      }),
+    );
+
+    return { messageId: result.MessageId || 'aws-ses' };
+  }
+
+  private createAwsSesClient(settings: AwsSesRuntimeSettings) {
+    return new SESv2Client({
+      region: settings.region,
+      endpoint: settings.endpoint || undefined,
+      credentials: {
+        accessKeyId: settings.accessKeyId,
+        secretAccessKey: settings.secretAccessKey,
+        sessionToken: settings.sessionToken || undefined,
+      },
+    });
+  }
+
+  private buildSmtpTransportOptions(settings: SmtpRuntimeSettings) {
+    const localDefault =
+      settings.source === 'default' && settings.host === 'mailpit';
+
+    return {
+      host: settings.host,
+      port: settings.port,
+      secure: settings.port === 465,
+      requireTLS: !localDefault,
+      auth:
+        settings.user && settings.pass
+          ? { user: settings.user, pass: settings.pass }
+          : undefined,
+      tls: localDefault
+        ? { rejectUnauthorized: false }
+        : {
+            rejectUnauthorized: true,
+            minVersion: 'TLSv1.2',
+            servername: settings.host,
+          },
+      from: settings.from,
+    };
+  }
+
+  private async getRuntimeSettings(): Promise<RuntimeEmailSettings> {
+    if (this.emailSettingsService) {
+      return this.emailSettingsService.getRuntimeSettings();
+    }
+
+    const host = process.env.MAIL_HOST || 'mailpit';
+    return {
+      connectorType: 'SMTP',
+      host,
+      port: Number(process.env.MAIL_PORT) || 1025,
+      user: process.env.MAIL_USER?.trim() || null,
+      pass: process.env.MAIL_PASS?.trim() || null,
+      from:
+        process.env.MAIL_FROM?.trim() || '"Mecerka" <no-reply@mecerka.local>',
+      source: process.env.MAIL_HOST ? 'environment' : 'default',
+    };
+  }
+
+  private async buildTransportOptions() {
+    if (this.isTestTransport()) {
+      return { jsonTransport: true };
+    }
+
+    const settings = await this.getRuntimeSettings();
+    if (settings.connectorType === 'AWS_SES') {
+      return {
+        connectorType: 'AWS_SES',
+        region: settings.region,
+        endpoint: settings.endpoint || undefined,
+        credentials: {
+          accessKeyId: settings.accessKeyId,
+          secretAccessKey: settings.secretAccessKey,
+          sessionToken: settings.sessionToken || undefined,
+        },
+        from: settings.from,
+      };
+    }
+
+    return this.buildSmtpTransportOptions(settings);
   }
 
   private maskEmail(email: string): string {
     const lastAtIndex = email.lastIndexOf('@');
-    if (lastAtIndex <= 0) return '***'; // Invalid or missing local part
+    if (lastAtIndex <= 0) return '***';
 
     const local = email.slice(0, lastAtIndex);
     const domain = email.slice(lastAtIndex + 1);
@@ -105,57 +264,5 @@ export class EmailService {
 
   private isTestTransport() {
     return process.env.NODE_ENV === 'test' || process.env.E2E === 'true';
-  }
-
-  private async buildTransportOptions(): Promise<
-    Record<string, unknown> & { from?: string }
-  > {
-    if (this.isTestTransport()) {
-      this.logger.log(
-        JSON.stringify({
-          event: 'email.transport.configured',
-          message: 'Email transport configured',
-          mode: 'json-test',
-        }),
-      );
-      return {
-        jsonTransport: true,
-      };
-    }
-
-    const settings = this.emailSettingsService
-      ? await this.emailSettingsService.getRuntimeSettings()
-      : {
-          host: process.env.MAIL_HOST || 'mailpit',
-          port: Number(process.env.MAIL_PORT) || 1025,
-          user: process.env.MAIL_USER?.trim() || null,
-          pass: process.env.MAIL_PASS?.trim() || null,
-          from:
-            process.env.MAIL_FROM?.trim() ||
-            '"Mecerka" <no-reply@mecerka.local>',
-          source: process.env.MAIL_HOST ? 'environment' : 'default',
-        };
-
-    this.logger.log(
-      JSON.stringify({
-        event: 'email.transport.configured',
-        message: 'Email transport configured',
-        source: settings.source,
-      }),
-    );
-
-    return {
-      host: settings.host,
-      port: settings.port,
-      secure: settings.port === 465,
-      auth:
-        settings.user && settings.pass
-          ? { user: settings.user, pass: settings.pass }
-          : undefined,
-      tls: {
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
-      },
-      from: settings.from,
-    };
   }
 }

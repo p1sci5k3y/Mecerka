@@ -1,8 +1,8 @@
 import {
   IsBoolean,
   IsEmail,
+  IsIn,
   IsInt,
-  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -10,14 +10,18 @@ import {
 } from 'class-validator';
 
 export class UpdateEmailSettingsDto {
-  @IsString()
-  @IsNotEmpty()
-  host: string;
+  @IsIn(['SMTP', 'AWS_SES'])
+  connectorType: 'SMTP' | 'AWS_SES';
 
+  @IsOptional()
+  @IsString()
+  host?: string;
+
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(65535)
-  port: number;
+  port?: number;
 
   @IsOptional()
   @IsString()
@@ -29,10 +33,33 @@ export class UpdateEmailSettingsDto {
 
   @IsOptional()
   @IsBoolean()
-  clearPassword?: boolean;
+  clearSecret?: boolean;
+
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @IsOptional()
+  @IsString()
+  accessKeyId?: string;
+
+  @IsOptional()
+  @IsString()
+  secretAccessKey?: string;
+
+  @IsOptional()
+  @IsString()
+  sessionToken?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  clearSessionToken?: boolean;
+
+  @IsOptional()
+  @IsString()
+  endpoint?: string;
 
   @IsString()
-  @IsNotEmpty()
   from: string;
 }
 
