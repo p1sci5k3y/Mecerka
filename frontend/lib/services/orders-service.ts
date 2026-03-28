@@ -5,6 +5,7 @@ import type {
   CreateOrderPayload,
   Order,
   OrderItem,
+  OrderTrackingSnapshot,
 } from "@/lib/types"
 
 function transformOrder(bo: BackendOrder): Order {
@@ -151,6 +152,9 @@ export const ordersService = {
   getOne: async (id: number | string) => {
     const data = await api.get<BackendOrder>(`/orders/${id}`)
     return transformOrder(data)
+  },
+  getTracking: async (id: number | string) => {
+    return api.get<OrderTrackingSnapshot>(`/orders/${id}/tracking`)
   },
   getProviderStats: async () => {
     return api.get<import("@/lib/types").ProviderStats>("/orders/provider/stats")

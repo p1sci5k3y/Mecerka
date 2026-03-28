@@ -6,6 +6,7 @@ const mockUseParams = vi.fn()
 const getOneMock = vi.fn()
 const listDeliveryOrderIncidentsMock = vi.fn()
 const getDeliveryOrderRefundsMock = vi.fn()
+const dynamicDeliveryMapMock = vi.fn()
 
 vi.mock("next/navigation", () => ({
   useParams: () => mockUseParams(),
@@ -56,6 +57,13 @@ vi.mock("@/lib/navigation", () => ({
       {children}
     </a>
   ),
+}))
+
+vi.mock("@/components/tracking/DynamicDeliveryMap", () => ({
+  default: (props: unknown) => {
+    dynamicDeliveryMapMock(props)
+    return <div data-testid="runner-delivery-map" />
+  },
 }))
 
 function makeOrder(overrides: Partial<Order> = {}): Order {
@@ -110,6 +118,7 @@ describe("RunnerOrderDetailPage", () => {
     getOneMock.mockReset()
     listDeliveryOrderIncidentsMock.mockReset()
     getDeliveryOrderRefundsMock.mockReset()
+    dynamicDeliveryMapMock.mockReset()
     mockUseParams.mockReturnValue({ id: "order-1" })
   })
 
@@ -156,6 +165,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(getDeliveryOrderRefundsMock).toHaveBeenCalledWith("delivery-1")
     expect(screen.getByText("Cerámica Norte")).toBeInTheDocument()
     expect(screen.getByText("Calle Feria 12")).toBeInTheDocument()
+    expect(screen.getByTestId("runner-delivery-map")).toBeInTheDocument()
     expect(screen.getAllByText("Pago pendiente")).toHaveLength(2)
     expect(screen.getByText("El cliente reportó retraso")).toBeInTheDocument()
     expect(screen.getByText("DELIVERY_PARTIAL")).toBeInTheDocument()
@@ -166,6 +176,12 @@ describe("RunnerOrderDetailPage", () => {
     expect(screen.getByRole("link", { name: /Abrir soporte/i })).toHaveAttribute(
       "href",
       "/runner/support",
+    )
+    expect(dynamicDeliveryMapMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: "order-1",
+        isRunner: true,
+      }),
     )
   })
 
@@ -224,6 +240,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(screen.getByText("2")).toBeInTheDocument()
     expect(screen.getAllByText("0")).toHaveLength(2)
     expect(screen.queryByText("Textil Sur")).not.toBeInTheDocument()
+    expect(screen.getByTestId("runner-delivery-map")).toBeInTheDocument()
   })
 
   it("does not query incidents or refunds when the order has no delivery order", async () => {
@@ -240,6 +257,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
     expect(getDeliveryOrderRefundsMock).not.toHaveBeenCalled()
     expect(screen.getAllByText("Sin estado").length).toBeGreaterThan(0)
+    expect(screen.getByText(/La ruta se habilitará/i)).toBeInTheDocument()
   })
 
   it("shows fallback route and delivery labels when operational context is sparse", async () => {

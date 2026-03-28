@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
@@ -41,6 +41,39 @@ const runnerIcon = new L.Icon({
     popupAnchor: [0, -35],
 });
 
+function calculateDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const toRad = (value: number) => (value * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return earthRadiusKm * c;
+}
+
+function formatDistanceLabel(distanceKm: number | null) {
+    if (distanceKm == null) return 'Sin estimación';
+    if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
+    return `${distanceKm.toFixed(1)} km`;
+}
+
+function formatEtaLabel(distanceKm: number | null) {
+    if (distanceKm == null) return 'Pendiente de GPS';
+    const minutes = Math.max(3, Math.round((distanceKm / 18) * 60));
+    return `${minutes} min aprox.`;
+}
+
+function formatLastUpdateLabel(updatedAt: string | null) {
+    if (!updatedAt) return 'Sin señal todavía';
+    return new Date(updatedAt).toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
 function FlyToRunner({ lat, lng }: { lat: number; lng: number }) {
     const map = useMap();
     useEffect(() => {
@@ -72,17 +105,49 @@ export interface DeliveryMapProps {
     isRunner?: boolean;
 }
 
+function runnerTrackingStatusLabel(status: string | null) {
+    switch (status) {
+        case 'RUNNER_ASSIGNED':
+            return 'Esperando recogida operativa';
+        case 'PICKUP_PENDING':
+            return 'Ruta lista para recogida';
+        case 'PICKED_UP':
+        case 'IN_TRANSIT':
+            return 'Transmitiendo reparto en curso';
+        case 'DELIVERING':
+            return 'Ruta activa';
+        case 'DELIVERED':
+            return 'Ruta cerrada por entrega completada';
+        case 'CANCELLED':
+            return 'Ruta cerrada por cancelación';
+        default:
+            return 'Esperando contexto operativo';
+    }
+}
+
 export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng = -3.7038, isRunner }: DeliveryMapProps) {
     const [position, setPosition] = useState<{ lat: number; lng: number }>({ lat: initialLat, lng: initialLng });
     const [origin, setOrigin] = useState<{ lat: number; lng: number, label: string } | null>(null);
     const [destination, setDestination] = useState<{ lat: number; lng: number, label: string } | null>(null);
     const [routeHistory, setRouteHistory] = useState<[number, number][]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [trackingStatus, setTrackingStatus] = useState<string | null>(null);
+    const [runnerName, setRunnerName] = useState<string | null>(null);
+    const [lastUpdateAt, setLastUpdateAt] = useState<string | null>(null);
 
     // Tracker State
     const [isTracking, setIsTracking] = useState(false);
     const watchIdRef = useRef<number | null>(null);
     const socketRef = useRef<Socket | null>(null);
+    const runnerCanTransmit =
+        trackingStatus === 'PICKUP_PENDING' ||
+        trackingStatus === 'PICKED_UP' ||
+        trackingStatus === 'IN_TRANSIT' ||
+        trackingStatus === null;
+    const remainingDistanceKm = useMemo(() => {
+        if (!destination) return null;
+        return calculateDistanceKm(position.lat, position.lng, destination.lat, destination.lng);
+    }, [destination, position.lat, position.lng]);
 
     // Initial Load & Socket Setup
     useEffect(() => {
@@ -90,8 +155,10 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
 
         const initMapData = async () => {
             try {
-                // Fetch Order Details for Origin and Destination
-                const order = await ordersService.getOne(orderId);
+                const [order, tracking] = await Promise.all([
+                    ordersService.getOne(orderId),
+                    ordersService.getTracking(orderId).catch(() => null),
+                ]);
                 const providerCity = order.items[0]?.product?.city || 'Madrid';
                 const destAddress = order.deliveryAddress || order.city || 'Madrid';
 
@@ -107,7 +174,17 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                 if (isSubscribed) {
                     setOrigin({ ...originCoords, label: `Origen (Taller de ${order.items[0]?.product?.providerId})` });
                     setDestination({ ...destCoords, label: `Destino (${destAddress})` });
-                    setPosition(originCoords);
+                    setTrackingStatus(tracking?.deliveryStatus ?? tracking?.status ?? null);
+                    setRunnerName(tracking?.runner?.name ?? null);
+                    setLastUpdateAt(tracking?.updatedAt ?? null);
+
+                    if (tracking?.location) {
+                        setPosition({ lat: tracking.location.lat, lng: tracking.location.lng });
+                        setRouteHistory([[tracking.location.lat, tracking.location.lng]]);
+                    } else {
+                        setPosition(originCoords);
+                        setRouteHistory([]);
+                    }
                 }
 
             } catch (err) {
@@ -140,6 +217,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
         newSocket.on('locationUpdated', (data: { lat: number; lng: number }) => {
             setPosition({ lat: data.lat, lng: data.lng });
             setRouteHistory((prev) => [...prev, [data.lat, data.lng]]);
+            setLastUpdateAt(new Date().toISOString());
         });
 
         return () => {
@@ -152,6 +230,11 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
     }, [initialLat, initialLng, orderId]);
 
     const toggleTracking = () => {
+        if (!runnerCanTransmit) {
+            setError('La ruta no está en una fase operativa que permita emitir GPS.');
+            return;
+        }
+
         if (isTracking) {
             // Stop tracking
             if (watchIdRef.current !== null) {
@@ -197,21 +280,51 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                 <div className="absolute top-4 right-4 z-[1000] bg-white dark:bg-slate-900 p-3 flex items-center gap-3 rounded-xl shadow-lg border border-border">
                     <div className="flex flex-col">
                         <span className="text-xs font-bold uppercase text-slate-500">Modo Repartidor</span>
-                        <span className="text-sm font-medium">{isTracking ? 'Transmitiendo GPS' : 'GPS Detenido'}</span>
+                        <span className="text-sm font-medium">
+                            {isTracking ? 'Transmitiendo GPS' : runnerTrackingStatusLabel(trackingStatus)}
+                        </span>
                     </div>
                     <button
                         onClick={toggleTracking}
+                        disabled={!runnerCanTransmit && !isTracking}
                         className={`h-12 px-6 flex items-center gap-2 rounded-lg font-bold text-white transition-colors ${isTracking ? 'bg-red-500 hover:bg-red-600' : 'bg-[#df795d] hover:bg-[#c05e42]'
-                            }`}
+                            } ${!runnerCanTransmit && !isTracking ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
                         {isTracking ? (
                             <><Square className="w-4 h-4" fill="currentColor" /> Detener</>
+                        ) : !runnerCanTransmit ? (
+                            <>Ruta cerrada</>
                         ) : (
                             <><Play className="w-4 h-4" fill="currentColor" /> Iniciar Ruta</>
                         )}
                     </button>
                 </div>
             )}
+
+            <div className="absolute left-4 top-4 z-[1000] max-w-sm rounded-xl border border-border bg-white/95 p-4 shadow-lg backdrop-blur dark:bg-slate-900/95">
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
+                        <p className="text-sm font-semibold text-foreground">{runnerTrackingStatusLabel(trackingStatus)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">ETA orientativa</p>
+                        <p className="text-sm font-semibold text-foreground">{formatEtaLabel(remainingDistanceKm)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Distancia restante</p>
+                        <p className="text-sm font-semibold text-foreground">{formatDistanceLabel(remainingDistanceKm)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Última señal</p>
+                        <p className="text-sm font-semibold text-foreground">{formatLastUpdateLabel(lastUpdateAt)}</p>
+                    </div>
+                </div>
+                <div className="mt-3 border-t border-border/70 pt-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Runner</p>
+                    <p className="text-sm font-semibold text-foreground">{runnerName || 'Asignación confirmada'}</p>
+                </div>
+            </div>
 
             {error && (
                 <div className="absolute inset-x-4 top-4 z-[1000] flex items-center justify-between bg-destructive p-4 rounded-xl text-destructive-foreground font-bold shadow-lg">
@@ -260,6 +373,16 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                     {/* Traced Route */}
                     {routeHistory.length > 0 && (
                         <Polyline positions={routeHistory} color="#df795d" weight={5} opacity={0.8} />
+                    )}
+
+                    {routeHistory.length === 0 && origin && destination && (
+                        <Polyline
+                            positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
+                            color="#94a3b8"
+                            weight={3}
+                            dashArray="8, 8"
+                            opacity={0.55}
+                        />
                     )}
 
                     {/* Projected Line To Destination */}

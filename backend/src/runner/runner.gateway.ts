@@ -12,7 +12,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Role, DeliveryStatus } from '@prisma/client';
+import { DeliveryOrderStatus, DeliveryStatus, Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnEvent } from '@nestjs/event-emitter';
 import { JwtPayload } from '../auth/interfaces/auth.interfaces';
@@ -37,6 +37,14 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(RunnerGateway.name);
   private readonly jwtSecret: string;
   private readonly locationRateLimits: Map<string, number> = new Map();
+
+  private isTrackingUpdateAllowed(status: DeliveryOrderStatus | null) {
+    return (
+      status === DeliveryOrderStatus.PICKUP_PENDING ||
+      status === DeliveryOrderStatus.PICKED_UP ||
+      status === DeliveryOrderStatus.IN_TRANSIT
+    );
+  }
 
   constructor(
     private readonly prisma: PrismaService,
@@ -291,17 +299,30 @@ export class RunnerGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Security check DB
     const order = await this.prisma.order.findUnique({
       where: { id: data.orderId },
-      select: { runnerId: true, status: true },
+      select: {
+        runnerId: true,
+        status: true,
+        deliveryOrder: {
+          select: {
+            runnerId: true,
+            status: true,
+          },
+        },
+      },
     });
 
-    if (order?.runnerId !== userId) {
+    const assignedRunnerId = order?.deliveryOrder?.runnerId ?? order?.runnerId;
+
+    if (assignedRunnerId !== userId) {
       throw new WsException(
         'Forbidden: Not the assigned runner for this order',
       );
     }
-    if (order.status !== DeliveryStatus.IN_TRANSIT) {
+
+    const trackingStatus = order?.deliveryOrder?.status ?? null;
+    if (!this.isTrackingUpdateAllowed(trackingStatus)) {
       throw new WsException(
-        'Forbidden: Location can only be updated while IN_TRANSIT',
+        'Forbidden: Location can only be updated during active delivery tracking',
       );
     }
 

@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { WsException } from '@nestjs/websockets';
-import { Role } from '@prisma/client';
+import { DeliveryOrderStatus, Role } from '@prisma/client';
 
 describe('RunnerGateway Security & Auth', () => {
   let gateway: RunnerGateway;
@@ -555,8 +555,12 @@ describe('RunnerGateway Security & Auth', () => {
 
     it('rejects location updates from a socket that is not the assigned runner', async () => {
       (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
-        runnerId: 'runner-2',
+        runnerId: null,
         status: 'IN_TRANSIT',
+        deliveryOrder: {
+          runnerId: 'runner-2',
+          status: DeliveryOrderStatus.IN_TRANSIT,
+        },
       });
 
       await expect(
@@ -567,10 +571,14 @@ describe('RunnerGateway Security & Auth', () => {
       ).rejects.toThrow(WsException);
     });
 
-    it('rejects location updates unless the order is IN_TRANSIT', async () => {
+    it('rejects location updates unless the delivery is in a tracking-active lifecycle', async () => {
       (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
-        runnerId: 'runner-1',
+        runnerId: null,
         status: 'ASSIGNED',
+        deliveryOrder: {
+          runnerId: 'runner-1',
+          status: DeliveryOrderStatus.RUNNER_ASSIGNED,
+        },
       });
 
       await expect(
@@ -581,10 +589,14 @@ describe('RunnerGateway Security & Auth', () => {
       ).rejects.toThrow(WsException);
     });
 
-    it('rate limits repeated location updates for the same runner and order', async () => {
+    it('allows updates from PICKUP_PENDING onwards and rate limits repeated location updates', async () => {
       (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
-        runnerId: 'runner-1',
-        status: 'IN_TRANSIT',
+        runnerId: null,
+        status: 'ASSIGNED',
+        deliveryOrder: {
+          runnerId: 'runner-1',
+          status: DeliveryOrderStatus.PICKUP_PENDING,
+        },
       });
 
       const socket = {
@@ -606,8 +618,12 @@ describe('RunnerGateway Security & Auth', () => {
 
     it('broadcasts a valid location update only to the client room', async () => {
       (prismaMock.order!.findUnique as jest.Mock).mockResolvedValue({
-        runnerId: 'runner-1',
+        runnerId: null,
         status: 'IN_TRANSIT',
+        deliveryOrder: {
+          runnerId: 'runner-1',
+          status: DeliveryOrderStatus.IN_TRANSIT,
+        },
       });
 
       await gateway.handleUpdateLocation(

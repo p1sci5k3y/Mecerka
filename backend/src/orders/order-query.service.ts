@@ -133,6 +133,7 @@ export class OrderQueryService {
     return {
       orderId: order.id,
       status: this.buildOrderTrackingStatus(order),
+      deliveryStatus: deliveryOrder?.status ?? null,
       runner: deliveryOrder?.runner
         ? {
             id: deliveryOrder.runner.id,
