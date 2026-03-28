@@ -1,10 +1,10 @@
 # Checkout Cart Validation Atom Spec
 
-## Goal
+## Objetivo
 
 Extract active-cart validation from `CheckoutService` into a dedicated class without changing the public checkout contract or the validation outcomes.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -14,7 +14,7 @@ This atom covers only:
 - filtering provider groups without items
 - computing the total provider subtotal amount
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -23,13 +23,13 @@ This atom does not change:
 - idempotency handling
 - payment session initialization
 
-## Public Contract
+## Contrato público
 
 The following `CheckoutService` method must keep its current signature and behavior:
 
 - `checkoutFromCart(clientId, dto, idempotencyKey?)`
 
-## Invariants
+## Invariantes
 
 - checkout still requires an active cart
 - checkout still requires the cart to be in `ACTIVE` status
@@ -39,7 +39,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - if every provider group is empty, checkout still fails
 - the total amount remains the sum of provider subtotals
 
-## Design Constraints
+## Restricciones de diseño
 
 - `CheckoutService` remains the checkout façade used by `OrdersService`
 - cart validation moves to a dedicated class under `backend/src/orders`
@@ -47,7 +47,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - no payload shape changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `CheckoutService` delegates cart validation to a dedicated class
 - a focused cart-validation spec covers the empty cart and city mismatch paths

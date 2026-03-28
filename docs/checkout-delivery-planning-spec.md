@@ -1,10 +1,10 @@
 # Checkout Delivery Planning Atom Spec
 
-## Goal
+## Objetivo
 
 Extract delivery-address resolution, provider coverage checks, and delivery pricing snapshot construction from `CheckoutService` into a dedicated class without changing the public checkout contract.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - distance and coverage-limit calculation
 - delivery pricing snapshot generation
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -22,13 +22,13 @@ This atom does not change:
 - idempotency handling
 - payment session initialization
 
-## Public Contract
+## Contrato público
 
 The following `CheckoutService` method must keep its current signature and behavior:
 
 - `checkoutFromCart(clientId, dto, idempotencyKey?)`
 
-## Invariants
+## Invariantes
 
 - the selected checkout city still scopes the geocoding request
 - providers without configured coordinates still block checkout
@@ -37,7 +37,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - delivery pricing still uses the farthest provider distance and additional pickup count
 - returned pricing fields and precision remain unchanged
 
-## Design Constraints
+## Restricciones de diseño
 
 - `CheckoutService` remains the checkout façade used by `OrdersService`
 - delivery planning moves to a dedicated class under `backend/src/orders`
@@ -45,7 +45,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - no payload shape changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `CheckoutService` delegates delivery planning to a dedicated class
 - a focused planning service spec covers coverage validation and delivery pricing

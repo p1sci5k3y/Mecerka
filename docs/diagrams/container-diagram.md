@@ -1,29 +1,29 @@
-# Container Diagram
+# Diagrama De Contenedores
 
 ```mermaid
 flowchart TB
-    subgraph "Client Layer"
-      browser["Web Browser"]
+    subgraph "Capa cliente"
+      browser["Web browser"]
     end
 
-    subgraph "Frontend Container"
+    subgraph "Contenedor frontend"
       next["Next.js App"]
       playwright["Playwright / Browser E2E"]
     end
 
-    subgraph "Backend Container"
-      api["NestJS Controllers / WebSockets"]
-      services["Application Services"]
+    subgraph "Contenedor backend"
+      api["Controladores NestJS / WebSockets"]
+      services["Application services"]
       prisma["Prisma Client"]
       support["Support / Refund / Demo / Risk"]
       emailcfg["EmailSettingsService"]
     end
 
-    subgraph "Database"
+    subgraph "Base de datos"
       postgres["PostgreSQL"]
     end
 
-    subgraph "External Services"
+    subgraph "Servicios externos"
       stripe["Stripe / Connect"]
       smtp["SMTP / SES / Mailpit"]
       geo["Geocoding"]

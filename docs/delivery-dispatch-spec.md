@@ -1,10 +1,10 @@
 # Delivery Dispatch Atom Spec
 
-## Goal
+## Objetivo
 
 Extract delivery job publication and assignment from `DeliveryService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -14,7 +14,7 @@ This atom covers only:
 - job expiration
 - runner assignment through the delivery job flow
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -25,7 +25,7 @@ This atom does not change:
 - delivery order reads
 - controller routes or DTOs
 
-## Public Contract
+## Contrato público
 
 The following `DeliveryService` methods must keep their current signatures and behavior:
 
@@ -35,7 +35,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - `acceptDeliveryJob(jobId, runnerId)`
 - `expireDeliveryJobs(now?)`
 
-## Invariants
+## Invariantes
 
 - only the client owner or an admin can assign a runner directly
 - only eligible delivery orders can be assigned
@@ -45,7 +45,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - expired jobs are marked as expired before rejecting acceptance
 - rapid job grabbing continues to emit the same runner risk event
 
-## Design Constraints
+## Restricciones de diseño
 
 - `DeliveryService` remains the application façade used by the controller
 - dispatch logic moves to a dedicated class under `backend/src/delivery`
@@ -53,7 +53,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates dispatch and assignment to a dedicated class
 - existing job and assignment tests keep passing

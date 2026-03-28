@@ -1,24 +1,24 @@
 # Delivery Runner Webhook Spec
 
-## Goal
+## Objetivo
 
 Move runner payment webhook processing out of `DeliveryRunnerPaymentService` into
 its own service, keeping runner payment preparation focused on session creation.
 
-## In Scope
+## Dentro de alcance
 
 - Confirming runner payments from Stripe webhook events.
 - Marking runner payment failures from Stripe webhook events.
 - Claiming and updating runner webhook audit records.
 - Emitting runner payment failure risk events.
 
-## Out of Scope
+## Fuera de alcance
 
 - Preparing runner Stripe payment intents.
 - Resolving runner Stripe accounts.
 - Delivery tracking or lifecycle operations unrelated to payment webhooks.
 
-## Invariants
+## Invariantes
 
 - Public methods exposed through `DeliveryService` remain unchanged.
 - Duplicate webhook events remain idempotent.
@@ -27,7 +27,7 @@ its own service, keeping runner payment preparation focused on session creation.
 - Failed payments still mark the delivery as failed and emit the same risk
   signal for the client.
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryRunnerPaymentService` delegates webhook confirmation/failure to a
   dedicated runner webhook service.

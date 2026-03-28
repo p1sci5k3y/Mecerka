@@ -1,12 +1,12 @@
 # Provider Payment Settlement Spec
 
-## Goal
+## Objetivo
 
 Extract provider-payment settlement from
 `ProviderPaymentConfirmationService` into a dedicated service without changing
 webhook confirmation behavior.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -17,21 +17,21 @@ This vertical owns:
 - marking the provider order as paid
 - confirming the root order when all provider orders are paid
 
-## Non-goals
+## No objetivos
 
 - loading the payment session
 - loading the provider order
 - Stripe connected-account resolution
 - webhook payload validation
 
-## Invariants
+## Invariantes
 
 - all active reservations must be consumed together
 - stock updates must fail on concurrent underflow
 - root order only moves to `CONFIRMED` when all provider orders are paid
 - return payload shape remains unchanged
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `ProviderPaymentConfirmationService` delegates settlement to a dedicated service
 - observable success and conflict behavior remains unchanged

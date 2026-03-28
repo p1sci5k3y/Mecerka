@@ -1,10 +1,10 @@
 # Checkout Order Creation Atom Spec
 
-## Goal
+## Objetivo
 
 Extract transactional order creation from `CheckoutService` into a dedicated class without changing the public checkout contract or the resulting persisted structure.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -14,7 +14,7 @@ This atom covers only:
 - creation of the order summary document
 - transition of the cart group to `CHECKED_OUT`
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -24,13 +24,13 @@ This atom does not change:
 - post-creation stock reservation records
 - payment session initialization
 
-## Public Contract
+## Contrato público
 
 The following `CheckoutService` method must keep its current signature and behavior:
 
 - `checkoutFromCart(clientId, dto, idempotencyKey?)`
 
-## Invariants
+## Invariantes
 
 - checkout still locks products in deterministic order
 - checkout still fails when there are no requested products
@@ -41,7 +41,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - the order summary document still uses the `SUM-XXXXXXXX` display number format
 - the originating cart still ends in `CHECKED_OUT` with incremented version
 
-## Design Constraints
+## Restricciones de diseño
 
 - `CheckoutService` remains the checkout façade used by `OrdersService`
 - transactional order creation moves to a dedicated class under `backend/src/orders`
@@ -49,7 +49,7 @@ The following `CheckoutService` method must keep its current signature and behav
 - no payload shape changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `CheckoutService` delegates transactional order creation to a dedicated class
 - a focused order-creation spec covers provider suborder creation and summary/cart side effects

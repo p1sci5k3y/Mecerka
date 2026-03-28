@@ -1,4 +1,4 @@
-## Observability Reconciliation Spec
+## Observabilidad Reconciliation Spec
 
 ### Objetivo
 

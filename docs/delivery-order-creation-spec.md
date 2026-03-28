@@ -1,11 +1,11 @@
 # Delivery Order Creation Spec
 
-## Goal
+## Objetivo
 
 Extract delivery-order creation from `DeliveryService` into a dedicated service
 without changing the observable behavior of the delivery API.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -16,7 +16,7 @@ This vertical owns:
 - delivery-order persistence
 - initial dispatch-job creation
 
-## Non-goals
+## No objetivos
 
 - delivery tracking
 - incidents
@@ -24,14 +24,14 @@ This vertical owns:
 - lifecycle transitions
 - delivery order read access
 
-## Invariants
+## Invariantes
 
 - only the order client or an admin can create a delivery order
 - delivery fee must match the order delivery fee
 - only one delivery order can exist per order
 - initial dispatch job is created inside the same transaction
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates `createDeliveryOrder()`
 - response payload and errors remain unchanged

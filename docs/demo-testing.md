@@ -1,6 +1,6 @@
-# Demo Testing Environment
+# Entorno De Pruebas Demo
 
-## Purpose of Demo Mode
+## Propósito of Demo Mode
 
 Demo mode provides a reproducible marketplace dataset so examiners can exercise the platform without manual setup.
 
@@ -17,7 +17,7 @@ When demo mode is explicitly enabled, the backend auto-seeds this dataset on sta
 
 Demo mode requires an explicit `DEMO_PASSWORD` value. The backend does not ship a built-in demo password.
 
-## Quick Start
+## Arranque rápido
 
 1. Start PostgreSQL.
 2. Run the backend.
@@ -37,7 +37,7 @@ curl -b cookies.txt -X POST http://127.0.0.1:3000/demo/reset
 
 `/demo/reset` is admin-only.
 
-## How to Reset the Environment
+## Cómo resetear el entorno
 
 Available endpoints:
 
@@ -62,7 +62,7 @@ Behavior:
 
 This makes repeated manual testing and Playwright reruns deterministic.
 
-## Test Users
+## Usuarios de prueba
 
 Default demo accounts:
 
@@ -88,7 +88,7 @@ Roles:
 - `user.demo@local.test`: `CLIENT`
 - `user2.demo@local.test`: `CLIENT`
 
-## Demo Providers
+## Providers demo
 
 The seeded provider-facing businesses are:
 
@@ -97,7 +97,7 @@ The seeded provider-facing businesses are:
 
 These providers are created through existing domain services and receive demo payment-account bootstrap values so marketplace flows can run in local/demo mode.
 
-## Demo Products
+## Productos demo
 
 The demo catalog includes:
 
@@ -120,7 +120,7 @@ Each demo product includes:
 - category
 - `imageUrl`
 
-## Order Lifecycle in Demo
+## Lifecycle de pedido en demo
 
 The demo seed creates at least:
 
@@ -141,7 +141,7 @@ Typical states visible during testing:
 - assigned / delivering order
 - delivered order
 
-## Playwright Test Coverage
+## Coverage Playwright
 
 Current Playwright coverage lives in:
 
@@ -175,7 +175,7 @@ The E2E suite resets demo data before tests so each run starts from a known base
 
 Because the demo module writes real application data through existing services, both manual demo runs and Playwright runs require the backend to be connected to the same PostgreSQL-backed application stack used in normal execution.
 
-## Notes
+## Notas
 
 - Demo data is intended for local testing and evaluation only.
 - Test identities must use `local.test` or `example.test` domains.

@@ -1,10 +1,10 @@
 # Provider Payment Preparation Atom Spec
 
-## Goal
+## Objetivo
 
 Extract provider payment preparation from `PaymentsService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -12,7 +12,7 @@ This atom covers only:
 - root-order aggregate provider payment preparation
 - demo-mode unavailability handling for provider Stripe sessions
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -21,14 +21,14 @@ This atom does not change:
 - onboarding links
 - tripartite or legacy payment wrappers
 
-## Public Contract
+## Contrato público
 
 The following `PaymentsService` methods must keep their current signatures and behavior:
 
 - `prepareProviderOrderPayment(providerOrderId, clientId)`
 - `prepareOrderProviderPayments(orderId, clientId)`
 
-## Invariants
+## Invariantes
 
 - provider payment preparation remains restricted to the owning client
 - only eligible provider-order states can open payment preparation
@@ -39,7 +39,7 @@ The following `PaymentsService` methods must keep their current signatures and b
 - provider payment sessions remain scoped to the provider connected account
 - demo mode with dummy Stripe credentials still returns aggregate `UNAVAILABLE` state
 
-## Design Constraints
+## Restricciones de diseño
 
 - `PaymentsService` remains the application façade used by controllers
 - provider payment preparation moves to a dedicated class under `backend/src/payments`
@@ -47,7 +47,7 @@ The following `PaymentsService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `PaymentsService` delegates provider payment preparation to a dedicated class
 - existing payment preparation tests keep passing

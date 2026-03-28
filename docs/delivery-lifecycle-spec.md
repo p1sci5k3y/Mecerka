@@ -1,10 +1,10 @@
 # Delivery Lifecycle Atom Spec
 
-## Goal
+## Objetivo
 
 Extract delivery lifecycle transitions from `DeliveryService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - transition to `IN_TRANSIT`
 - transition to `DELIVERED`
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -23,7 +23,7 @@ This atom does not change:
 - delivery job dispatch
 - controller routes or DTOs
 
-## Public Contract
+## Contrato público
 
 The following `DeliveryService` methods must keep their current signatures and behavior:
 
@@ -32,7 +32,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - `startTransit(deliveryOrderId, userId, roles)`
 - `confirmDelivery(deliveryOrderId, userId, roles, dto?)`
 
-## Invariants
+## Invariantes
 
 - only the assigned runner or an admin can update delivery lifecycle
 - lifecycle transitions remain restricted to the current allowed state machine
@@ -41,7 +41,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - delivery proof URL and delivery notes are only persisted on `DELIVERED`
 - lifecycle transitions continue emitting the same structured log event
 
-## Design Constraints
+## Restricciones de diseño
 
 - `DeliveryService` remains the application façade used by the controller
 - lifecycle logic moves to a dedicated class under `backend/src/delivery`
@@ -49,7 +49,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates lifecycle transitions to a dedicated class
 - existing lifecycle tests keep passing

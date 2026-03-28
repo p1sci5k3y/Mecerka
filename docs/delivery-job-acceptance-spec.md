@@ -1,11 +1,11 @@
 # Delivery Job Acceptance Spec
 
-## Goal
+## Objetivo
 
 Extract delivery-job acceptance from `DeliveryDispatchService` into a dedicated
 service without changing the observable dispatch API.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -16,14 +16,14 @@ This vertical owns:
 - assignment of runner to the delivery order and root order
 - post-acceptance job-grabbing risk emission
 
-## Non-goals
+## No objetivos
 
 - manual runner assignment by client/admin
 - job listing
 - job creation
 - job expiry worker
 
-## Invariants
+## Invariantes
 
 - only open, non-expired jobs can be accepted
 - a runner can only claim a given job once
@@ -31,7 +31,7 @@ This vertical owns:
 - delivery order and root order stay aligned on assigned runner
 - job-grabbing risk signal remains emitted on the same threshold/window rules
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `DeliveryDispatchService` delegates `acceptDeliveryJob()`
 - observable result shape and conflicts remain unchanged

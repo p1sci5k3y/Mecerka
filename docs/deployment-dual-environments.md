@@ -1,20 +1,20 @@
-# Dual Deployment: Demo and Production
+# Despliegue Dual: Demo Y Producción
 
-This repository deploys the same application artifact into two isolated environments:
+Este repositorio despliega el mismo artefacto de aplicación en dos entornos aislados:
 
 - `mecerka.me` as production
 - `demo.mecerka.me` as demo
 
-## Deployment model
+## Modelo de despliegue
 
-- Images are built from the same commit.
-- The workflow deploys one backend image and one frontend image.
-- The same codebase is used for both stacks.
-- Environment-specific behavior is controlled through secrets, runtime config, and data isolation.
+- Las imágenes se construyen desde el mismo commit.
+- El workflow despliega una imagen de backend y una de frontend.
+- La misma base de código se usa en ambos stacks.
+- El comportamiento específico de cada entorno se controla con secretos, runtime config y aislamiento de datos.
 
-## Isolation rules
+## Reglas de aislamiento
 
-Demo and production must not share:
+Demo y producción no deben compartir:
 
 - database name
 - persistent volume
@@ -24,16 +24,16 @@ Demo and production must not share:
 - demo mode
 - demo password
 
-Isolation is enforced by:
+El aislamiento se fuerza mediante:
 
 - two environment files rendered on the server
 - two Compose projects
 - separate host ports behind Nginx
 - runtime-only frontend config under the same host using `"/api"`
 
-## Required GitHub secrets / variables
+## Secrets y variables necesarios en GitHub
 
-The deploy workflow expects split values with `PROD_*` and `DEMO_*` prefixes.
+El workflow de despliegue espera valores separados con prefijos `PROD_*` y `DEMO_*`.
 
 Examples:
 
@@ -60,42 +60,42 @@ The workflow also needs:
 - `GHCR_TOKEN`
 - `LETSENCRYPT_EMAIL`
 
-## Reverse proxy and TLS
+## Proxy inverso y TLS
 
 `infrastructure/nginx.conf` routes:
 
 - `mecerka.me` and `www.mecerka.me`
 - `demo.mecerka.me`
 
-TLS is managed by Certbot during deploy, followed by `nginx -t`, reload, and public smoke checks.
+TLS se gestiona con Certbot durante el despliegue, seguido de `nginx -t`, recarga y smoke checks públicos.
 
-## SMTP operational model
+## Modelo operativo de SMTP
 
-Deployment still supports environment-driven SMTP through `PROD_MAIL_*` and `DEMO_MAIL_*`.
+El despliegue sigue soportando SMTP conducido por entorno mediante `PROD_MAIL_*` y `DEMO_MAIL_*`.
 
-In addition, the app now exposes admin-managed SMTP configuration:
+Además, la aplicación ahora expone configuración SMTP gestionable desde admin:
 
-- infrastructure can keep mail fully secret-managed through environment
-- self-hosted operators can override SMTP from the admin UI
-- the effective source is visible as `environment`, `database`, or `default`
+- infraestructura puede mantener el correo completamente gobernado por secrets de entorno
+- operadores self-hosted pueden sobrescribir SMTP desde la UI admin
+- el origen efectivo se muestra como `environment`, `database` o `default`
 
-## Demo reset policy
+## Política de reseteo de la demo
 
-The demo stack is recreated from a clean volume on deploy so that the public demo does not accumulate stale business data between releases.
+El stack demo se recrea desde un volumen limpio en cada despliegue para que la demo pública no acumule datos de negocio obsoletos entre releases.
 
-## Validated current state
+## Estado actual validado
 
-At `28/03/2026`, the observable state is:
+A `28/03/2026`, el estado observable es:
 
 - `https://mecerka.me/` and `https://mecerka.me/api/health` respond `200`
 - `https://demo.mecerka.me/` and `https://demo.mecerka.me/api/health` respond `200`
 - `https://demo.mecerka.me/runtime-config` serves `"/api"` and Stripe dummy
-- admin demo login reaches `/api/admin/email-settings`
-- the SMTP summary is visible and currently resolves from `environment` in the public demo
+- el login admin demo alcanza `/api/admin/email-settings`
+- el resumen SMTP es visible y actualmente resuelve desde `environment` en la demo pública
 
-## Pending external infrastructure
+## Infraestructura externa pendiente
 
-The repository does not provision by itself:
+El repositorio no aprovisiona por sí mismo:
 
 - DNS
 - cloud secrets

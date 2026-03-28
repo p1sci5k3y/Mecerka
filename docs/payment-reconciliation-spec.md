@@ -1,10 +1,10 @@
 # Payment Reconciliation Atom Spec
 
-## Goal
+## Objetivo
 
 Extract payment reconciliation issue detection from `PaymentsService` into a dedicated class without changing the public service contract or the returned payload.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - detection of stale received webhook events
 - detection of provider orders with multiple open payment sessions
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -22,13 +22,13 @@ This atom does not change:
 - webhook confirmation
 - legacy tripartite or cash wrappers
 
-## Public Contract
+## Contrato público
 
 The following `PaymentsService` method must keep its current signature and behavior:
 
 - `findPaymentReconciliationIssues(now?)`
 
-## Invariants
+## Invariantes
 
 - the stale webhook window remains five minutes
 - stale webhook detection continues to use status `RECEIVED`
@@ -36,14 +36,14 @@ The following `PaymentsService` method must keep its current signature and behav
 - `multipleOpenSessions` still counts provider orders with more than one open session
 - the returned payload shape remains unchanged
 
-## Design Constraints
+## Restricciones de diseño
 
 - `PaymentsService` remains the façade used by controllers and admin flows
 - reconciliation logic moves to a dedicated class under `backend/src/payments`
 - no schema changes
 - no behavior changes outside the extracted scope
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `PaymentsService` delegates reconciliation issue detection to a dedicated class
 - a focused reconciliation service spec covers stale windows and multiple-open-session detection

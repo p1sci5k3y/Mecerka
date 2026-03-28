@@ -1,11 +1,11 @@
-# System Context
+# Contexto Del Sistema
 
 ```mermaid
 flowchart LR
-    user["Customer / CLIENT"] --> frontend["Next.js Frontend"]
-    provider["Merchant / PROVIDER"] --> frontend
-    runner["Runner / RUNNER"] --> frontend
-    admin["Supervisor / ADMIN"] --> frontend
+    user["Cliente / CLIENT"] --> frontend["Next.js Frontend"]
+    provider["Provider / PROVIDER"] --> frontend
+    runner["Repartidor / RUNNER"] --> frontend
+    admin["Administrador / ADMIN"] --> frontend
 
     frontend --> backend["NestJS Backend API"]
     backend --> db["PostgreSQL"]

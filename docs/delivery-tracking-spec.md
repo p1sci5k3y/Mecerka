@@ -1,10 +1,10 @@
 # Delivery Tracking Atom Spec
 
-## Goal
+## Objetivo
 
 Extract delivery tracking behavior from `DeliveryService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - delivery location history reads
 - runner location cleanup
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -23,7 +23,7 @@ This atom does not change:
 - delivery job dispatch
 - controller routes or DTOs
 
-## Public Contract
+## Contrato público
 
 The following `DeliveryService` methods must keep their current signatures and behavior:
 
@@ -32,7 +32,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - `getDeliveryLocationHistory(deliveryOrderId)`
 - `cleanupRunnerLocations(now?)`
 
-## Invariants
+## Invariantes
 
 - only the assigned runner or an admin can advance tracking-sensitive delivery state
 - location updates are rejected when the delivery status is not tracking-active
@@ -44,7 +44,7 @@ The following `DeliveryService` methods must keep their current signatures and b
   - client, only when delivery visibility rules allow it
 - cleanup only removes runner locations older than the configured retention window
 
-## Design Constraints
+## Restricciones de diseño
 
 - `DeliveryService` remains the application façade used by the controller
 - tracking logic moves to a dedicated class under `backend/src/delivery`
@@ -52,7 +52,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates the tracking vertical to a dedicated class
 - existing delivery tracking tests keep passing

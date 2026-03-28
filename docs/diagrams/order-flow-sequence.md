@@ -1,4 +1,4 @@
-# Order Flow Sequence
+# Secuencia Del Flujo De Pedido
 
 ```mermaid
 sequenceDiagram
@@ -8,7 +8,7 @@ sequenceDiagram
     participant O as Orders Services
     participant P as Payments / Delivery
     participant S as Support / Refunds
-    participant A as Admin Backoffice
+    participant A as Backoffice admin
     participant DB as PostgreSQL
     participant X as Stripe / SMTP
 

@@ -1,10 +1,10 @@
 # Refund Read Model Atom Spec
 
-## Goal
+## Objetivo
 
 Remove `any` from refund read-model code paths in `RefundsService` without changing payloads, access-control behavior or query semantics.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -14,7 +14,7 @@ This atom covers only:
 - provider-order refund listing
 - delivery-order refund listing
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -23,7 +23,7 @@ This atom does not change:
 - refund status transitions
 - boundary locking or Stripe execution
 
-## Public Contract
+## Contrato público
 
 The following `RefundsService` methods must keep their current signatures and behavior:
 
@@ -31,7 +31,7 @@ The following `RefundsService` methods must keep their current signatures and be
 - `listProviderOrderRefunds(providerOrderId, userId, roles)`
 - `listDeliveryOrderRefunds(deliveryOrderId, userId, roles)`
 
-## Invariants
+## Invariantes
 
 - admins still have read access to every refund
 - clients still only read refunds related to their own order or delivery
@@ -39,13 +39,13 @@ The following `RefundsService` methods must keep their current signatures and be
 - list endpoints still return sanitized refund payloads
 - payload shape remains unchanged
 
-## Design Constraints
+## Restricciones de diseño
 
 - no schema changes
 - no query-scope changes
 - no API payload changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `sanitizeRefund` no longer accepts `any`
 - `assertReadAccess` no longer accepts `any`

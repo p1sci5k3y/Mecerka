@@ -1,11 +1,11 @@
 # Order Legacy Manual Creation Spec
 
-## Goal
+## Objetivo
 
 Move the legacy single-provider manual order creation flow out of `OrdersService`
 into a dedicated application service without changing observable behavior.
 
-## In Scope
+## Dentro de alcance
 
 - PIN verification for the legacy manual order flow.
 - Product existence, activity, stock, city and connected-account validation.
@@ -13,14 +13,14 @@ into a dedicated application service without changing observable behavior.
 - Creation of the root order and its single `ProviderOrder`.
 - Legacy structured log emission for successful order creation.
 
-## Out of Scope
+## Fuera de alcance
 
 - Official cart checkout flow.
 - Provider payment preparation.
 - Reservation expiry.
 - Runner lifecycle or delivery orchestration.
 
-## Invariants
+## Invariantes
 
 - The legacy manual flow still allows only one provider per order.
 - Orders with products from multiple cities remain rejected.
@@ -28,7 +28,7 @@ into a dedicated application service without changing observable behavior.
   remain rejected.
 - Existing controller/service contracts remain unchanged.
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `OrdersService.create()` delegates to a dedicated legacy creation service.
 - Existing tests for the legacy manual flow keep passing unchanged.

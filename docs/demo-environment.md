@@ -1,6 +1,6 @@
-# Demo Environment
+# Entorno Demo
 
-## Purpose
+## Propósito
 
 The demo environment allows evaluators to exercise the real platform with reproducible sample data. It is not a separate fake frontend: it is the same application and API, isolated by data and runtime config.
 

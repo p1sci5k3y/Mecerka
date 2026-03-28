@@ -1,11 +1,11 @@
 # Refund Boundary Resolution Spec
 
-## Goal
+## Objetivo
 
 Extract refund boundary resolution from `RefundBoundaryService` into a dedicated
 service without changing refund request behavior.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -15,7 +15,7 @@ This vertical owns:
 - delivery boundary lookup
 - request boundary resolution from DTO input
 
-## Non-goals
+## No objetivos
 
 - refund type validation
 - currency validation
@@ -23,14 +23,14 @@ This vertical owns:
 - refund amount capacity rules
 - request rate limits
 
-## Invariants
+## Invariantes
 
 - provider and delivery boundaries keep the same shaped read model
 - incident matching semantics remain unchanged
 - request DTO must still resolve exactly one payment boundary
 - connected Stripe account fallback from `user.stripeAccountId` remains unchanged
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `RefundBoundaryService` delegates boundary resolution concerns
 - observable refund behavior remains unchanged

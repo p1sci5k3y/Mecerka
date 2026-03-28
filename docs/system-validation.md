@@ -1,9 +1,9 @@
-# System Validation Report
+# Informe De Validación Del Sistema
 
 Date: 2026-03-18  
 Workspace: repository root
 
-## Objective
+## Objetivo
 
 Document the current validation baseline of the implemented system in a way that matches the repository as shipped.
 
@@ -14,7 +14,7 @@ This report focuses on:
 - automated validation
 - security/privacy/concurrency checks covered by tests
 
-## Runtime validation model
+## Modelo de validación en runtime
 
 The platform is designed to be validated in two complementary ways:
 
@@ -47,7 +47,7 @@ If demo mode is intentionally enabled, validation may additionally include:
 - demo accounts
 - Playwright demo flows
 
-## Automated backend validation
+## Validación automatizada del backend
 
 The backend validation pipeline is executed with:
 
@@ -78,7 +78,7 @@ Backend test execution is therefore self-contained and does not depend on:
 - pre-provisioned local database credentials
 - external SMTP infrastructure
 
-## Security and consistency validation covered by tests
+## Validación de seguridad y consistencia cubierta por tests
 
 The current test baseline validates:
 
@@ -92,7 +92,7 @@ The current test baseline validates:
 - admin role grant consistency;
 - guarded access to protected routes.
 
-## Observability of validation
+## Observabilidad of validation
 
 During backend test execution, the repository logs:
 
@@ -103,7 +103,7 @@ During backend test execution, the repository logs:
 
 This provides reproducibility evidence and reduces environment drift.
 
-## What this report should and should not claim
+## Qué debe y qué no debe afirmar este informe
 
 The correct validation claim is:
 

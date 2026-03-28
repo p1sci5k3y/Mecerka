@@ -1,10 +1,10 @@
 # Legacy Cash Payment Atom Spec
 
-## Goal
+## Objetivo
 
 Extract the legacy offline cash flow from `PaymentsService` into a dedicated class without changing the public contract or reviving deprecated behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -12,7 +12,7 @@ This atom covers only:
 - transactional stock deduction for legacy cash confirmation
 - root order confirmation and event emission for the legacy cash path
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -22,13 +22,13 @@ This atom does not change:
 - reconciliation
 - the fact that legacy cash payments remain disabled by default
 
-## Public Contract
+## Contrato público
 
 The following `PaymentsService` method must keep its current signature and behavior:
 
 - `processCashPayment(orderId, clientId, pin)`
 
-## Invariants
+## Invariantes
 
 - the feature stays disabled unless `ENABLE_LEGACY_CASH_PAYMENTS=true`
 - the transaction PIN remains mandatory
@@ -38,14 +38,14 @@ The following `PaymentsService` method must keep its current signature and behav
 - a confirmed cash payment still emits `order.stateChanged`
 - the response payload shape remains unchanged
 
-## Design Constraints
+## Restricciones de diseño
 
 - `PaymentsService` remains the façade used by controllers
 - legacy cash logic moves to a dedicated class under `backend/src/payments`
 - no schema changes
 - no new feature behavior
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `PaymentsService` delegates legacy cash handling to a dedicated class
 - stock deduction is typed without `any`

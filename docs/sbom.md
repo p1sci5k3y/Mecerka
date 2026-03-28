@@ -1,12 +1,12 @@
-# Software Supply Chain Security
+# Seguridad De La Cadena De Suministro De Software
 
-## Purpose
+## Propósito
 
 The security posture of the system depends not only on the application code, but also on the third-party components pulled through the npm ecosystem.
 
 To improve traceability and auditability, the repository supports generation of an **SBOM (Software Bill of Materials)**.
 
-## Dependency management strategy
+## Estrategia de gestión de dependencias
 
 The project uses npm-based dependency management with lockfiles (`package-lock.json`), which provides:
 
@@ -16,7 +16,7 @@ The project uses npm-based dependency management with lockfiles (`package-lock.j
 
 In a monorepo context, lockfiles are important because they reduce uncontrolled drift between developer machines and automated pipelines.
 
-## What an SBOM is
+## Qué es un SBOM
 
 An SBOM is a machine-readable inventory of software components included in a build or repository state.
 
@@ -27,7 +27,7 @@ Its value is practical:
 - improve compliance and auditability;
 - accelerate incident response when a third-party package is disclosed as vulnerable.
 
-## CycloneDX implementation
+## Implementación de CycloneDX
 
 The recommended SBOM format for this repository is **CycloneDX JSON**.
 
@@ -45,7 +45,7 @@ This produces a JSON SBOM that can include:
 - licenses;
 - hashes or related metadata when available from the package ecosystem.
 
-## Monorepo recommendation
+## Recomendación para el monorepo
 
 Because the repository contains multiple Node.js workspaces, the practical recommendation is to generate SBOMs per lockfile boundary when needed, for example:
 
@@ -55,7 +55,7 @@ Because the repository contains multiple Node.js workspaces, the practical recom
 
 This avoids flattening unrelated component trees into a single ambiguous artifact.
 
-## Workflow integration
+## Integración con workflows
 
 SBOM generation can be used:
 
@@ -70,7 +70,7 @@ Typical downstream uses:
 - software inventory tracking;
 - incident response after upstream package disclosures.
 
-## Positioning
+## Posicionamiento
 
 An SBOM does **not** replace:
 
@@ -86,6 +86,6 @@ It complements tooling such as:
 - Snyk
 - other SCA scanners
 
-## Limitation
+## Limitación
 
 SBOM reflects dependencies at generation time and does not replace continuous vulnerability monitoring.

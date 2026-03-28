@@ -1,10 +1,10 @@
 # Delivery Runner Payment Atom Spec
 
-## Goal
+## Objetivo
 
 Extract runner payment handling from `DeliveryService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -14,7 +14,7 @@ This atom covers only:
 - Stripe client resolution for runner payments
 - runner payment webhook claim/update bookkeeping
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -25,7 +25,7 @@ This atom does not change:
 - runner assignment
 - controller routes or DTOs
 
-## Public Contract
+## Contrato público
 
 The following `DeliveryService` methods must keep their current signatures and behavior:
 
@@ -33,7 +33,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - `confirmRunnerPayment(externalSessionId, eventId?)`
 - `failRunnerPayment(externalSessionId, eventId?)`
 
-## Invariants
+## Invariantes
 
 - runner payment preparation remains restricted to the client owner or an admin
 - runner payment can only be prepared for eligible delivery states
@@ -45,7 +45,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - webhook idempotency remains enforced by `runnerWebhookEvent`
 - payment failure still emits the same client risk event
 
-## Design Constraints
+## Restricciones de diseño
 
 - `DeliveryService` remains the application façade used by the controller
 - runner payment logic moves to a dedicated class under `backend/src/delivery`
@@ -53,7 +53,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates runner payment handling to a dedicated class
 - existing runner payment tests keep passing

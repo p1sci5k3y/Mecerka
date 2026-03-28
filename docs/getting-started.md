@@ -1,4 +1,4 @@
-# Getting Started
+# Puesta En Marcha
 
 This guide reflects the current implementation and the shipped repository defaults.
 

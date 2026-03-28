@@ -1,11 +1,11 @@
 # Cart Product Pricing Spec
 
-## Goal
+## Objetivo
 
 Extract active product lookup and cart snapshot pricing from `CartService`
 into a dedicated service without changing cart mutation behavior.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -16,21 +16,21 @@ This vertical owns:
 - effective unit price calculation
 - snapshot payload construction for cart items
 
-## Non-goals
+## No objetivos
 
 - cart group lifecycle
 - cart provider lifecycle
 - cart item persistence
 - cart subtotal recalculation
 
-## Invariants
+## Invariantes
 
 - only active products from active providers with connected Stripe accounts are eligible
 - the lowest valid discount between public and client-specific discount wins
 - snapshot fields remain consistent between add and quantity-update flows
 - unavailable products still raise `Product not available`
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `CartService` delegates product pricing snapshot resolution
 - add/update cart flows keep the same observable behavior

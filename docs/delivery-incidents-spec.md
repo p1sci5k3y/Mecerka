@@ -1,10 +1,10 @@
 # Delivery Incidents Atom Spec
 
-## Goal
+## Objetivo
 
 Extract delivery incident behavior from `DeliveryService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - incident listing per delivery order
 - incident lifecycle transitions
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -23,7 +23,7 @@ This atom does not change:
 - delivery job dispatch
 - controller routes or DTOs
 
-## Public Contract
+## Contrato público
 
 The following `DeliveryService` methods must keep their current signatures and behavior:
 
@@ -34,7 +34,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - `resolveIncident(incidentId, actorId)`
 - `rejectIncident(incidentId, actorId)`
 
-## Invariants
+## Invariantes
 
 - incident evidence URLs remain restricted to HTTPS
 - only an authorized actor can create an incident for a delivery order
@@ -52,7 +52,7 @@ The following `DeliveryService` methods must keep their current signatures and b
   - actors who are already allowed to participate in the delivery order
 - risk events emitted after incident creation keep the current categories and scoring
 
-## Design Constraints
+## Restricciones de diseño
 
 - `DeliveryService` remains the application façade used by the controller
 - incident logic moves to a dedicated class under `backend/src/delivery`
@@ -60,7 +60,7 @@ The following `DeliveryService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `DeliveryService` delegates the incidents vertical to a dedicated class
 - existing incident tests keep passing

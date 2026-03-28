@@ -1,10 +1,10 @@
 # Payment Account Onboarding Atom Spec
 
-## Goal
+## Objetivo
 
 Extract Stripe connected-account onboarding from `PaymentsService` into a dedicated class without changing the public HTTP contract or observable behavior.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -13,7 +13,7 @@ This atom covers only:
 - post-callback verification of the connected account
 - activation of the corresponding `PaymentAccount` record
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -22,14 +22,14 @@ This atom does not change:
 - reconciliation
 - legacy tripartite or cash wrappers
 
-## Public Contract
+## Contrato público
 
 The following `PaymentsService` methods must keep their current signatures and behavior:
 
 - `generateOnboardingLink(userId)`
 - `verifyAndSaveConnectedAccount(userId, accountId)`
 
-## Invariants
+## Invariantes
 
 - onboarding remains available only for existing users
 - a new Stripe Express account is created only when the user has no stored `stripeAccountId`
@@ -39,7 +39,7 @@ The following `PaymentsService` methods must keep their current signatures and b
 - verification fails while Stripe onboarding is still incomplete
 - refresh and return URLs remain derived from the configured frontend/backend URLs
 
-## Design Constraints
+## Restricciones de diseño
 
 - `PaymentsService` remains the application façade used by controllers
 - onboarding logic moves to a dedicated class under `backend/src/payments`
@@ -47,7 +47,7 @@ The following `PaymentsService` methods must keep their current signatures and b
 - no database schema changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `PaymentsService` delegates onboarding and account verification to a dedicated class
 - existing controller contract remains unchanged

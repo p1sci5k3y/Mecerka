@@ -1,11 +1,11 @@
 # Catalog Import Validation Spec
 
-## Goal
+## Objetivo
 
 Extract catalog row normalization and validation from `CatalogImportService`
 into a dedicated service without changing the import-job API.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -15,14 +15,14 @@ This vertical owns:
 - spreadsheet formula-injection checks
 - normalized row construction for valid records
 
-## Non-goals
+## No objetivos
 
 - provider/job lookup
 - import job persistence
 - transactional application of validated rows
 - CSV export/template generation
 
-## Invariants
+## Invariantes
 
 - invalid rows generate structured validation errors
 - only rows without errors become normalized rows
@@ -30,7 +30,7 @@ This vertical owns:
 - image URLs must be valid http/https URLs
 - cells starting with spreadsheet formula characters are rejected
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `CatalogImportService` delegates row normalization to a dedicated service
 - `validateImport()` response shape remains unchanged

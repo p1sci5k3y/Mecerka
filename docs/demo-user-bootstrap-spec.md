@@ -1,11 +1,11 @@
 # Demo User Bootstrap Spec
 
-## Goal
+## Objetivo
 
 Extract demo user bootstrap concerns from `DemoService` into a dedicated
 service without changing demo seed behavior.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -16,7 +16,7 @@ This vertical owns:
 - role shaping for demo users
 - bootstrap of demo Stripe account identifiers and provider coordinates
 
-## Non-goals
+## No objetivos
 
 - demo dataset status checks
 - demo catalog creation
@@ -24,14 +24,14 @@ This vertical owns:
 - demo dataset cleanup
 - demo bootstrap orchestration
 
-## Invariants
+## Invariantes
 
 - demo users keep the same emails and role shape
 - `DEMO_PASSWORD` remains mandatory when demo mode needs registration
 - provider and runner Stripe account bootstrap values remain unchanged
 - `DemoService` private wrappers remain callable by existing specs
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `DemoService` delegates user bootstrap concerns
 - existing demo service specs continue to pass

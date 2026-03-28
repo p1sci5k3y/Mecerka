@@ -2,7 +2,7 @@
 
 Todos los cambios notables de este proyecto se documentan en este archivo.
 
-El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
+El formato se inspira en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]

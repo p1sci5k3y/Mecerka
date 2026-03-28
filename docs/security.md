@@ -1,10 +1,10 @@
-# Security Model
+# Modelo De Seguridad
 
-## Scope
+## Alcance
 
 This document describes the security controls that are actually implemented in the backend. It does not claim absolute security; it explains the mechanisms that can be verified in code and tests.
 
-## Authentication
+## Autenticación
 
 The backend uses JWT-based authentication with NestJS guards.
 
@@ -27,7 +27,7 @@ Validation accepts:
 
 This supports controlled secret rotation by configuration. It is a practical rotation model, not a centralized key-management platform.
 
-## Authorization
+## Autorización
 
 Authorization is implemented in layers:
 

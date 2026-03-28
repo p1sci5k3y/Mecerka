@@ -1,10 +1,10 @@
-# Observability
+# Observabilidad
 
-## Purpose
+## Propósito
 
 The observability layer provides operational visibility for debugging, supervision, and academic evaluation. It is intentionally read-only.
 
-## Health endpoint
+## Endpoint de health
 
 `GET /health`
 
@@ -17,7 +17,7 @@ This endpoint is public and returns:
 
 The database check uses a minimal query to verify PostgreSQL availability without loading business entities.
 
-## Metrics endpoint
+## Endpoint de métricas
 
 `GET /metrics`
 
@@ -30,7 +30,7 @@ This endpoint is **not public**. It is protected with:
 
 Its purpose is to expose lightweight platform counters to administrators, not to anonymous callers.
 
-## Admin observability endpoints
+## Endpoints de observabilidad admin
 
 The dedicated observability module exposes admin-only endpoints such as:
 
@@ -40,7 +40,7 @@ The dedicated observability module exposes admin-only endpoints such as:
 
 These routes remain read-only and do not mutate payments, deliveries, orders, or risk state.
 
-## Structured logging
+## Logging estructurado
 
 The backend emits structured logs with fields such as:
 
@@ -54,17 +54,17 @@ The backend emits structured logs with fields such as:
 - `durationMs`
 - `userId`
 
-## Request correlation
+## Correlación de requests
 
 Every HTTP request receives an `X-Request-ID`. This improves traceability across logs without exposing business secrets.
 
-## Failure logging accuracy
+## Precisión del logging de errores
 
 The request logging interceptor distinguishes successful requests from failed requests and records the effective failure status code.
 
 When the error is an `HttpException`, the logger uses `error.getStatus()` instead of relying on a possibly stale `response.statusCode`.
 
-## Privacy and redaction
+## Privacidad y redacción de datos
 
 The structured logger redacts sensitive values recursively, including:
 
@@ -79,7 +79,7 @@ The structured logger redacts sensitive values recursively, including:
 
 The observability surface therefore avoids turning operational tooling into a privacy leak.
 
-## Scope and limits
+## Alcance and limits
 
 The observability layer improves diagnosability and supervision, but it does not replace:
 

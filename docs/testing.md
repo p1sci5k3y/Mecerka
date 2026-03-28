@@ -1,6 +1,6 @@
-# Testing Strategy
+# Estrategia De Pruebas
 
-## Overview
+## Resumen
 
 The project uses a layered testing strategy:
 

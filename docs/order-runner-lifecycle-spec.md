@@ -1,10 +1,10 @@
 # Order Runner Lifecycle Atom Spec
 
-## Goal
+## Objetivo
 
 Extract runner-controlled root-order lifecycle transitions from `OrderStatusService` into a dedicated class without changing the public contract or emitted events.
 
-## Scope
+## Alcance
 
 This atom covers only:
 
@@ -12,7 +12,7 @@ This atom covers only:
 - runner transition to `IN_TRANSIT`
 - runner completion to `DELIVERED`
 
-## Out of Scope
+## Fuera de alcance
 
 This atom does not change:
 
@@ -21,7 +21,7 @@ This atom does not change:
 - client/admin order cancellation
 - risk event integration
 
-## Public Contract
+## Contrato público
 
 The following `OrderStatusService` methods must keep their current signatures and behavior:
 
@@ -29,7 +29,7 @@ The following `OrderStatusService` methods must keep their current signatures an
 - `markInTransit(id, runnerId)`
 - `completeOrder(id, runnerId)`
 
-## Invariants
+## Invariantes
 
 - only active runners with a Stripe account can accept orders
 - only orders in `READY_FOR_ASSIGNMENT` can be accepted
@@ -39,7 +39,7 @@ The following `OrderStatusService` methods must keep their current signatures an
 - optimistic concurrency failures keep the same error behavior
 - the same `order.stateChanged` events are emitted
 
-## Design Constraints
+## Restricciones de diseño
 
 - `OrderStatusService` remains the façade used by `OrdersService`
 - runner lifecycle logic moves to a dedicated class under `backend/src/orders`
@@ -47,7 +47,7 @@ The following `OrderStatusService` methods must keep their current signatures an
 - no API payload changes
 - no business feature changes
 
-## Acceptance Criteria
+## Criterios de aceptación
 
 - `OrderStatusService` delegates runner lifecycle transitions to a dedicated class
 - a focused runner-lifecycle spec covers acceptance, in-transit checks and completion

@@ -1,92 +1,92 @@
-# Architecture Overview
+# Arquitectura Del Sistema
 
-## Purpose
+## Propósito
 
-Mecerka is a city-scoped local-commerce marketplace that connects `CLIENT`, `PROVIDER`, `RUNNER`, and `ADMIN` through a localized Next.js frontend and a NestJS backend.
+Mecerka es una plataforma de comercio local acotada a una ciudad que conecta `CLIENT`, `PROVIDER`, `RUNNER` y `ADMIN` a través de un frontend localizado en Next.js y un backend NestJS.
 
-The current implementation is not a mock split into separate apps for demo and production. It is one application, one API, and one codebase, deployed into isolated environments with different data, secrets, and runtime configuration.
+La implementación actual no separa demo y producción en aplicaciones distintas. Existe una sola aplicación, una sola API y una sola base de código, desplegadas en entornos aislados con datos, secretos y configuración de ejecución diferentes.
 
-## Real implementation stack
+## Stack real de implementación
 
-- Next.js App Router frontend
-- NestJS modular monolith backend
+- frontend con Next.js App Router
+- backend NestJS como monolito modular
 - Prisma ORM / Prisma Client
-- PostgreSQL as the operational database
-- Docker Compose for local and production-style orchestration
-- Stripe / Stripe Connect for payment orchestration
-- Nodemailer for email transport
-- Mailpit locally, external SMTP in deployed environments
+- PostgreSQL como base de datos operativa
+- Docker Compose para ejecución local y despliegue estilo producción
+- Stripe / Stripe Connect para orquestación de pagos
+- Nodemailer para transporte de correo
+- Mailpit en local y SMTP externo en entornos desplegados
 
-## Architectural style
+## Estilo arquitectónico
 
-The backend is a modular monolith organized around business capabilities.
+El backend es un monolito modular organizado por capacidades de negocio.
 
-It is accurate to describe the implementation as DDD-inspired, but not as full tactical DDD. What is verifiable in code is:
+La descripción correcta es "inspirado en DDD", no DDD táctico completo. Lo verificable en código es:
 
-- thin controllers for HTTP and WebSocket transport
-- DTO-based validation and guard chains
-- services as the main location for invariants and orchestration
-- Prisma as the single persistence layer
+- controladores finos para transporte HTTP y WebSocket
+- validación por DTOs y cadenas de guards
+- servicios como punto principal de invariantes y orquestación
+- Prisma como capa única de persistencia
 
-## Verified runtime architecture
+## Arquitectura de ejecución verificada
 
-The application depends on PostgreSQL through `DATABASE_URL`. If the database is unavailable, the backend cannot complete normal startup.
+La aplicación depende de PostgreSQL a través de `DATABASE_URL`. Si la base de datos no está disponible, el backend no puede completar su arranque normal.
 
-This is visible in:
+Esto se observa en:
 
-- the Prisma datasource configuration
+- la configuración del datasource de Prisma
 - `PrismaService`
-- startup and migration behavior in the deployed stacks
+- el comportamiento de arranque y migraciones en los despliegues
 
-## Containerized execution model
+## Modelo de ejecución en contenedores
 
-The repository includes:
+El repositorio incluye:
 
-- local Docker Compose orchestration
-- dual-environment deployment orchestration
-- backend and frontend Dockerfiles
+- orquestación local con Docker Compose
+- orquestación de despliegue dual
+- Dockerfiles separados para backend y frontend
 
-The local stack includes:
+La pila local incluye:
 
 - `postgres`
 - `backend`
 - `frontend`
 - `mailpit`
 
-The deployed model uses:
+El modelo desplegado usa:
 
-- one backend image
-- one frontend image
-- isolated `prod` and `demo` stacks
-- Nginx as reverse proxy with TLS
+- una imagen de backend
+- una imagen de frontend
+- stacks aislados `prod` y `demo`
+- Nginx como proxy inverso con TLS
 
-## Layered structure
+## Estructura por capas
 
 ### Frontend
 
-The frontend is responsible for:
+El frontend se responsabiliza de:
 
-- localized routing under `app/[locale]`
-- role-aware navigation and protected routes
-- catalog browsing
-- cart, checkout, orders, payments, and tracking UX
-- support, finance, and admin backoffice surfaces
+- rutas localizadas bajo `app/[locale]`
+- navegación sensible al rol y rutas protegidas
+- exploración de catálogo
+- UX de carrito, checkout, pedidos, pagos y seguimiento
+- superficies de soporte, finanzas y backoffice admin
 
-### Controllers
+### Controladores
 
-NestJS controllers handle:
+Los controladores NestJS gestionan:
 
 - routing
-- DTO binding
-- validation
-- guard application
-- transport concerns
+- binding de DTOs
+- validación
+- aplicación de guards
+- preocupaciones de transporte
 
-Business rules are intentionally not concentrated in controllers.
+Las reglas de negocio no se concentran deliberadamente en los controladores.
 
-### Services
+### Servicios
 
-The main invariants live in services such as:
+Las invariantes principales viven en servicios como:
 
 - `AuthService`
 - `UsersService`
@@ -98,20 +98,20 @@ The main invariants live in services such as:
 - `AdminService`
 - `EmailSettingsService`
 
-This is where the project enforces:
+Aquí es donde el proyecto hace cumplir:
 
-- ownership checks
-- transactional boundaries
-- role-assignment invariants
-- order / delivery / payment state transitions
-- refund and incident boundaries
-- admin-governed SMTP configuration
+- validaciones de propiedad del recurso
+- límites transaccionales
+- invariantes de asignación de roles
+- transiciones de estado de pedido, reparto y pago
+- fronteras entre devoluciones e incidencias
+- configuración SMTP gobernada por admin
 
-### Persistence
+### Persistencia
 
-Prisma is used as a persistence and query layer, not as a business-rules engine.
+Prisma se usa como capa de persistencia y consulta, no como motor de reglas de negocio.
 
-Important persistence concepts in the current model include:
+Conceptos persistentes importantes del modelo actual:
 
 - `User`
 - `RunnerProfile`

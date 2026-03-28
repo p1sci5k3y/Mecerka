@@ -1,8 +1,8 @@
-# Domain Model
+# Modelo De Dominio
 
-## Core Actors
+## Actores principales
 
-### User
+### Usuario
 
 `User` is the principal identity record.
 
@@ -49,11 +49,11 @@ This is an important implementation detail when explaining the current aggregate
 - active flag
 - rating summary
 
-### City
+### Ciudad
 
 The platform is city-based. Products, providers, carts, and orders are scoped by city.
 
-### Product
+### Producto
 
 Products belong to a provider user and a city, and include:
 
@@ -65,7 +65,7 @@ Products belong to a provider user and a city, and include:
 - category
 - active flag
 
-### Order
+### Pedido
 
 `Order` is the orchestration container created at checkout.
 
@@ -91,20 +91,20 @@ It contains:
 - payment session references
 - stock reservations
 
-### OrderItem
+### PedidoItem
 
 `OrderItem` links a purchased product to a provider order with:
 
 - quantity
 - snapshot purchase price
 
-### Delivery
+### Reparto
 
 Delivery is modeled through `DeliveryOrder`, `DeliveryJob`, and `RunnerLocation`.
 
 `DeliveryOrder` is the delivery fulfillment boundary attached to one root order.
 
-## Relationship Summary
+## Resumen de relaciones
 
 - one `User` may be a `CLIENT`, `PROVIDER`, `RUNNER`, or `ADMIN`
 - one provider profile belongs to one user
@@ -120,9 +120,9 @@ See:
 
 - [Domain Model Diagram](diagrams/domain-model-diagram.md)
 
-## Important Domain Rules
+## Reglas de dominio importantes
 
-### City Consistency
+### Ciudad Consistency
 
 Orders must not mix products from different cities.
 
@@ -131,11 +131,11 @@ This is enforced at:
 - cart level when adding items
 - legacy order creation flow
 
-### Product Ownership
+### Producto Ownership
 
 Providers can create, update, and delete only their own products.
 
-### Order Access
+### Pedido Access
 
 Users can only read their own orders unless they are:
 
@@ -143,7 +143,7 @@ Users can only read their own orders unless they are:
 - the involved provider
 - an admin
 
-### Delivery Ownership
+### Reparto Ownership
 
 Runners can only update deliveries assigned to them, unless an admin acts.
 
@@ -161,9 +161,9 @@ This protects the invariant:
 
 `reservation -> stock decrement -> provider order payment`
 
-## Order and Delivery Lifecycles
+## Lifecycles de pedido y reparto
 
-### Root Order Lifecycle
+### Lifecycle del pedido raíz
 
 Typical root order progression:
 
@@ -174,11 +174,11 @@ Typical root order progression:
 - `IN_TRANSIT`
 - `DELIVERED`
 
-### Provider Order Lifecycle
+### Lifecycle del ProviderOrder
 
 Provider orders progress independently as merchants accept and prepare their own items.
 
-### Delivery Lifecycle
+### Reparto Lifecycle
 
 `DeliveryOrder` progresses through:
 

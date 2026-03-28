@@ -1,11 +1,11 @@
 # Product Client Discount Spec
 
-## Goal
+## Objetivo
 
 Extract provider-managed client-specific product discounts from `ProductsService`
 into a dedicated service without changing observable controller behavior.
 
-## Scope
+## Alcance
 
 This vertical owns:
 
@@ -16,14 +16,14 @@ This vertical owns:
 - partially updating an existing discount
 - response mapping for discount read models
 
-## Non-goals
+## No objetivos
 
 - product catalog reads
 - product CRUD
 - stock availability enrichment
 - catalog import workflow
 
-## Invariants
+## Invariantes
 
 - only the owning provider can manage discounts for a product
 - the target user must exist, be active, and have the `CLIENT` role
@@ -31,7 +31,7 @@ This vertical owns:
 - partial updates keep the existing price when no new discount price is supplied
 - response payload shape stays unchanged
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - `ProductsService` delegates discount operations to a dedicated service
 - controller contracts remain unchanged

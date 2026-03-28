@@ -1,12 +1,12 @@
-# Domain Model Diagram
+# Diagrama Del Modelo De Dominio
 
 ```mermaid
 erDiagram
     USER_ACCOUNT ||--o{ ORDER : places
     USER_ACCOUNT ||--o| RUNNER_PROFILE : owns
     USER_ACCOUNT ||--o| PROVIDER_PROFILE : owns
-    USER_ACCOUNT ||--o{ PRODUCT : publishes_operationally
-    USER_ACCOUNT ||--o{ PROVIDER_ORDER : fulfills_operationally
+    USER_ACCOUNT ||--o{ PRODUCT : publishes
+    USER_ACCOUNT ||--o{ PROVIDER_ORDER : fulfills
     USER_ACCOUNT ||--o{ DELIVERY_ORDER : assigned_runner
     USER_ACCOUNT ||--o{ GOVERNANCE_AUDIT_ENTRY : audits
     USER_ACCOUNT ||--o{ SYSTEM_SETTING : updates
