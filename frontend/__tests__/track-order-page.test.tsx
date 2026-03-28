@@ -210,6 +210,11 @@ describe("TrackOrderPage", () => {
     expect(await screen.findByText("Falta un producto")).toBeInTheDocument()
     expect(screen.getByText(/En revisión/i)).toBeInTheDocument()
     expect(screen.getByText("2 solicitudes")).toBeInTheDocument()
+    expect(screen.getByText("Progreso del reparto")).toBeInTheDocument()
+    expect(screen.getByText("Pedido confirmado")).toBeInTheDocument()
+    expect(screen.getByText("Recogida coordinada")).toBeInTheDocument()
+    expect(screen.getByText("Pedido en reparto")).toBeInTheDocument()
+    expect(screen.getByText("Entrega completada")).toBeInTheDocument()
     expect(mapPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: "577731b8-f2e9-4a16-8594-981b5dff09b2",

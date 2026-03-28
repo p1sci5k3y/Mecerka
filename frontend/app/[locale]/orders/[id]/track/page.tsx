@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 
 import dynamic from "next/dynamic"
 import { Navbar } from "@/components/navbar"
+import { DeliveryProgressTimeline } from "@/components/tracking/DeliveryProgressTimeline"
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -334,6 +335,12 @@ export default function TrackOrderPage() {
               isRunner={isRunner}
             />
           </div>
+
+          <DeliveryProgressTimeline
+            orderStatus={order?.status ?? null}
+            deliveryStatus={order?.deliveryOrder?.status ?? null}
+            stopCount={order?.providerOrders?.length ?? 0}
+          />
 
           {isClient ? (
             <section className="mt-8 rounded-2xl border bg-card p-6">

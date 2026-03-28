@@ -7,7 +7,15 @@ import L from 'leaflet';
 import io, { Socket } from 'socket.io-client';
 import { ordersService } from '@/lib/services/orders-service';
 import { Play, Square, MapPin } from 'lucide-react';
-import { getRoutingBaseUrl, getTrackingBaseUrl } from '@/lib/runtime-config';
+import { getTrackingBaseUrl } from '@/lib/runtime-config';
+import { DeliveryTrackingSummary } from '@/components/tracking/DeliveryTrackingSummary';
+import {
+    calculateDistanceKm,
+    fetchProjectedRoute,
+    formatEtaLabel,
+    geocode,
+    runnerTrackingStatusLabel,
+} from '@/components/tracking/delivery-map-utils';
 
 type LeafletDefaultIconPrototype = typeof L.Icon.Default.prototype & {
     _getIconUrl?: unknown;
@@ -41,45 +49,6 @@ const runnerIcon = new L.Icon({
     popupAnchor: [0, -35],
 });
 
-function calculateDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const toRad = (value: number) => (value * Math.PI) / 180;
-    const earthRadiusKm = 6371;
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return earthRadiusKm * c;
-}
-
-function formatDistanceLabel(distanceKm: number | null) {
-    if (distanceKm == null) return 'Sin estimación';
-    if (distanceKm < 1) return `${Math.round(distanceKm * 1000)} m`;
-    return `${distanceKm.toFixed(1)} km`;
-}
-
-function formatEtaLabel(distanceKm: number | null) {
-    if (distanceKm == null) return 'Pendiente de GPS';
-    const minutes = Math.max(3, Math.round((distanceKm / 18) * 60));
-    return `${minutes} min aprox.`;
-}
-
-type RouteProjection = {
-    coordinates: [number, number][];
-    distanceKm: number;
-    etaMinutes: number;
-};
-
-function formatLastUpdateLabel(updatedAt: string | null) {
-    if (!updatedAt) return 'Sin señal todavía';
-    return new Date(updatedAt).toLocaleTimeString('es-ES', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
 function FlyToRunner({ lat, lng }: { lat: number; lng: number }) {
     const map = useMap();
     useEffect(() => {
@@ -90,85 +59,11 @@ function FlyToRunner({ lat, lng }: { lat: number; lng: number }) {
     return null;
 }
 
-// Simple geocoding helper (OpenStreetMap Nominatim)
-async function geocode(address: string, fallbackLat: number, fallbackLng: number): Promise<{ lat: number, lng: number }> {
-    try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`);
-        const data = await res.json();
-        if (data && data.length > 0) {
-            return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-        }
-    } catch (e) {
-        console.error("Geocoding failed for", address);
-    }
-    return { lat: fallbackLat, lng: fallbackLng };
-}
-
-async function fetchProjectedRoute(
-    start: { lat: number; lng: number },
-    end: { lat: number; lng: number },
-): Promise<RouteProjection | null> {
-    try {
-        const routeUrl =
-            `${getRoutingBaseUrl().replace(/\/$/, '')}/route/v1/driving/` +
-            `${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-        const res = await fetch(routeUrl);
-        if (!res.ok) {
-            throw new Error(`Route service unavailable (${res.status})`);
-        }
-
-        const data = await res.json() as {
-            routes?: Array<{
-                distance?: number;
-                duration?: number;
-                geometry?: {
-                    coordinates?: Array<[number, number]>;
-                };
-            }>;
-        };
-
-        const route = data.routes?.[0];
-        const geometry = route?.geometry?.coordinates;
-        if (!route || !geometry || geometry.length === 0) {
-            return null;
-        }
-
-        return {
-            coordinates: geometry.map(([lng, lat]) => [lat, lng]),
-            distanceKm: (route.distance ?? 0) / 1000,
-            etaMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)),
-        };
-    } catch (error) {
-        console.error('Route projection failed', error);
-        return null;
-    }
-}
-
 export interface DeliveryMapProps {
     orderId: number | string;
     initialLat?: number;
     initialLng?: number;
     isRunner?: boolean;
-}
-
-function runnerTrackingStatusLabel(status: string | null) {
-    switch (status) {
-        case 'RUNNER_ASSIGNED':
-            return 'Esperando recogida operativa';
-        case 'PICKUP_PENDING':
-            return 'Ruta lista para recogida';
-        case 'PICKED_UP':
-        case 'IN_TRANSIT':
-            return 'Transmitiendo reparto en curso';
-        case 'DELIVERING':
-            return 'Ruta activa';
-        case 'DELIVERED':
-            return 'Ruta cerrada por entrega completada';
-        case 'CANCELLED':
-            return 'Ruta cerrada por cancelación';
-        default:
-            return 'Esperando contexto operativo';
-    }
 }
 
 export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng = -3.7038, isRunner }: DeliveryMapProps) {
@@ -390,30 +285,13 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                 </div>
             )}
 
-            <div className="absolute left-4 top-4 z-[1000] max-w-sm rounded-xl border border-border bg-white/95 p-4 shadow-lg backdrop-blur dark:bg-slate-900/95">
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Estado</p>
-                        <p className="text-sm font-semibold text-foreground">{runnerTrackingStatusLabel(trackingStatus)}</p>
-                    </div>
-                    <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">ETA orientativa</p>
-                        <p className="text-sm font-semibold text-foreground">{etaLabel}</p>
-                    </div>
-                    <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Distancia restante</p>
-                        <p className="text-sm font-semibold text-foreground">{formatDistanceLabel(remainingDistanceKm)}</p>
-                    </div>
-                    <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Última señal</p>
-                        <p className="text-sm font-semibold text-foreground">{formatLastUpdateLabel(lastUpdateAt)}</p>
-                    </div>
-                </div>
-                <div className="mt-3 border-t border-border/70 pt-3">
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Runner</p>
-                    <p className="text-sm font-semibold text-foreground">{runnerName || 'Asignación confirmada'}</p>
-                </div>
-            </div>
+            <DeliveryTrackingSummary
+                trackingStatus={trackingStatus}
+                etaLabel={etaLabel}
+                remainingDistanceKm={remainingDistanceKm}
+                lastUpdateAt={lastUpdateAt}
+                runnerName={runnerName}
+            />
 
             {error && (
                 <div className="absolute inset-x-4 top-4 z-[1000] flex items-center justify-between bg-destructive p-4 rounded-xl text-destructive-foreground font-bold shadow-lg">

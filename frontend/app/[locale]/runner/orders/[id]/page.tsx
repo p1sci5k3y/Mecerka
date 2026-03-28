@@ -2,16 +2,24 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
-import dynamic from "next/dynamic"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
+import { RunnerLiveRouteCard } from "@/components/runner/RunnerLiveRouteCard"
+import {
+  deliveryStatusLabel,
+  formatCurrency,
+  incidentStatusLabel,
+  pickupStatusLabel,
+  refundStatusLabel,
+  runnerPaymentLabel,
+} from "@/components/runner/runner-order-detail-utils"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
-import type { DeliveryIncidentSummary, Order, ProviderOrder, RefundSummary } from "@/lib/types"
+import type { DeliveryIncidentSummary, Order, RefundSummary } from "@/lib/types"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -24,119 +32,10 @@ import {
   Truck,
 } from "lucide-react"
 
-const DynamicDeliveryMap = dynamic(
-  () => import("@/components/tracking/DynamicDeliveryMap"),
-  {
-    ssr: false,
-    loading: () => <div className="h-[400px] w-full animate-pulse rounded-2xl bg-muted" />,
-  },
-)
-
 type RunnerOrderDetail = {
   order: Order
   incidents: DeliveryIncidentSummary[]
   refunds: RefundSummary[]
-}
-
-function formatCurrency(amount: number) {
-  return amount.toLocaleString("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  })
-}
-
-function deliveryStatusLabel(status?: string | null) {
-  switch (status) {
-    case "ASSIGNED":
-      return "Asignado"
-    case "IN_TRANSIT":
-      return "En reparto"
-    case "DELIVERED":
-      return "Entregado"
-    case "CANCELLED":
-      return "Cancelado"
-    default:
-      return "Sin estado"
-  }
-}
-
-function runnerPaymentLabel(status?: string | null) {
-  switch (status) {
-    case "PAID":
-      return "Cobrado"
-    case "PAYMENT_READY":
-      return "Sesión lista"
-    case "PAYMENT_PENDING":
-    case "PENDING":
-      return "Pago pendiente"
-    case "FAILED":
-      return "Pago fallido"
-    default:
-      return "Sin estado"
-  }
-}
-
-function pickupStatusLabel(status: ProviderOrder["status"]) {
-  switch (status) {
-    case "READY_FOR_PICKUP":
-      return "Listo para recoger"
-    case "PICKED_UP":
-      return "Recogido"
-    case "PREPARING":
-    case "ACCEPTED":
-    case "PENDING":
-      return "En preparación"
-    case "DELIVERED":
-      return "Entregado"
-    default:
-      return status
-  }
-}
-
-function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
-  switch (status) {
-    case "OPEN":
-      return "Abierta"
-    case "UNDER_REVIEW":
-      return "En revisión"
-    case "RESOLVED":
-      return "Resuelta"
-    case "REJECTED":
-      return "Rechazada"
-    default:
-      return "Sin estado"
-  }
-}
-
-function refundStatusLabel(status: string) {
-  switch (status) {
-    case "REQUESTED":
-      return "Solicitada"
-    case "UNDER_REVIEW":
-      return "En revisión"
-    case "APPROVED":
-      return "Aprobada"
-    case "REJECTED":
-      return "Rechazada"
-    case "EXECUTING":
-      return "Ejecutando"
-    case "COMPLETED":
-      return "Completada"
-    case "FAILED":
-      return "Fallida"
-    default:
-      return "Sin estado"
-  }
-}
-
-function shouldShowRouteMap(status?: string | null) {
-  return (
-    status === "RUNNER_ASSIGNED" ||
-    status === "PICKUP_PENDING" ||
-    status === "PICKED_UP" ||
-    status === "IN_TRANSIT" ||
-    status === "DELIVERED"
-  )
 }
 
 export default function RunnerOrderDetailPage() {
@@ -416,35 +315,12 @@ function RunnerOrderDetailContent() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-5 w-5 text-primary" />
-                      <h2 className="text-xl font-bold text-foreground">
-                        Ruta operativa en vivo
-                      </h2>
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      El runner ya puede ver el trayecto real del pedido y, cuando la entrega entra en fase activa, emitir su GPS sin salir de esta ficha.
-                    </p>
-                    <div className="mt-5">
-                      {shouldShowRouteMap(detail.order.deliveryOrder?.status) ? (
-                        <div className="overflow-hidden rounded-2xl border border-border/50">
-                          <div className="h-[420px] w-full">
-                            <DynamicDeliveryMap
-                              orderId={detail.order.id}
-                              initialLat={detail.order.deliveryLat ?? undefined}
-                              initialLng={detail.order.deliveryLng ?? undefined}
-                              isRunner
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-4 py-8 text-center text-sm text-muted-foreground">
-                          La ruta se habilitará en cuanto esta entrega tenga contexto operativo suficiente.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <RunnerLiveRouteCard
+                    orderId={detail.order.id}
+                    deliveryStatus={detail.order.deliveryOrder?.status}
+                    deliveryLat={detail.order.deliveryLat}
+                    deliveryLng={detail.order.deliveryLng}
+                  />
 
                   <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
                     <div className="flex items-center gap-2">
