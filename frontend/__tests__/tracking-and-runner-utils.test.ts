@@ -9,6 +9,12 @@ import {
 } from "@/components/tracking/delivery-map-utils"
 import { buildDeliveryMilestones } from "@/components/tracking/DeliveryProgressTimeline"
 import {
+  getPickupCoverageLabel,
+  getRunnerAssignmentLabel,
+  getTrackingSignalLabel,
+  getTrackingSignalState,
+} from "@/components/tracking/delivery-operational-health"
+import {
   deliveryStatusLabel,
   incidentStatusLabel,
   pickupStatusLabel,
@@ -127,5 +133,27 @@ describe("tracking and runner detail utils", () => {
         stopCount: 1,
       })[2]?.description,
     ).toContain("ya está recogido")
+  })
+
+  it("summarizes operational health from tracking snapshot data", () => {
+    const nowMs = new Date("2026-03-28T21:00:00.000Z").getTime()
+
+    expect(getTrackingSignalState("2026-03-28T20:55:00.000Z", nowMs)).toBe("recent")
+    expect(getTrackingSignalState("2026-03-28T20:40:00.000Z", nowMs)).toBe("stale")
+    expect(getTrackingSignalState(null, nowMs)).toBe("missing")
+
+    expect(getTrackingSignalLabel("2026-03-28T20:55:00.000Z", nowMs)).toBe("Señal reciente")
+    expect(getPickupCoverageLabel("PICKUP_PENDING", 2)).toBe("Recogidas coordinándose")
+    expect(getPickupCoverageLabel("PICKED_UP", 1)).toBe("Recogida completada")
+    expect(
+      getRunnerAssignmentLabel({
+        orderId: "ord-1",
+        status: "CONFIRMED",
+        deliveryStatus: "RUNNER_ASSIGNED",
+        runner: { id: "runner-1", name: "Runner Uno" },
+        location: null,
+        updatedAt: null,
+      }),
+    ).toBe("Asignado a Runner Uno")
   })
 })

@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 
 import dynamic from "next/dynamic"
+import { DeliveryOperationalHealthCard } from "@/components/tracking/DeliveryOperationalHealthCard"
 import { Navbar } from "@/components/navbar"
 import { DeliveryProgressTimeline } from "@/components/tracking/DeliveryProgressTimeline"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button"
 import { ordersService } from "@/lib/services/orders-service"
 import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { refundsService } from "@/lib/services/refunds-service"
-import type { DeliveryIncidentSummary, Order, RefundSummary } from "@/lib/types"
+import type { DeliveryIncidentSummary, Order, OrderTrackingSnapshot, RefundSummary } from "@/lib/types"
 import { useToast } from "@/components/ui/use-toast"
 
 const DynamicDeliveryMap = dynamic(
@@ -140,6 +141,7 @@ export default function TrackOrderPage() {
   const isRunner = user?.roles?.includes("RUNNER")
   const isClient = user?.roles?.includes("CLIENT")
   const [order, setOrder] = useState<Order | null>(null)
+  const [trackingSnapshot, setTrackingSnapshot] = useState<OrderTrackingSnapshot | null>(null)
   const [incidents, setIncidents] = useState<DeliveryIncidentSummary[]>([])
   const [refunds, setRefunds] = useState<RefundSummary[]>([])
   const [supportLoading, setSupportLoading] = useState(true)
@@ -188,8 +190,12 @@ export default function TrackOrderPage() {
 
     setSupportLoading(true)
     try {
-      const loadedOrder = await ordersService.getOne(orderId)
+      const [loadedOrder, tracking] = await Promise.all([
+        ordersService.getOne(orderId),
+        ordersService.getTracking(orderId).catch(() => null),
+      ])
       setOrder(loadedOrder)
+      setTrackingSnapshot(tracking)
 
       const refundPromises =
         loadedOrder.providerOrders?.map((providerOrder) =>
@@ -342,6 +348,15 @@ export default function TrackOrderPage() {
             stopCount={order?.providerOrders?.length ?? 0}
             openIncidentCount={incidents.filter((incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED").length}
             openRefundCount={refunds.filter((refund) => refund.status !== "COMPLETED" && refund.status !== "REJECTED" && refund.status !== "FAILED").length}
+          />
+
+          <DeliveryOperationalHealthCard
+            tracking={trackingSnapshot}
+            stopCount={order?.providerOrders?.length ?? 0}
+            openSupportCount={
+              incidents.filter((incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED").length +
+              refunds.filter((refund) => refund.status !== "COMPLETED" && refund.status !== "REJECTED" && refund.status !== "FAILED").length
+            }
           />
 
           {isClient ? (
