@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import { AdminNextActionCard } from "@/components/admin/AdminNextActionCard"
+import { getAdminIncidentCaseNextActionSummary } from "@/components/admin/admin-incident-next-action"
 import { Link } from "@/lib/navigation"
 import { adminService } from "@/lib/services/admin-service"
 import type { AdminIncidentSummary } from "@/lib/types"
@@ -74,6 +76,7 @@ export default function AdminIncidentDetailPage() {
   const [processing, setProcessing] = useState(false)
   const { toast } = useToast()
   const contextLinks = incident ? buildIncidentLinks(incident) : []
+  const nextAction = incident ? getAdminIncidentCaseNextActionSummary(incident) : null
 
   const loadIncident = async () => {
     if (!incidentId) {
@@ -232,6 +235,15 @@ export default function AdminIncidentDetailPage() {
         </section>
 
         <aside className="space-y-6">
+          {nextAction ? (
+            <AdminNextActionCard
+              heading="Siguiente acción operativa"
+              title={nextAction.title}
+              description={nextAction.description}
+              tone={nextAction.tone}
+            />
+          ) : null}
+
           <div className="rounded-xl border bg-card p-6">
             <div className="flex items-center gap-2">
               <ExternalLink className="h-5 w-5 text-primary" />

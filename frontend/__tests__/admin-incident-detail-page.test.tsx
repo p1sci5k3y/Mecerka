@@ -77,6 +77,8 @@ describe("Admin incident detail page", () => {
     render(<Page />)
 
     expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción operativa")).toBeInTheDocument()
+    expect(screen.getByText("Cerrar decisión del caso")).toBeInTheDocument()
     expect(screen.getByText("delivery-order-1")).toBeInTheDocument()
     expect(screen.getByText("Runner Demo")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /Ver pedido cliente/i })).toHaveAttribute(
@@ -117,6 +119,7 @@ describe("Admin incident detail page", () => {
     render(<Page />)
 
     expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
+    expect(screen.getByText("Abrir revisión operativa")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /Revisar/i }))
 
     await waitFor(() => {
@@ -158,5 +161,19 @@ describe("Admin incident detail page", () => {
     expect(screen.queryByRole("link", { name: /Ver pedido cliente/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /Ver entrega de reparto/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /Ver evidencia/i })).not.toBeInTheDocument()
+  })
+
+  it("treats rejected incidents as closed operationally", async () => {
+    getIncidentMock.mockResolvedValue({
+      ...incident,
+      status: "REJECTED",
+    })
+
+    const Page = (await import("@/app/[locale]/admin/incidents/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción operativa")).toBeInTheDocument()
+    expect(screen.getByText("Caso operativo cerrado sin continuidad")).toBeInTheDocument()
   })
 })

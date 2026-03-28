@@ -92,6 +92,8 @@ describe("Admin refund detail page", () => {
     render(<Page />)
 
     expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Resolver decisión económica")).toBeInTheDocument()
     expect(screen.getByText("Comercio provider-order-1")).toBeInTheDocument()
     expect(screen.getByText("Client Demo")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /Ver pedido cliente/i })).toHaveAttribute(
@@ -136,6 +138,7 @@ describe("Admin refund detail page", () => {
     const { unmount } = render(<Page />)
 
     expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
+    expect(screen.getByText("Abrir revisión del caso")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /Revisar/i }))
 
     await waitFor(() => {
@@ -185,5 +188,20 @@ describe("Admin refund detail page", () => {
     expect(screen.queryByRole("link", { name: /Ver pedido cliente/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /Ver venta de comercio/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /Ver entrega de reparto/i })).not.toBeInTheDocument()
+  })
+
+  it("surfaces failed refunds as an escalation path", async () => {
+    getRefundMock.mockResolvedValue({
+      ...refund,
+      status: "FAILED",
+      externalRefundId: "re_123",
+    })
+
+    const Page = (await import("@/app/[locale]/admin/refunds/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Revisar fallo de devolución")).toBeInTheDocument()
   })
 })

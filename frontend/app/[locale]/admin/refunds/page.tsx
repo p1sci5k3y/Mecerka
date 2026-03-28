@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { AdminNextActionCard } from "@/components/admin/AdminNextActionCard"
+import { getAdminRefundQueueNextActionSummary } from "@/components/admin/admin-refund-next-action"
 import { adminService } from "@/lib/services/admin-service"
 import { Link } from "@/lib/navigation"
 import type { AdminRefundSummary } from "@/lib/types"
@@ -127,6 +129,10 @@ export default function AdminRefundsPage() {
         if (filter === "ALL") return refunds
         return refunds.filter((refund) => refund.status === filter)
     }, [filter, refunds])
+    const nextAction = useMemo(
+        () => getAdminRefundQueueNextActionSummary(refunds),
+        [refunds],
+    )
 
     const runAction = async (
         refundId: string,
@@ -169,6 +175,13 @@ export default function AdminRefundsPage() {
                 <SummaryCard label="Aprobadas" value={summary.approved} />
                 <SummaryCard label="Completadas" value={summary.completed} />
             </div>
+
+            <AdminNextActionCard
+                heading="Siguiente acción de backoffice"
+                title={nextAction.title}
+                description={nextAction.description}
+                tone={nextAction.tone}
+            />
 
             <div className="flex flex-wrap gap-2">
                 {STATUS_FILTERS.map((status) => (

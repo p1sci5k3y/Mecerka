@@ -129,6 +129,8 @@ describe("Admin refunds page", () => {
     expect(screen.getByRole("button", { name: "Solicitadas" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "En revisión" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Aprobadas" })).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Priorizar solicitudes nuevas")).toBeInTheDocument()
     expect(screen.getAllByText("Client Demo")).toHaveLength(3)
     expect(screen.getAllByText("Comercio provider-order-1")).toHaveLength(3)
     expect(screen.getAllByRole("link", { name: /Ver caso/i })[0]).toHaveAttribute(
@@ -156,6 +158,9 @@ describe("Admin refunds page", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Client Demo")).toHaveLength(2)
     })
+
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Cerrar revisión en curso")).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole("button", { name: "Aprobar" }))
     await waitFor(() => {
@@ -195,6 +200,8 @@ describe("Admin refunds page", () => {
       expect(screen.getByText("No hay devoluciones en este estado.")).toBeInTheDocument()
     })
 
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Cola económica estabilizada")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Completadas" }))
     expect(screen.getByText("No hay devoluciones en este estado.")).toBeInTheDocument()
     consoleErrorSpy.mockRestore()
@@ -226,6 +233,8 @@ describe("Admin refunds page", () => {
       expect(screen.getByText("No hay devoluciones en este estado.")).toBeInTheDocument()
     })
 
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Cola económica estabilizada")).toBeInTheDocument()
     expect(toastMock).not.toHaveBeenCalled()
   })
 
@@ -248,5 +257,19 @@ describe("Admin refunds page", () => {
       variant: "destructive",
     })
     consoleErrorSpy.mockRestore()
+  })
+
+  it("prioritizes approved refunds when the queue no longer has requested or review cases", async () => {
+    getRefundsMock.mockResolvedValueOnce([approvedRefund, completedRefund])
+
+    const Page = (await import("@/app/[locale]/admin/refunds/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Devoluciones")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Siguiente acción de backoffice")).toBeInTheDocument()
+    expect(screen.getByText("Ejecutar devoluciones aprobadas")).toBeInTheDocument()
   })
 })

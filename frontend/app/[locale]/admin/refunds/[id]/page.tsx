@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import { AdminNextActionCard } from "@/components/admin/AdminNextActionCard"
+import { getAdminRefundCaseNextActionSummary } from "@/components/admin/admin-refund-next-action"
 import { Link } from "@/lib/navigation"
 import { adminService } from "@/lib/services/admin-service"
 import type { AdminRefundSummary } from "@/lib/types"
@@ -105,6 +107,7 @@ export default function AdminRefundDetailPage() {
   const [processing, setProcessing] = useState(false)
   const { toast } = useToast()
   const contextLinks = refund ? buildRefundLinks(refund) : []
+  const nextAction = refund ? getAdminRefundCaseNextActionSummary(refund) : null
 
   const loadRefund = async () => {
     if (!refundId) {
@@ -282,6 +285,15 @@ export default function AdminRefundDetailPage() {
         </section>
 
         <aside className="space-y-6">
+          {nextAction ? (
+            <AdminNextActionCard
+              heading="Siguiente acción de backoffice"
+              title={nextAction.title}
+              description={nextAction.description}
+              tone={nextAction.tone}
+            />
+          ) : null}
+
           <div className="rounded-xl border bg-card p-6">
             <div className="flex items-center gap-2">
               <ExternalLink className="h-5 w-5 text-primary" />
