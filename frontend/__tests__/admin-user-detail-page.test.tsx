@@ -166,4 +166,205 @@ describe("Admin user detail page", () => {
       expect(toastMock).toHaveBeenCalledWith({ title: "Rol RUNNER concedido" })
     })
   })
+
+  it("shows the empty governance history and prevents self-admin revocation", async () => {
+    getUserMock.mockResolvedValue({
+      id: "admin-self",
+      email: "admin@example.com",
+      name: "Admin Demo",
+      roles: ["ADMIN"],
+      createdAt: "2026-03-20T10:00:00.000Z",
+      mfaEnabled: true,
+      active: true,
+      requestedRole: null,
+      roleStatus: null,
+      requestedAt: null,
+      lastRoleSource: "ADMIN",
+      lastRoleGrantedById: "admin-self",
+      lastRoleGrantedBy: {
+        id: "admin-self",
+        email: "admin@example.com",
+        name: "Admin Demo",
+      },
+    })
+    getHistoryMock.mockResolvedValue([])
+
+    const Page = (await import("@/app/[locale]/admin/users/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Admin Demo")).toBeInTheDocument()
+    expect(
+      screen.getByText(/Este usuario todavía no tiene eventos de gobernanza registrados/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Revocar ADMIN/i })).not.toBeInTheDocument()
+  })
+
+  it("shows the fallback state when the admin user cannot be loaded", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getUserMock.mockRejectedValueOnce(new Error("missing"))
+
+    const Page = (await import("@/app/[locale]/admin/users/[id]/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith({
+        title: "Error",
+        description: "No se pudo cargar el detalle del usuario",
+        variant: "destructive",
+      })
+    })
+    expect(screen.getByText("No se encontró el usuario.")).toBeInTheDocument()
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("keeps the user detail visible when only the governance history fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "lucia@example.com",
+      name: "Lucia Admin",
+      roles: ["CLIENT"],
+      createdAt: "2026-03-20T10:00:00.000Z",
+      mfaEnabled: true,
+      active: true,
+      requestedRole: null,
+      roleStatus: null,
+      requestedAt: null,
+      lastRoleSource: "SELF_SERVICE",
+      lastRoleGrantedById: null,
+      lastRoleGrantedBy: null,
+    })
+    getHistoryMock.mockRejectedValue(new Error("history down"))
+
+    const Page = (await import("@/app/[locale]/admin/users/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Lucia Admin")).toBeInTheDocument()
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith({
+        title: "Error",
+        description: "No se pudo cargar el historial de gobernanza",
+        variant: "destructive",
+      })
+    })
+    expect(screen.getByText(/No se pudo cargar el historial de gobernanza/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Este usuario todavía no tiene eventos de gobernanza registrados/i),
+    ).toBeInTheDocument()
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("shows a destructive toast when an admin action fails and preserves the detail view", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getUserMock.mockResolvedValue({
+      id: "user-1",
+      email: "runner@example.com",
+      name: "Runner Demo",
+      roles: ["CLIENT"],
+      createdAt: "2026-03-20T10:00:00.000Z",
+      mfaEnabled: false,
+      active: true,
+      requestedRole: null,
+      roleStatus: null,
+      requestedAt: null,
+      lastRoleSource: null,
+      lastRoleGrantedById: null,
+      lastRoleGrantedBy: null,
+    })
+    getHistoryMock.mockResolvedValue([])
+    grantRoleMock.mockRejectedValueOnce(new Error("grant failed"))
+
+    const Page = (await import("@/app/[locale]/admin/users/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Runner Demo")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /conceder runner/i }))
+
+    await waitFor(() => {
+      expect(grantRoleMock).toHaveBeenCalledWith("user-1", "RUNNER")
+    })
+
+    expect(screen.getByText("Runner Demo")).toBeInTheDocument()
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Error",
+      description: "No se pudo conceder el rol RUNNER",
+      variant: "destructive",
+    })
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("renders remaining governance action labels and empty administrative affordances", async () => {
+    getUserMock.mockResolvedValue({
+      id: "user-2",
+      email: "blank@example.com",
+      name: "Blank User",
+      roles: [],
+      createdAt: "2026-03-20T10:00:00.000Z",
+      mfaEnabled: false,
+      active: false,
+      requestedRole: "PROVIDER",
+      roleStatus: null,
+      requestedAt: null,
+      lastRoleSource: null,
+      lastRoleGrantedById: null,
+      lastRoleGrantedBy: null,
+    })
+    getHistoryMock.mockResolvedValue([
+      {
+        id: "audit-1",
+        action: "ROLE_REQUESTED",
+        role: "PROVIDER",
+        source: "SELF_SERVICE",
+        metadata: null,
+        createdAt: "2026-03-21T10:10:00.000Z",
+        actorId: null,
+        actorEmail: null,
+        actorName: null,
+      },
+      {
+        id: "audit-2",
+        action: "ROLE_REVOKED",
+        role: "RUNNER",
+        source: "ADMIN",
+        metadata: null,
+        createdAt: "2026-03-21T11:10:00.000Z",
+        actorId: "admin-1",
+        actorEmail: "admin@example.com",
+        actorName: "Admin Demo",
+      },
+      {
+        id: "audit-3",
+        action: "USER_BLOCKED",
+        role: null,
+        source: null,
+        metadata: null,
+        createdAt: "2026-03-21T12:10:00.000Z",
+        actorId: null,
+        actorEmail: null,
+        actorName: null,
+      },
+      {
+        id: "audit-4",
+        action: "USER_ACTIVATED",
+        role: null,
+        source: null,
+        metadata: null,
+        createdAt: "2026-03-21T13:10:00.000Z",
+        actorId: null,
+        actorEmail: null,
+        actorName: null,
+      },
+    ])
+
+    const Page = (await import("@/app/[locale]/admin/users/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Blank User")).toBeInTheDocument()
+    expect(screen.getByText(/No hay roles revocables/i)).toBeInTheDocument()
+    expect(screen.getByText(/Solicitud PROVIDER/i)).toBeInTheDocument()
+    expect(screen.getByText(/Rol RUNNER revocado/i)).toBeInTheDocument()
+    expect(screen.getByText(/Usuario bloqueado/i)).toBeInTheDocument()
+    expect(screen.getByText(/Usuario activado/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Sistema · Sin fuente/i).length).toBeGreaterThan(0)
+  })
 })

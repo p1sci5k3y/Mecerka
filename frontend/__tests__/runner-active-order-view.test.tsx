@@ -177,4 +177,60 @@ describe("RunnerActiveOrderView operational experience", () => {
 
     expect(onCompleteMock).toHaveBeenCalledWith("order-1")
   })
+
+  it("shows ready-to-pick and fallback pickup labels with fallback store naming", async () => {
+    const order = makeOrder({
+      status: "ASSIGNED",
+      providerOrders: [
+        makeProviderOrder({ id: "po-1", status: "READY_FOR_PICKUP" }),
+        makeProviderOrder({
+          id: "po-2",
+          providerId: "provider-2",
+          providerName: "",
+          status: "UNKNOWN_STATUS" as never,
+          items: [{ id: "item-2", productId: "prod-2", quantity: 1, unitPrice: 18, baseUnitPrice: 18, appliedDiscountUnitPrice: null, discountAmount: 0 }],
+        }),
+      ],
+    })
+
+    const { RunnerActiveOrderView } = await import(
+      "@/components/runner/RunnerActiveOrderView"
+    )
+    render(
+      <RunnerActiveOrderView
+        order={order}
+        onInTransit={onInTransitMock}
+        onComplete={onCompleteMock}
+      />,
+    )
+
+    expect(screen.getByText("Listo para recoger")).toBeInTheDocument()
+    expect(screen.getByText("Desconocido")).toBeInTheDocument()
+    expect(screen.getByText("Tienda Asociada 2")).toBeInTheDocument()
+  })
+
+  it("falls back to city center delivery and empty route collections", async () => {
+    const order = makeOrder({
+      status: "IN_TRANSIT",
+      providerOrders: undefined,
+      deliveryAddress: "",
+      city: "Sevilla",
+    })
+
+    const { RunnerActiveOrderView } = await import(
+      "@/components/runner/RunnerActiveOrderView"
+    )
+    render(
+      <RunnerActiveOrderView
+        order={order}
+        onInTransit={onInTransitMock}
+        onComplete={onCompleteMock}
+        disabled
+      />,
+    )
+
+    expect(screen.getByText("Sevilla (Centro)")).toBeInTheDocument()
+    expect(screen.getByText(/Entregar 0 paquete\(s\)/i)).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /Marcar Entregado/i })).toBeDisabled()
+  })
 })

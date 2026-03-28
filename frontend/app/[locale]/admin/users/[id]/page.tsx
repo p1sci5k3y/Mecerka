@@ -44,23 +44,47 @@ export default function AdminUserDetailPage() {
   const [history, setHistory] = useState<AdminGovernanceAuditEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const { toast } = useToast()
   const { user: currentUser } = useAuth()
 
   const load = useCallback(async () => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      setUser(null)
+      setHistory([])
+      setHistoryError(null)
+      return
+    }
     try {
-      const [detail, entries] = await Promise.all([
-        adminService.getUser(userId),
-        adminService.getUserGovernanceHistory(userId),
-      ])
+      const detail = await adminService.getUser(userId)
       setUser(detail)
-      setHistory(entries)
+      setHistoryError(null)
     } catch (error) {
       console.error("Error cargando el usuario admin:", error)
+      setUser(null)
+      setHistory([])
+      setHistoryError(null)
       toast({
         title: "Error",
         description: "No se pudo cargar el detalle del usuario",
+        variant: "destructive",
+      })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const entries = await adminService.getUserGovernanceHistory(userId)
+      setHistory(Array.isArray(entries) ? entries : [])
+      setHistoryError(null)
+    } catch (error) {
+      console.error("Error cargando historial de gobernanza:", error)
+      setHistory([])
+      setHistoryError("No se pudo cargar el historial de gobernanza.")
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el historial de gobernanza",
         variant: "destructive",
       })
     } finally {
@@ -273,6 +297,12 @@ export default function AdminUserDetailPage() {
           </div>
           <span className="text-sm text-muted-foreground">{history.length} eventos</span>
         </div>
+
+        {historyError ? (
+          <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {historyError}
+          </div>
+        ) : null}
 
         {history.length === 0 ? (
           <div className="mt-4 rounded-lg border border-dashed p-6 text-sm text-muted-foreground">

@@ -14,6 +14,7 @@ import type { DeliveryIncidentSummary, Order, RefundSummary } from "@/lib/types"
 import { AlertTriangle, Loader2, Receipt, RotateCcw, Truck } from "lucide-react"
 
 type RunnerOrderWithSupport = Order & {
+  deliveryOrder: NonNullable<Order["deliveryOrder"]>
   incidents: DeliveryIncidentSummary[]
   refunds: RefundSummary[]
 }
@@ -45,7 +46,7 @@ function refundStatusLabel(status: string) {
     case "FAILED":
       return "Fallida"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -60,7 +61,7 @@ function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
     case "REJECTED":
       return "Rechazada"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -97,6 +98,7 @@ function RunnerSupportContent() {
   const { toast } = useToast()
   const [orders, setOrders] = useState<RunnerOrderWithSupport[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [targetOrderId, setTargetOrderId] = useState("")
   const [incidentType, setIncidentType] =
     useState<DeliveryIncidentSummary["type"]>("FAILED_DELIVERY")
@@ -107,36 +109,49 @@ function RunnerSupportContent() {
   const loadData = useCallback(async () => {
     try {
       const data = await ordersService.getAll()
+      const safeOrders = Array.isArray(data) ? data : []
       const withSupport = await Promise.all(
-        data
+        safeOrders
           .filter((order) => order.deliveryOrder?.id)
           .map(async (order) => {
-            const deliveryOrderId = order.deliveryOrder?.id
             const [incidents, refunds] = await Promise.all([
-              deliveryOrderId
-                ? deliveryIncidentsService
-                    .listDeliveryOrderIncidents(deliveryOrderId)
-                    .catch(() => [] as DeliveryIncidentSummary[])
-                : Promise.resolve([] as DeliveryIncidentSummary[]),
-              deliveryOrderId
-                ? refundsService
-                    .getDeliveryOrderRefunds(deliveryOrderId)
-                    .catch(() => [] as RefundSummary[])
-                : Promise.resolve([] as RefundSummary[]),
+              deliveryIncidentsService
+                .listDeliveryOrderIncidents(order.deliveryOrder!.id)
+                .catch(() => [] as DeliveryIncidentSummary[]),
+              refundsService
+                .getDeliveryOrderRefunds(order.deliveryOrder!.id)
+                .catch(() => [] as RefundSummary[]),
             ])
-            return { ...order, incidents, refunds }
+            return {
+              ...order,
+              deliveryOrder: order.deliveryOrder!,
+              incidents: Array.isArray(incidents) ? incidents : [],
+              refunds: Array.isArray(refunds) ? refunds : [],
+            }
           }),
       )
 
       setOrders(withSupport)
+      setLoadError(null)
       setTargetOrderId((currentTargetId) => {
-        if (currentTargetId) return currentTargetId
-        return withSupport.find((order) => order.deliveryOrder?.id)?.id || ""
+        const stillVisible = withSupport.find((order) => order.id === currentTargetId)
+        if (stillVisible) return stillVisible.id
+        return withSupport[0]?.id || ""
+      })
+    } catch (error) {
+      console.error("Error cargando soporte runner:", error)
+      setOrders([])
+      setTargetOrderId("")
+      setLoadError("No se pudo cargar el centro de soporte del runner.")
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el centro de soporte del runner.",
+        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     void loadData()
@@ -155,11 +170,10 @@ function RunnerSupportContent() {
       orders.filter((order) => order.refunds.length > 0 || order.incidents.length > 0),
     [orders],
   )
-  const selectedOrder =
-    orders.find((order) => order.id === targetOrderId && order.deliveryOrder?.id) ?? null
+  const selectedOrder = orders.find((order) => order.id === targetOrderId) ?? null
 
   async function submitIncident() {
-    if (!selectedOrder?.deliveryOrder?.id) return
+    if (!selectedOrder) return
 
     setSubmittingIncident(true)
     try {
@@ -215,6 +229,12 @@ function RunnerSupportContent() {
               Reúne incidencias y devoluciones visibles ligadas a tus entregas para que puedas operar con contexto sin saltar entre cobro y ruta.
             </p>
           </div>
+
+          {loadError ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {loadError} Estamos mostrando el estado seguro vacío mientras el servicio se recupera.
+            </div>
+          ) : null}
 
           <div className="grid gap-6 sm:grid-cols-3">
             <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
@@ -275,9 +295,7 @@ function RunnerSupportContent() {
                     onChange={(event) => setTargetOrderId(event.target.value)}
                     className="h-10 w-full rounded-md border bg-background px-3"
                   >
-                    {orders
-                      .filter((order) => order.deliveryOrder?.id)
-                      .map((order) => (
+                    {orders.map((order) => (
                         <option key={order.id} value={order.id}>
                           Pedido #{order.id.slice(0, 8).toUpperCase()}
                         </option>
@@ -325,8 +343,7 @@ function RunnerSupportContent() {
                     type="button"
                     disabled={
                       submittingIncident ||
-                      incidentDescription.trim().length < 5 ||
-                      !selectedOrder?.deliveryOrder?.id
+                      incidentDescription.trim().length < 5 || !selectedOrder
                     }
                     onClick={() => void submitIncident()}
                   >
@@ -356,7 +373,7 @@ function RunnerSupportContent() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-                          DeliveryOrder #{order.deliveryOrder?.id || order.id}
+                          DeliveryOrder #{order.deliveryOrder.id}
                         </p>
                         <h3 className="mt-2 text-lg font-bold text-foreground">
                           Pedido #{order.id.slice(0, 8).toUpperCase()}

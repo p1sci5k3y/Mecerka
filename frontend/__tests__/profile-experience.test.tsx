@@ -158,6 +158,31 @@ describe("Profile role request experience", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith("Solicitud enviada")
   })
 
+  it("switches the requested role when runner is the only remaining requestable role", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-1",
+        name: "Sofia Alva",
+        email: "sofia@example.com",
+        roles: ["CLIENT", "PROVIDER"],
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+
+    const Page = (await import("@/app/[locale]/profile/page")).default
+    render(<Page />)
+
+    const roleSelect = screen.getByLabelText("Rol solicitado") as HTMLSelectElement
+    expect(roleSelect.value).toBe("RUNNER")
+    expect(
+      screen.queryByRole("option", { name: "Solicitar alta como proveedor" }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("option", { name: "Solicitar licencia de repartidor" }),
+    ).toBeInTheDocument()
+  })
+
   it("shows completion state when the user already has every requestable role", async () => {
     useAuthMock.mockReturnValue({
       user: {
@@ -311,5 +336,38 @@ describe("Profile role request experience", () => {
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalledWith("No se pudo tramitar la solicitud de rol.")
     })
+  })
+
+  it("surfaces pin setup API errors without reloading the profile", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "client-4",
+        name: "Pilar Doe",
+        email: "pilar@example.com",
+        roles: ["CLIENT"],
+        mfaEnabled: true,
+        hasPin: false,
+      },
+    })
+    apiPostMock.mockRejectedValueOnce(new Error("pin failed"))
+
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { reload: reloadSpy },
+    })
+
+    const Page = (await import("@/app/[locale]/profile/page")).default
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText("Nuevo PIN Transaccional"), {
+      target: { value: "1234" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar PIN" }))
+
+    await waitFor(() => {
+      expect(toastErrorMock).toHaveBeenCalledWith("pin failed")
+    })
+    expect(reloadSpy).not.toHaveBeenCalled()
   })
 })

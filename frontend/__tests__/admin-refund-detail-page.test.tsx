@@ -67,6 +67,19 @@ const refund = {
   reviewedByName: null,
 }
 
+const requestedRefund = {
+  ...refund,
+  id: "refund-requested",
+  status: "REQUESTED",
+}
+
+const approvedRefund = {
+  ...refund,
+  id: "refund-approved",
+  status: "APPROVED",
+  deliveryOrderId: "delivery-order-1",
+}
+
 describe("Admin refund detail page", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -107,5 +120,70 @@ describe("Admin refund detail page", () => {
       expect(approveRefundMock).toHaveBeenCalledWith("refund-1")
       expect(toastMock).toHaveBeenCalledWith({ title: "Devolución aprobada" })
     })
+  })
+
+  it("routes delivery refunds to the runner order hub and supports review/execution paths", async () => {
+    getRefundMock
+      .mockResolvedValueOnce(requestedRefund)
+      .mockResolvedValueOnce(approvedRefund)
+      .mockResolvedValueOnce(approvedRefund)
+      .mockRejectedValueOnce(new Error("missing"))
+    reviewRefundMock.mockResolvedValueOnce({})
+    executeRefundMock.mockResolvedValueOnce({})
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    const Page = (await import("@/app/[locale]/admin/refunds/[id]/page")).default
+    const { unmount } = render(<Page />)
+
+    expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Revisar/i }))
+
+    await waitFor(() => {
+      expect(reviewRefundMock).toHaveBeenCalledWith("refund-requested")
+      expect(toastMock).toHaveBeenCalledWith({ title: "Devolución puesta en revisión" })
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: /Ver entrega de reparto/i })).toHaveAttribute(
+        "href",
+        "/runner/orders/order-1",
+      )
+    })
+
+    fireEvent.click(screen.getByRole("button", { name: /Ejecutar/i }))
+    await waitFor(() => {
+      expect(executeRefundMock).toHaveBeenCalledWith("refund-approved")
+      expect(toastMock).toHaveBeenCalledWith({ title: "Devolución ejecutada" })
+    })
+
+    unmount()
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/No pudimos cargar este caso de devolución/i)).toBeInTheDocument()
+    })
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("shows a safe fallback when the refund has no extra context links", async () => {
+    getRefundMock.mockResolvedValue({
+      ...refund,
+      providerOrderId: null,
+      deliveryOrderId: null,
+      orderId: null,
+      incidentId: null,
+    })
+
+    const Page = (await import("@/app/[locale]/admin/refunds/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Caso de devolución")).toBeInTheDocument()
+    expect(
+      screen.getByText(/Este caso no expone saltos de contexto adicionales/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver pedido cliente/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver venta de comercio/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver entrega de reparto/i })).not.toBeInTheDocument()
   })
 })

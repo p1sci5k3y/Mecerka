@@ -313,4 +313,37 @@ describe("Admin users page", () => {
     })
     expect(screen.getByText(/ramon@example.com/i)).toBeInTheDocument()
   })
+
+  it("shows an explicit empty state for filters without matches and does not offer self-admin revocation", async () => {
+    getUsersMock.mockResolvedValue([
+      {
+        id: "admin-self",
+        name: "Admin Root",
+        email: "root@example.com",
+        roles: ["ADMIN"],
+        active: true,
+        mfaEnabled: true,
+        createdAt: "2026-03-20T10:00:00.000Z",
+        requestedRole: null,
+        roleStatus: null,
+        requestedAt: null,
+        lastRoleSource: "ADMIN",
+      },
+    ])
+
+    const Page = (await import("@/app/[locale]/admin/users/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/root@example.com/i)).toBeInTheDocument()
+    })
+
+    expect(screen.queryByRole("button", { name: /revocar admin/i })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/buscar usuarios/i), {
+      target: { value: "nobody" },
+    })
+
+    expect(screen.getByText(/No hay usuarios para los filtros actuales/i)).toBeInTheDocument()
+  })
 })

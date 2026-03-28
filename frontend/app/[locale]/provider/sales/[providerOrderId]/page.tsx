@@ -57,7 +57,7 @@ function providerStatusLabel(status: ProviderOrder["status"]) {
     case "REJECTED_BY_STORE":
       return "Rechazado por comercio"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -72,7 +72,7 @@ function paymentStatusLabel(status?: string) {
     case "FAILED":
       return "Pago fallido"
     default:
-      return status || "Sin estado"
+      return "Sin estado"
   }
 }
 
@@ -93,7 +93,22 @@ function orderStatusLabel(status: Order["status"]) {
     case "CANCELLED":
       return "Cancelado"
     default:
-      return status
+      return "Sin estado"
+  }
+}
+
+function deliveryStatusLabel(status?: string | null) {
+  switch (status) {
+    case "ASSIGNED":
+      return "Asignado"
+    case "IN_TRANSIT":
+      return "En reparto"
+    case "DELIVERED":
+      return "Entregado"
+    case "CANCELLED":
+      return "Cancelado"
+    default:
+      return "Sin estado"
   }
 }
 
@@ -114,7 +129,7 @@ function refundStatusLabel(status: string) {
     case "FAILED":
       return "Fallida"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -129,7 +144,7 @@ function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
     case "REJECTED":
       return "Rechazada"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -160,7 +175,8 @@ function ProviderOrderDetailContent() {
 
       try {
         const orders = await ordersService.getAll()
-        const match = orders
+        const safeOrders = Array.isArray(orders) ? orders : []
+        const match = safeOrders
           .map((order) => ({
             rootOrder: order,
             providerOrder: order.providerOrders?.find(
@@ -178,7 +194,8 @@ function ProviderOrderDetailContent() {
 
         let refunds: RefundSummary[] = []
         try {
-          refunds = await refundsService.getProviderOrderRefunds(match.providerOrder.id)
+          const refundData = await refundsService.getProviderOrderRefunds(match.providerOrder.id)
+          refunds = Array.isArray(refundData) ? refundData : []
         } catch {
           refunds = []
         }
@@ -186,9 +203,10 @@ function ProviderOrderDetailContent() {
         let incidents: DeliveryIncidentSummary[] = []
         if (match.rootOrder.deliveryOrder?.id) {
           try {
-            incidents = await deliveryIncidentsService.listDeliveryOrderIncidents(
+            const incidentData = await deliveryIncidentsService.listDeliveryOrderIncidents(
               match.rootOrder.deliveryOrder.id,
             )
+            incidents = Array.isArray(incidentData) ? incidentData : []
           } catch {
             incidents = []
           }
@@ -495,7 +513,9 @@ function ProviderOrderDetailContent() {
                       <p className="text-muted-foreground">
                         Estado reparto:{" "}
                         <span className="font-semibold text-foreground">
-                          {detail.rootOrder.deliveryOrder?.status || "Sin reparto asignado"}
+                          {detail.rootOrder.deliveryOrder
+                            ? deliveryStatusLabel(detail.rootOrder.deliveryOrder.status)
+                            : "Sin reparto asignado"}
                         </span>
                       </p>
                       <p className="text-muted-foreground">

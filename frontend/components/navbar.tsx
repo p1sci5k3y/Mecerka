@@ -46,6 +46,8 @@ export function Navbar() {
   const canUseCart = !isAuthenticated || user?.roles?.includes("CLIENT")
 
   const handleLanguageChange = (newLocale: string) => {
+    if (newLocale === locale) return
+
     startTransition(() => {
       router.replace(pathname, { locale: newLocale })
     })

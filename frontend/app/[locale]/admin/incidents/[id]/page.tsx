@@ -49,17 +49,21 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
 
 function buildIncidentLinks(incident: AdminIncidentSummary) {
   return [
-    {
-      href: `/orders/${incident.orderId}`,
-      label: "Ver pedido cliente",
-      icon: ShoppingBag,
-    },
-    {
-      href: `/runner/orders/${incident.deliveryOrderId}`,
-      label: "Ver entrega de reparto",
-      icon: Route,
-    },
-  ]
+    incident.orderId
+      ? {
+          href: `/orders/${incident.orderId}`,
+          label: "Ver pedido cliente",
+          icon: ShoppingBag,
+        }
+      : null,
+    incident.orderId || incident.deliveryOrderId
+      ? {
+          href: `/runner/orders/${incident.orderId || incident.deliveryOrderId}`,
+          label: "Ver entrega de reparto",
+          icon: Route,
+        }
+      : null,
+  ].filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
 }
 
 export default function AdminIncidentDetailPage() {
@@ -69,6 +73,7 @@ export default function AdminIncidentDetailPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const { toast } = useToast()
+  const contextLinks = incident ? buildIncidentLinks(incident) : []
 
   const loadIncident = async () => {
     if (!incidentId) {
@@ -233,7 +238,7 @@ export default function AdminIncidentDetailPage() {
               <h2 className="text-lg font-semibold">Saltos de contexto</h2>
             </div>
             <div className="mt-5 flex flex-col gap-2">
-              {buildIncidentLinks(incident).map((link) => {
+              {contextLinks.map((link) => {
                 const Icon = link.icon
                 return (
                   <Button key={link.href} asChild variant="outline" className="justify-start">
@@ -244,6 +249,11 @@ export default function AdminIncidentDetailPage() {
                   </Button>
                 )
               })}
+              {contextLinks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Esta incidencia no tiene saltos de contexto adicionales.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -265,9 +275,9 @@ export default function AdminIncidentDetailPage() {
               <h2 className="text-lg font-semibold">Evidencia</h2>
             </div>
             <div className="mt-5 text-sm">
-              {incident.evidenceUrl ? (
+              {incident.evidenceUrl?.trim() ? (
                 <a
-                  href={incident.evidenceUrl}
+                  href={incident.evidenceUrl.trim()}
                   target="_blank"
                   rel="noreferrer"
                   className="text-primary underline"

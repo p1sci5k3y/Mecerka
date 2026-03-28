@@ -5,6 +5,7 @@ import { Link } from "@/lib/navigation"
 import { Clock3, ShieldCheck, UserCog } from "lucide-react"
 import { adminService } from "@/lib/services/admin-service"
 import { BackendAdminUser } from "@/lib/types"
+import { useToast } from "@/components/ui/use-toast"
 
 function governanceOriginLabel(user: BackendAdminUser) {
   if (user.lastRoleSource === "ADMIN") return "Concedido por admin"
@@ -15,14 +16,28 @@ function governanceOriginLabel(user: BackendAdminUser) {
 export default function AdminRoleRequestsPage() {
   const [users, setUsers] = useState<BackendAdminUser[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filter, setFilter] = useState<"ALL" | "PENDING" | "SELF_SERVICE" | "ADMIN">("ALL")
+  const { toast } = useToast()
 
   useEffect(() => {
     adminService.getUsers()
-      .then(setUsers)
-      .catch(console.error)
+      .then((data) => {
+        setUsers(data)
+        setLoadError(false)
+      })
+      .catch((error) => {
+        console.error("Error cargando solicitudes y concesiones:", error)
+        setUsers([])
+        setLoadError(true)
+        toast({
+          title: "Error",
+          description: "No se pudo cargar la cola de gobierno.",
+          variant: "destructive",
+        })
+      })
       .finally(() => setLoading(false))
-  }, [])
+  }, [toast])
 
   const governanceUsers = useMemo(() => {
     const relevant = users.filter((user) => user.requestedRole || user.lastRoleSource)
@@ -89,6 +104,12 @@ export default function AdminRoleRequestsPage() {
           Admin
         </button>
       </div>
+
+      {loadError ? (
+        <div className="mb-6 rounded-xl border bg-card p-5 text-sm text-destructive">
+          La cola de gobierno no se pudo cargar correctamente. Revisa la conexión y vuelve a intentarlo.
+        </div>
+      ) : null}
 
       {governanceUsers.length === 0 ? (
         <div className="rounded-xl border bg-card p-8 text-sm text-muted-foreground">

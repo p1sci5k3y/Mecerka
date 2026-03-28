@@ -619,7 +619,9 @@ describe("OrderPaymentsPage experience", () => {
       )
     })
 
-    expect(screen.getByTestId("stripe-direct-checkout")).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId("stripe-direct-checkout")).toBeInTheDocument()
+    })
   })
 
   it("prepares runner payment and degrades safely when Stripe cannot complete locally", async () => {

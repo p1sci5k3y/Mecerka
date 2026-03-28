@@ -125,6 +125,8 @@ function ProviderFinanceContent() {
         )
       } catch (error) {
         console.error("Error loading provider finance center:", error)
+        setProviderOrders([])
+        toast.error("No se pudo cargar el centro financiero del provider.")
       } finally {
         setLoading(false)
       }

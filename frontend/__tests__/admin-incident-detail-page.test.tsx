@@ -59,6 +59,12 @@ const incident = {
   reporterName: "Runner Demo",
 }
 
+const openIncident = {
+  ...incident,
+  id: "incident-open",
+  status: "OPEN",
+}
+
 describe("Admin incident detail page", () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -79,7 +85,7 @@ describe("Admin incident detail page", () => {
     )
     expect(screen.getByRole("link", { name: /Ver entrega de reparto/i })).toHaveAttribute(
       "href",
-      "/runner/orders/delivery-order-1",
+      "/runner/orders/order-7",
     )
     expect(screen.getByRole("link", { name: /Ver evidencia/i })).toHaveAttribute(
       "href",
@@ -101,5 +107,56 @@ describe("Admin incident detail page", () => {
       expect(resolveIncidentMock).toHaveBeenCalledWith("incident-1")
       expect(toastMock).toHaveBeenCalledWith({ title: "Incidencia resuelta" })
     })
+  })
+
+  it("moves open incidents into review", async () => {
+    getIncidentMock.mockResolvedValue(openIncident)
+    reviewIncidentMock.mockResolvedValueOnce({})
+
+    const Page = (await import("@/app/[locale]/admin/incidents/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /Revisar/i }))
+
+    await waitFor(() => {
+      expect(reviewIncidentMock).toHaveBeenCalledWith("incident-open")
+      expect(toastMock).toHaveBeenCalledWith({ title: "Incidencia puesta en revisión" })
+    })
+  })
+
+  it("shows the fallback state when the case cannot be loaded", async () => {
+    getIncidentMock.mockRejectedValueOnce(new Error("gone"))
+
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    const Page = (await import("@/app/[locale]/admin/incidents/[id]/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/No pudimos cargar este caso de incidencia/i)).toBeInTheDocument()
+    })
+
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("shows safe fallbacks when the incident has no extra links or usable evidence", async () => {
+    getIncidentMock.mockResolvedValue({
+      ...incident,
+      orderId: "",
+      deliveryOrderId: "",
+      evidenceUrl: "   ",
+    })
+
+    const Page = (await import("@/app/[locale]/admin/incidents/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Caso de incidencia")).toBeInTheDocument()
+    expect(
+      screen.getByText(/Esta incidencia no tiene saltos de contexto adicionales/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText("Sin evidencia adjunta")).toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver pedido cliente/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver entrega de reparto/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Ver evidencia/i })).not.toBeInTheDocument()
   })
 })

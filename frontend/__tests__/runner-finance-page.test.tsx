@@ -197,6 +197,9 @@ describe("Runner finance page", () => {
     expect(
       screen.getByText(/el runner no revisa ni ejecuta devoluciones desde este panel/i),
     ).toBeInTheDocument()
+    expect(getAllMock).toHaveBeenCalled()
+    expect(listDeliveryOrderIncidentsMock).toHaveBeenCalledWith("delivery-1")
+    expect(getDeliveryOrderRefundsMock).toHaveBeenCalledWith("delivery-1")
   })
 
   it("shows the stripe connect CTA when the runner is not connected yet", async () => {
@@ -275,5 +278,30 @@ describe("Runner finance page", () => {
     await waitFor(() => {
       expect(toastErrorMock).toHaveBeenCalledWith("No se pudo iniciar la conexión con Stripe.")
     })
+  })
+
+  it("degrades safely when the main runner finance load fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getAllMock.mockRejectedValueOnce(new Error("finance down"))
+
+    const Page = (await import("@/app/[locale]/runner/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Cobros del runner")).toBeInTheDocument()
+    })
+
+    expect(
+      screen.getByText(/Aun no tienes repartos con datos de cobro visibles/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/No hay devoluciones ni incidencias visibles en tus repartos ahora mismo/i),
+    ).toBeInTheDocument()
+    expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
+    expect(getDeliveryOrderRefundsMock).not.toHaveBeenCalled()
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      "No se pudo cargar el centro financiero del runner.",
+    )
+    consoleErrorSpy.mockRestore()
   })
 })

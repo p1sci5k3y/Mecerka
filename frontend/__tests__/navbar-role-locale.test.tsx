@@ -223,6 +223,7 @@ describe("Navbar role and locale experience", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Salir" })[1])
     expect(logoutMock).toHaveBeenCalled()
+    expect(screen.queryAllByRole("link", { name: "Carrito" })).toHaveLength(1)
   })
 
   it("uses the user fallback label and points runner-only users to the runner dashboard", async () => {
@@ -351,5 +352,275 @@ describe("Navbar role and locale experience", () => {
       "/profile",
     )
     expect(screen.getAllByText("4")).not.toHaveLength(0)
+  })
+
+  it("keeps the current locale disabled and routes admin users to the admin dashboard", async () => {
+    useLocaleMock.mockReturnValue("en")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalog",
+            dashboard: "Dashboard",
+            profile: "Profile",
+            logout: "Logout",
+            cart: "Cart",
+            switchLanguage: "Switch language",
+            toggleMenu: "Toggle menu",
+            userFallback: "User",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "admin-1",
+        name: "Admin User",
+        roles: ["ADMIN"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/admin")
+
+    fireEvent.click(screen.getByRole("button", { name: "English" }))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+  })
+
+  it("closes the guest mobile drawer after navigating to login", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            login: "Entrar",
+            register: "Registrarse",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Entrar" })[1])
+
+    expect(screen.queryAllByRole("link", { name: "Registrarse" })).toHaveLength(1)
+  })
+
+  it("hides cart entry for provider-only users in the authenticated mobile drawer", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            dashboard: "Panel",
+            inventory: "Inventario",
+            profile: "Perfil",
+            logout: "Salir",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+            userFallback: "Usuario",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-1",
+        name: "Taller",
+        roles: ["PROVIDER"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 9 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+
+    expect(screen.queryAllByRole("link", { name: "Carrito" })).toHaveLength(0)
+    expect(screen.getAllByRole("link", { name: "Inventario" })[1]).toHaveAttribute(
+      "href",
+      "/provider/products",
+    )
+  })
+
+  it("routes client-only users to /dashboard, keeps cart visible and hides the zero badge", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            dashboard: "Panel",
+            profile: "Perfil",
+            logout: "Salir",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+            userFallback: "Usuario",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "client-1",
+        name: "Lucia",
+        roles: ["CLIENT"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    expect(screen.getByRole("link", { name: "Panel" })).toHaveAttribute("href", "/dashboard")
+    expect(screen.getByRole("link", { name: "Perfil" })).toHaveAttribute("href", "/profile")
+    expect(screen.getByLabelText("Carrito")).toHaveAttribute("href", "/cart")
+    expect(screen.queryByText("0")).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Inventario" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "Repartos" })).not.toBeInTheDocument()
+  })
+
+  it("uses the current pathname when switching locale and ignores the current locale in mobile", async () => {
+    useLocaleMock.mockReturnValue("es")
+    usePathnameMock.mockReturnValue("/profile/support")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            login: "Entrar",
+            register: "Registrarse",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    expect(screen.getByRole("link", { name: "Mecerka" })).toHaveAttribute("href", "/")
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getByRole("button", { name: "ES" }))
+    expect(routerReplaceMock).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole("button", { name: "EN" }))
+    expect(routerReplaceMock).toHaveBeenCalledWith("/profile/support", { locale: "en" })
+  })
+
+  it("closes the authenticated mobile drawer after navigating through role links and cart", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            dashboard: "Panel",
+            inventory: "Inventario",
+            deliveries: "Repartos",
+            profile: "Perfil",
+            logout: "Salir",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+            userFallback: "Usuario",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-runner-client-1",
+        name: "Aitana",
+        roles: ["CLIENT", "PROVIDER", "RUNNER"],
+      },
+      isAuthenticated: true,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 2 })
+
+    const { Navbar } = await import("@/components/navbar")
+    const { rerender } = render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(
+      screen
+        .getAllByRole("link")
+        .find((link) => link.getAttribute("href") === "/cart" && link.textContent?.includes("Carrito")) as HTMLElement,
+    )
+    expect(screen.queryAllByRole("link", { name: "Inventario" })).toHaveLength(1)
+
+    rerender(<Navbar />)
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Panel" })[1])
+    expect(screen.queryAllByRole("link", { name: "Repartos" })).toHaveLength(1)
+
+    rerender(<Navbar />)
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Inventario" })[1])
+    expect(screen.queryAllByRole("link", { name: "Perfil" })).toHaveLength(1)
+
+    rerender(<Navbar />)
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Repartos" })[1])
+    expect(screen.queryAllByRole("link", { name: "Carrito" })).toHaveLength(1)
+
+    rerender(<Navbar />)
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Perfil" })[1])
+    expect(screen.queryAllByRole("link", { name: "Panel" })).toHaveLength(1)
+  })
+
+  it("closes the guest mobile drawer after navigating to register", async () => {
+    useLocaleMock.mockReturnValue("es")
+    useTranslationsMock.mockImplementation(
+      () =>
+        (key: string) =>
+          ({
+            catalog: "Catalogo",
+            login: "Entrar",
+            register: "Registrarse",
+            cart: "Carrito",
+            switchLanguage: "Cambiar idioma",
+            toggleMenu: "Abrir menu",
+          })[key] ?? key,
+    )
+    useAuthMock.mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      logout: logoutMock,
+    })
+    useCartMock.mockReturnValue({ totalItems: 0 })
+
+    const { Navbar } = await import("@/components/navbar")
+    render(<Navbar />)
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menu" }))
+    fireEvent.click(screen.getAllByRole("link", { name: "Registrarse" })[1])
+
+    expect(screen.queryAllByRole("link", { name: "Entrar" })).toHaveLength(1)
   })
 })

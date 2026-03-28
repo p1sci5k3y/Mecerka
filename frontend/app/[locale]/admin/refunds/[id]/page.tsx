@@ -82,7 +82,7 @@ function buildRefundLinks(refund: AdminRefundSummary) {
       : null,
     refund.deliveryOrderId
       ? {
-          href: `/runner/orders/${refund.deliveryOrderId}`,
+          href: `/runner/orders/${refund.orderId || refund.deliveryOrderId}`,
           label: "Ver entrega de reparto",
           icon: Route,
         }
@@ -104,6 +104,7 @@ export default function AdminRefundDetailPage() {
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const { toast } = useToast()
+  const contextLinks = refund ? buildRefundLinks(refund) : []
 
   const loadRefund = async () => {
     if (!refundId) {
@@ -287,7 +288,7 @@ export default function AdminRefundDetailPage() {
               <h2 className="text-lg font-semibold">Saltos de contexto</h2>
             </div>
             <div className="mt-5 flex flex-col gap-2">
-              {buildRefundLinks(refund).map((link) => {
+              {contextLinks.map((link) => {
                 const Icon = link.icon
                 return (
                   <Button key={link.href} asChild variant="outline" className="justify-start">
@@ -298,6 +299,11 @@ export default function AdminRefundDetailPage() {
                   </Button>
                 )
               })}
+              {contextLinks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Este caso no expone saltos de contexto adicionales.
+                </p>
+              ) : null}
             </div>
           </div>
 

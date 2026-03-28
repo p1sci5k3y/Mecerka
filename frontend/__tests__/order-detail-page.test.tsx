@@ -157,6 +157,7 @@ describe("OrderDetailPage", () => {
     )
     expect(screen.getAllByText("Cerámica Norte")).toHaveLength(2)
     expect(screen.getByText("Cuenco artesanal")).toBeInTheDocument()
+    expect(screen.getAllByText(/6,50/).length).toBeGreaterThan(0)
   })
 
   it("falls back to view payments when the order is economically covered", async () => {
@@ -216,8 +217,45 @@ describe("OrderDetailPage", () => {
       expect(screen.getByText("No pudimos cargar este pedido.")).toBeInTheDocument()
     })
 
+    expect(screen.queryByRole("link", { name: /Resolver pagos/i })).not.toBeInTheDocument()
+
     expect(errorSpy).toHaveBeenCalled()
     errorSpy.mockRestore()
+  })
+
+  it("falls back to opening seguimiento when there are no pending payments and delivery is not active", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        status: "CONFIRMED",
+        providerOrders: [
+          {
+            id: "provider-order-1",
+            providerId: "provider-1",
+            providerName: "Cerámica Norte",
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PAID",
+            subtotal: 24,
+            originalSubtotal: 24,
+            discountAmount: 0,
+            items: [],
+          },
+        ],
+        deliveryOrder: {
+          id: "delivery-1",
+          runnerId: "runner-1",
+          status: "ASSIGNED",
+          paymentStatus: "PAID",
+        },
+      }),
+    )
+
+    const Page = (await import("@/app/[locale]/orders/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByRole("link", { name: /Abrir seguimiento/i })).toHaveAttribute(
+      "href",
+      "/orders/order-1/track",
+    )
   })
 
   it("redirects unauthenticated users to login with returnTo", async () => {
@@ -268,5 +306,125 @@ describe("OrderDetailPage", () => {
     await waitFor(() => {
       expect(routerReplaceMock).toHaveBeenCalledWith("/dashboard")
     })
+  })
+
+  it("renders pending and fallback vocabulary across payment, delivery and product summaries", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        status: "PENDING",
+        deliveryAddress: "",
+        postalCode: "",
+        deliveryOrder: undefined,
+        items: [
+          {
+            id: "item-1",
+            productId: "prod-raw",
+            quantity: 1,
+            unitPrice: 10,
+            baseUnitPrice: 10,
+            appliedDiscountUnitPrice: null,
+            discountAmount: 0,
+          },
+        ],
+        providerOrders: [
+          {
+            id: "provider-order-1",
+            providerId: "provider-abcdef",
+            providerName: "",
+            status: "PICKED_UP",
+            paymentStatus: "PAYMENT_READY",
+            subtotal: 20,
+            originalSubtotal: 25,
+            discountAmount: 5,
+            items: [],
+          },
+          {
+            id: "provider-order-2",
+            providerId: "provider-xyz",
+            providerName: "",
+            status: "CANCELLED",
+            paymentStatus: "FAILED",
+            subtotal: 8,
+            originalSubtotal: 8,
+            discountAmount: 0,
+            items: [],
+          },
+        ],
+      }),
+    )
+
+    const Page = (await import("@/app/[locale]/orders/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Ficha del pedido")).toBeInTheDocument()
+    expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0)
+    expect(screen.getByText("Recogido · Sesión lista")).toBeInTheDocument()
+    expect(screen.getByText("Cancelado · Fallido")).toBeInTheDocument()
+    expect(screen.getAllByText(/Comercio provid/i).length).toBeGreaterThan(0)
+    expect(screen.getByText("Producto prod-raw")).toBeInTheDocument()
+    expect(screen.getByText("Comercio local · Ciudad no disponible")).toBeInTheDocument()
+    expect(screen.getByText("Sin CP")).toBeInTheDocument()
+    expect(screen.getByText("Sin reparto asignado")).toBeInTheDocument()
+    expect(screen.getAllByText(/25,00/).length).toBeGreaterThan(0)
+  })
+
+  it("renders assignment and unknown fallback labels without crashing", async () => {
+    getOneMock.mockResolvedValueOnce(
+      makeOrder({
+        status: "UNKNOWN_ROOT" as never,
+        providerOrders: [
+          {
+            id: "provider-order-1",
+            providerId: "provider-1",
+            providerName: "Cerámica Norte",
+            status: "ACCEPTED",
+            paymentStatus: "PENDING",
+            subtotal: 24,
+            originalSubtotal: 24,
+            discountAmount: 0,
+            items: [],
+          },
+          {
+            id: "provider-order-2",
+            providerId: "provider-2",
+            providerName: "Textil Sur",
+            status: "UNKNOWN_STATUS" as never,
+            paymentStatus: "UNKNOWN_PAYMENT",
+            subtotal: 12,
+            originalSubtotal: 12,
+            discountAmount: 0,
+            items: [],
+          },
+        ],
+        deliveryOrder: {
+          id: "delivery-1",
+          runnerId: "runner-1",
+          status: "ASSIGNED",
+          paymentStatus: "PENDING",
+        },
+      }),
+    )
+
+    const Page = (await import("@/app/[locale]/orders/[id]/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Ficha del pedido")).toBeInTheDocument()
+    expect(screen.getByText("UNKNOWN_ROOT")).toBeInTheDocument()
+    expect(screen.getByText("Aceptado · Pendiente")).toBeInTheDocument()
+    expect(screen.getByText("UNKNOWN_STATUS · UNKNOWN_PAYMENT")).toBeInTheDocument()
+    expect(screen.getByText("ASSIGNED")).toBeInTheDocument()
+  })
+
+  it("stops early when the route param is missing and preserves the loading shell semantics", async () => {
+    mockUseParams.mockReturnValue({ id: undefined })
+
+    const Page = (await import("@/app/[locale]/orders/[id]/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(getOneMock).not.toHaveBeenCalled()
+    })
+
+    expect(screen.queryByText("No pudimos cargar este pedido.")).not.toBeInTheDocument()
   })
 })

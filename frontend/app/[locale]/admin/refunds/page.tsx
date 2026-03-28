@@ -86,6 +86,7 @@ function getStatusVariant(status: string): "default" | "secondary" | "destructiv
 export default function AdminRefundsPage() {
     const [refunds, setRefunds] = useState<AdminRefundSummary[]>([])
     const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
     const [filter, setFilter] = useState<StatusFilter>("ALL")
     const [processingId, setProcessingId] = useState<string | null>(null)
     const { toast } = useToast()
@@ -93,9 +94,12 @@ export default function AdminRefundsPage() {
     const fetchRefunds = async () => {
         try {
             const data = await adminService.getRefunds()
-            setRefunds(data)
+            setRefunds(Array.isArray(data) ? data : [])
+            setLoadError(null)
         } catch (error) {
             console.error("Error cargando devoluciones:", error)
+            setRefunds([])
+            setLoadError("No se pudieron cargar las devoluciones.")
             toast({
                 title: "Error",
                 description: "No se pudieron cargar las devoluciones",
@@ -181,6 +185,12 @@ export default function AdminRefundsPage() {
                     Refrescar
                 </Button>
             </div>
+
+            {loadError ? (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                    {loadError} Se muestra la cola vacía segura mientras el servicio se recupera.
+                </div>
+            ) : null}
 
             <div className="rounded-md border bg-card">
                 <Table>

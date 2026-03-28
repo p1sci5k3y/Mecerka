@@ -47,7 +47,7 @@ function deliveryStatusLabel(status?: string | null) {
     case "CANCELLED":
       return "Cancelado"
     default:
-      return status || "Sin estado"
+      return "Sin estado"
   }
 }
 
@@ -63,7 +63,7 @@ function runnerPaymentLabel(status?: string | null) {
     case "FAILED":
       return "Pago fallido"
     default:
-      return status || "Sin estado"
+      return "Sin estado"
   }
 }
 
@@ -79,10 +79,6 @@ function pickupStatusLabel(status: ProviderOrder["status"]) {
       return "En preparación"
     case "DELIVERED":
       return "Entregado"
-    case "CANCELLED":
-      return "Cancelado"
-    case "REJECTED_BY_STORE":
-      return "No disponible"
     default:
       return status
   }
@@ -99,7 +95,7 @@ function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
     case "REJECTED":
       return "Rechazada"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -120,7 +116,7 @@ function refundStatusLabel(status: string) {
     case "FAILED":
       return "Fallida"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -154,15 +150,17 @@ function RunnerOrderDetailContent() {
 
         if (data.deliveryOrder?.id) {
           try {
-            incidents = await deliveryIncidentsService.listDeliveryOrderIncidents(
+            const incidentData = await deliveryIncidentsService.listDeliveryOrderIncidents(
               data.deliveryOrder.id,
             )
+            incidents = Array.isArray(incidentData) ? incidentData : []
           } catch {
             incidents = []
           }
 
           try {
-            refunds = await refundsService.getDeliveryOrderRefunds(data.deliveryOrder.id)
+            const refundData = await refundsService.getDeliveryOrderRefunds(data.deliveryOrder.id)
+            refunds = Array.isArray(refundData) ? refundData : []
           } catch {
             refunds = []
           }

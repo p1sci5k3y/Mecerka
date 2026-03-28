@@ -97,6 +97,12 @@ const approvedRefund = {
   status: "APPROVED",
 }
 
+const completedRefund = {
+  ...requestedRefund,
+  id: "refund-completed",
+  status: "COMPLETED",
+}
+
 describe("Admin refunds page", () => {
   beforeEach(() => {
     getRefundsMock.mockReset()
@@ -191,6 +197,56 @@ describe("Admin refunds page", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Completadas" }))
     expect(screen.getByText("No hay devoluciones en este estado.")).toBeInTheDocument()
+    consoleErrorSpy.mockRestore()
+  })
+
+  it("refreshes the queue and shows completed refunds as read-only", async () => {
+    getRefundsMock
+      .mockResolvedValueOnce([completedRefund])
+      .mockResolvedValueOnce([completedRefund])
+
+    const Page = (await import("@/app/[locale]/admin/refunds/page")).default
+    render(<Page />)
+
+    expect(await screen.findByText("Sin acciones manuales")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Refrescar" }))
+
+    await waitFor(() => {
+      expect(getRefundsMock).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it("falls back to a safe empty queue when refunds payload is not an array", async () => {
+    getRefundsMock.mockResolvedValueOnce({ invalid: true })
+
+    const Page = (await import("@/app/[locale]/admin/refunds/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("No hay devoluciones en este estado.")).toBeInTheDocument()
+    })
+
+    expect(toastMock).not.toHaveBeenCalled()
+  })
+
+  it("shows a visible error banner when the refunds queue cannot be loaded", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getRefundsMock.mockRejectedValueOnce(new Error("offline"))
+
+    const Page = (await import("@/app/[locale]/admin/refunds/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Se muestra la cola vacía segura mientras el servicio se recupera/i),
+      ).toBeInTheDocument()
+    })
+
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Error",
+      description: "No se pudieron cargar las devoluciones",
+      variant: "destructive",
+    })
     consoleErrorSpy.mockRestore()
   })
 })

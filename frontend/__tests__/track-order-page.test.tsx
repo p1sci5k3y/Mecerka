@@ -317,4 +317,56 @@ describe("TrackOrderPage", () => {
     )
     expect(await screen.findByText("1 solicitudes")).toBeInTheDocument()
   })
+
+  it("shows safe empty states when the order has no delivery or refundable targets", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { roles: ["CLIENT"] },
+    })
+    getOneMock.mockResolvedValueOnce({
+      id: "order-no-delivery",
+      deliveryFee: 0,
+      providerOrders: [],
+      deliveryOrder: null,
+    })
+
+    const TrackOrderPage = (await import("@/app/[locale]/orders/[id]/track/page")).default
+    render(<TrackOrderPage />)
+
+    expect(await screen.findByText("Centro de soporte del pedido")).toBeInTheDocument()
+    expect(
+      screen.getByText(/todavía no tiene reparto asignado/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/no tiene todavía un tramo económico reembolsable/i),
+    ).toBeInTheDocument()
+    expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
+    expect(getProviderOrderRefundsMock).not.toHaveBeenCalled()
+    expect(getDeliveryOrderRefundsMock).not.toHaveBeenCalled()
+  })
+
+  it("shows a destructive toast and skips secondary fetches when support loading fails", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { roles: ["CLIENT"] },
+    })
+    getOneMock.mockRejectedValueOnce(new Error("track support down"))
+
+    const TrackOrderPage = (await import("@/app/[locale]/orders/[id]/track/page")).default
+    render(<TrackOrderPage />)
+
+    expect(await screen.findByText("Centro de soporte del pedido")).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Error",
+          variant: "destructive",
+        }),
+      )
+    })
+    expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
+    expect(getProviderOrderRefundsMock).not.toHaveBeenCalled()
+    expect(getDeliveryOrderRefundsMock).not.toHaveBeenCalled()
+    expect(screen.getByText("0 casos")).toBeInTheDocument()
+    expect(screen.getByText("0 solicitudes")).toBeInTheDocument()
+  })
 })

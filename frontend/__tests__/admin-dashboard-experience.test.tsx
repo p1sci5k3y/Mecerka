@@ -85,6 +85,10 @@ describe("Admin dashboard experience", () => {
       "href",
       "/admin/incidents",
     )
+    expect(screen.getByRole("link", { name: /Editar maestros/i })).toHaveAttribute(
+      "href",
+      "/admin/masters?tab=cities",
+    )
   })
 
   it("shows an explicit error state when metrics cannot be loaded", async () => {

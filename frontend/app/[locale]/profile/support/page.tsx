@@ -9,6 +9,7 @@ import { Link } from "@/lib/navigation"
 import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import type { DeliveryIncidentSummary, RefundSummary } from "@/lib/types"
+import { useToast } from "@/components/ui/use-toast"
 import {
   ArrowRight,
   CircleDollarSign,
@@ -122,6 +123,8 @@ function ProfileSupportContent() {
   const [incidents, setIncidents] = useState<DeliveryIncidentSummary[]>([])
   const [refunds, setRefunds] = useState<RefundSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     async function loadData() {
@@ -130,17 +133,26 @@ function ProfileSupportContent() {
           deliveryIncidentsService.listMyIncidents(),
           refundsService.getMyRefunds(),
         ])
-        setIncidents(incidentData)
-        setRefunds(refundData)
+        setIncidents(Array.isArray(incidentData) ? incidentData : [])
+        setRefunds(Array.isArray(refundData) ? refundData : [])
+        setLoadError(false)
       } catch (error) {
         console.error("Error loading support center:", error)
+        setIncidents([])
+        setRefunds([])
+        setLoadError(true)
+        toast({
+          title: "Error",
+          description: "No se pudo cargar tu centro de soporte.",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
       }
     }
 
     void loadData()
-  }, [])
+  }, [toast])
 
   const openIncidents = useMemo(
     () => incidents.filter((incident) => isOpenIncident(incident.status)),
@@ -209,6 +221,12 @@ function ProfileSupportContent() {
               </p>
             </div>
           </div>
+
+          {loadError ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Tu centro de soporte no se pudo cargar correctamente. Te mostramos una vista vacía segura para que puedas volver a intentarlo desde tus pedidos.
+            </div>
+          ) : null}
 
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">

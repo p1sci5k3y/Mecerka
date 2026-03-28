@@ -269,127 +269,135 @@ export default function UsersPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredUsers.map((user) => (
-                            <TableRow key={user.id}>
-                                <TableCell className="font-medium">{user.name}</TableCell>
-                                <TableCell>
-                                    <div className="space-y-1">
-                                        <p>{user.email}</p>
-                                        <Link href={`/admin/users/${user.id}`} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
-                                            Abrir detalle
-                                        </Link>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                        {user.roles.map((role) => (
-                                            <Badge key={role} variant={role === "ADMIN" ? "default" : "secondary"}>
-                                                {role}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex items-center gap-2">
-                                            {user.roleStatus === "PENDING" ? (
-                                                <Clock3 className="h-4 w-4 text-amber-600" />
-                                            ) : (
-                                                <BadgeCheck className="h-4 w-4 text-emerald-600" />
-                                            )}
-                                            <span>{roleRequestLabel(user)}</span>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">{governanceSourceLabel(user)}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            MFA {user.mfaEnabled ? "activado" : "pendiente"}
-                                        </p>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    {user.active ? (
-                                        <div className="flex items-center gap-2 text-green-600">
-                                            <UserCheck className="h-4 w-4" />
-                                            <span className="text-xs font-medium">Activo</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 text-destructive">
-                                            <UserX className="h-4 w-4" />
-                                            <span className="text-xs font-medium">Bloqueado</span>
-                                        </div>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <span className="sr-only">Abrir menú</span>
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.email)}>
-                                                Copiar Email
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuLabel>Conceder roles</DropdownMenuLabel>
-                                            {!hasRole(user, "PROVIDER") && (
-                                                <DropdownMenuItem onClick={() => handleRoleChange(user.id, "PROVIDER", "grant")}>
-                                                    Conceder PROVIDER
-                                                </DropdownMenuItem>
-                                            )}
-                                            {!hasRole(user, "RUNNER") && (
-                                                <DropdownMenuItem onClick={() => handleRoleChange(user.id, "RUNNER", "grant")}>
-                                                    Conceder RUNNER
-                                                </DropdownMenuItem>
-                                            )}
-                                            {!hasRole(user, "ADMIN") && (
-                                                <DropdownMenuItem onClick={() => handleRoleChange(user.id, "ADMIN", "grant")}>
-                                                    <Shield className="mr-2 h-4 w-4" />
-                                                    Conceder ADMIN
-                                                </DropdownMenuItem>
-                                            )}
-                                            {user.roleStatus === "PENDING" && user.requestedRole ? (
-                                                !hasRole(user, user.requestedRole) ? (
-                                                    <DropdownMenuItem onClick={() => handleRoleChange(user.id, user.requestedRole as Role, "grant")}>
-                                                        Aprobar solicitud {user.requestedRole}
-                                                    </DropdownMenuItem>
-                                                ) : null
-                                            ) : null}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuLabel>Revocar roles</DropdownMenuLabel>
-                                            {user.roles.map((role) => {
-                                                const isSelfAdminRole = currentUser?.userId === user.id && role === "ADMIN"
-                                                if (user.roles.length === 1 || isSelfAdminRole) return null
-                                                return (
-                                                    <DropdownMenuItem key={`revoke-${role}`} onClick={() => handleRoleChange(user.id, role, "revoke")}>
-                                                        Revocar {role}
-                                                    </DropdownMenuItem>
-                                                )
-                                            })}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem
-                                                disabled={actingUserId === user.id || currentUser?.userId === user.id}
-                                                className={user.active ? "text-destructive" : "text-green-600"}
-                                                onClick={() => handleStatusChange(user.id, user.active)}
-                                            >
-                                                {user.active ? (
-                                                    <>
-                                                        <UserX className="mr-2 h-4 w-4" />
-                                                        Bloquear
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <UserCheck className="mr-2 h-4 w-4" />
-                                                        Activar
-                                                    </>
-                                                )}
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                        {filteredUsers.length === 0 ? (
+                            <TableRow>
+                                <TableCell className="py-8 text-center text-muted-foreground" colSpan={6}>
+                                    No hay usuarios para los filtros actuales.
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        ) : (
+                            filteredUsers.map((user) => (
+                                <TableRow key={user.id}>
+                                    <TableCell className="font-medium">{user.name}</TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1">
+                                            <p>{user.email}</p>
+                                            <Link href={`/admin/users/${user.id}`} className="text-xs font-medium text-primary underline-offset-4 hover:underline">
+                                                Abrir detalle
+                                            </Link>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1">
+                                            {user.roles.map((role) => (
+                                                <Badge key={role} variant={role === "ADMIN" ? "default" : "secondary"}>
+                                                    {role}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1 text-sm">
+                                            <div className="flex items-center gap-2">
+                                                {user.roleStatus === "PENDING" ? (
+                                                    <Clock3 className="h-4 w-4 text-amber-600" />
+                                                ) : (
+                                                    <BadgeCheck className="h-4 w-4 text-emerald-600" />
+                                                )}
+                                                <span>{roleRequestLabel(user)}</span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{governanceSourceLabel(user)}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                MFA {user.mfaEnabled ? "activado" : "pendiente"}
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {user.active ? (
+                                            <div className="flex items-center gap-2 text-green-600">
+                                                <UserCheck className="h-4 w-4" />
+                                                <span className="text-xs font-medium">Activo</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-2 text-destructive">
+                                                <UserX className="h-4 w-4" />
+                                                <span className="text-xs font-medium">Bloqueado</span>
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                                    <span className="sr-only">Abrir menú</span>
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(user.email)}>
+                                                    Copiar Email
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuLabel>Conceder roles</DropdownMenuLabel>
+                                                {!hasRole(user, "PROVIDER") && (
+                                                    <DropdownMenuItem onClick={() => handleRoleChange(user.id, "PROVIDER", "grant")}>
+                                                        Conceder PROVIDER
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {!hasRole(user, "RUNNER") && (
+                                                    <DropdownMenuItem onClick={() => handleRoleChange(user.id, "RUNNER", "grant")}>
+                                                        Conceder RUNNER
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {!hasRole(user, "ADMIN") && (
+                                                    <DropdownMenuItem onClick={() => handleRoleChange(user.id, "ADMIN", "grant")}>
+                                                        <Shield className="mr-2 h-4 w-4" />
+                                                        Conceder ADMIN
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {user.roleStatus === "PENDING" && user.requestedRole ? (
+                                                    !hasRole(user, user.requestedRole) ? (
+                                                        <DropdownMenuItem onClick={() => handleRoleChange(user.id, user.requestedRole as Role, "grant")}>
+                                                            Aprobar solicitud {user.requestedRole}
+                                                        </DropdownMenuItem>
+                                                    ) : null
+                                                ) : null}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuLabel>Revocar roles</DropdownMenuLabel>
+                                                {user.roles.map((role) => {
+                                                    const isSelfAdminRole = currentUser?.userId === user.id && role === "ADMIN"
+                                                    if (user.roles.length === 1 || isSelfAdminRole) return null
+                                                    return (
+                                                        <DropdownMenuItem key={`revoke-${role}`} onClick={() => handleRoleChange(user.id, role, "revoke")}>
+                                                            Revocar {role}
+                                                        </DropdownMenuItem>
+                                                    )
+                                                })}
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    disabled={actingUserId === user.id || currentUser?.userId === user.id}
+                                                    className={user.active ? "text-destructive" : "text-green-600"}
+                                                    onClick={() => handleStatusChange(user.id, user.active)}
+                                                >
+                                                    {user.active ? (
+                                                        <>
+                                                            <UserX className="mr-2 h-4 w-4" />
+                                                            Bloquear
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <UserCheck className="mr-2 h-4 w-4" />
+                                                            Activar
+                                                        </>
+                                                    )}
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
                     </TableBody>
                 </Table>
             </div>

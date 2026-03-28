@@ -205,6 +205,9 @@ describe("Provider finance page", () => {
     expect(
       screen.getByText(/La revisión y ejecución siguen siendo flujos de backoffice\/admin/i),
     ).toBeInTheDocument()
+    expect(getAllMock).toHaveBeenCalled()
+    expect(getProviderOrderRefundsMock).toHaveBeenCalledWith("provider-order-1")
+    expect(listDeliveryOrderIncidentsMock).toHaveBeenCalledWith("delivery-1")
   })
 
   it("shows the stripe connect CTA when the provider is not connected yet", async () => {
@@ -320,5 +323,28 @@ describe("Provider finance page", () => {
     expect(
       screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i),
     ).toBeInTheDocument()
+  })
+
+  it("degrades safely when the main finance load fails", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
+    getAllMock.mockRejectedValueOnce(new Error("finance down"))
+
+    const Page = (await import("@/app/[locale]/provider/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Cobros y devoluciones")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/Todavía no tienes provider orders cobrados/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i),
+    ).toBeInTheDocument()
+    expect(getProviderOrderRefundsMock).not.toHaveBeenCalled()
+    expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      "No se pudo cargar el centro financiero del provider.",
+    )
+    consoleErrorSpy.mockRestore()
   })
 })

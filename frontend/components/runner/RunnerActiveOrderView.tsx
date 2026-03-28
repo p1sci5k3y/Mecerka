@@ -22,9 +22,6 @@ function getPickupStatusLabel(poStatus: string) {
         case "ACCEPTED":
         case "PENDING":
             return { text: "En preparación", color: "text-yellow-600", bg: "bg-yellow-100" };
-        case "REJECTED_BY_STORE":
-        case "CANCELLED":
-            return { text: "No aplica", color: "text-muted-foreground", bg: "bg-muted" };
         default:
             return { text: "Desconocido", color: "text-muted-foreground", bg: "bg-muted" };
     }

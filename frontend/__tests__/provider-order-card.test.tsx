@@ -218,4 +218,64 @@ describe("ProviderOrderCard operational experience", () => {
       screen.queryByRole("button", { name: /Marcar Listo|Aceptar Pedido|Empezar a Preparar/i }),
     ).not.toBeInTheDocument()
   })
+
+  it("renders fallback product/timer data and no action for unknown or cancelled statuses", async () => {
+    const cancelledOrder = makeProviderOrder({
+      id: "po-cancelled",
+      status: "CANCELLED",
+      items: [{ id: "item-1", productId: "prod-raw", quantity: 1, unitPrice: 12, baseUnitPrice: 12, appliedDiscountUnitPrice: null, discountAmount: 0 }],
+      updatedAt: undefined,
+      createdAt: undefined,
+    })
+
+    const { ProviderOrderCard } = await import("@/components/provider/ProviderOrderCard")
+    const { rerender, container } = render(
+      <ProviderOrderCard
+        order={makeOrder(cancelledOrder)}
+        providerOrderId={cancelledOrder.id}
+        now={new Date("2026-03-24T10:20:00.000Z")}
+        onStatusChange={onStatusChangeMock}
+        onReject={onRejectMock}
+      />,
+    )
+
+    expect(screen.getByText("Producto desconocido")).toBeInTheDocument()
+    expect(screen.getByText("20 min")).toBeInTheDocument()
+    expect(container.firstChild).toHaveClass("opacity-50")
+    expect(
+      screen.queryByRole("button", { name: /Aceptar Pedido|Empezar a Preparar|Marcar Listo|Rechazar/i }),
+    ).not.toBeInTheDocument()
+
+    const unknownOrder = makeProviderOrder({
+      id: "po-unknown",
+      status: "UNKNOWN_STATUS" as never,
+    })
+
+    rerender(
+      <ProviderOrderCard
+        order={makeOrder(unknownOrder)}
+        providerOrderId={unknownOrder.id}
+        now={new Date("2026-03-24T10:20:00.000Z")}
+        onStatusChange={onStatusChangeMock}
+        onReject={onRejectMock}
+      />,
+    )
+
+    expect(screen.queryByRole("button", { name: /Aceptar Pedido|Empezar a Preparar|Marcar Listo|Rechazar/i })).not.toBeInTheDocument()
+  })
+
+  it("returns null when the provider order is missing from the order payload", async () => {
+    const { ProviderOrderCard } = await import("@/components/provider/ProviderOrderCard")
+    const { container } = render(
+      <ProviderOrderCard
+        order={makeOrder(makeProviderOrder({ id: "po-1" }))}
+        providerOrderId="missing-provider-order"
+        now={new Date("2026-03-24T10:20:00.000Z")}
+        onStatusChange={onStatusChangeMock}
+        onReject={onRejectMock}
+      />,
+    )
+
+    expect(container.firstChild).toBeNull()
+  })
 })

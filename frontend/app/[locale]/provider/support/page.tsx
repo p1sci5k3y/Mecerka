@@ -48,7 +48,7 @@ function refundStatusLabel(status: string) {
     case "FAILED":
       return "Fallida"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -63,7 +63,7 @@ function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
     case "REJECTED":
       return "Rechazada"
     default:
-      return status
+      return "Sin estado"
   }
 }
 
@@ -101,6 +101,7 @@ function ProviderSupportContent() {
   const { toast } = useToast()
   const [providerOrders, setProviderOrders] = useState<ProviderOrderWithSupport[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [targetProviderOrderId, setTargetProviderOrderId] = useState("")
   const [incidentType, setIncidentType] =
     useState<DeliveryIncidentSummary["type"]>("DAMAGED_ITEMS")
@@ -116,7 +117,8 @@ function ProviderSupportContent() {
 
     try {
       const orders = await ordersService.getAll()
-      const ownProviderOrders = orders.flatMap((order) =>
+      const safeOrders = Array.isArray(orders) ? orders : []
+      const ownProviderOrders = safeOrders.flatMap((order) =>
         (order.providerOrders || [])
           .filter((providerOrder) => providerOrder.providerId === String(user.userId))
           .map((providerOrder) => ({
@@ -141,21 +143,36 @@ function ProviderSupportContent() {
 
           return {
             ...providerOrder,
-            refunds,
-            incidents,
+            refunds: Array.isArray(refunds) ? refunds : [],
+            incidents: Array.isArray(incidents) ? incidents : [],
           }
         }),
       )
 
       setProviderOrders(withSupport)
+      setLoadError(null)
       setTargetProviderOrderId((currentTargetId) => {
-        if (currentTargetId) return currentTargetId
+        const stillVisible = withSupport.find(
+          (providerOrder) =>
+            providerOrder.id === currentTargetId && providerOrder.deliveryOrderId,
+        )
+        if (stillVisible) return stillVisible.id
         return withSupport.find((providerOrder) => providerOrder.deliveryOrderId)?.id || ""
+      })
+    } catch (error) {
+      console.error("Error cargando soporte provider:", error)
+      setProviderOrders([])
+      setTargetProviderOrderId("")
+      setLoadError("No se pudo cargar el centro de soporte del comercio.")
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el centro de soporte del comercio.",
+        variant: "destructive",
       })
     } finally {
       setLoading(false)
     }
-  }, [user?.userId])
+  }, [toast, user?.userId])
 
   useEffect(() => {
     void loadData()
@@ -255,6 +272,12 @@ function ProviderSupportContent() {
               Reúne incidencias y devoluciones visibles sobre tus provider orders para que no tengas que buscarlas entre ventas y finanzas.
             </p>
           </div>
+
+          {loadError ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {loadError} Estamos mostrando el estado seguro vacío mientras el servicio se recupera.
+            </div>
+          ) : null}
 
           <div className="grid gap-6 sm:grid-cols-3">
             <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">

@@ -95,6 +95,8 @@ function RunnerFinanceContent() {
         setOrders(withSupport)
       } catch (error) {
         console.error("Error loading runner finance center:", error)
+        setOrders([])
+        toast.error("No se pudo cargar el centro financiero del runner.")
       } finally {
         setLoading(false)
       }
