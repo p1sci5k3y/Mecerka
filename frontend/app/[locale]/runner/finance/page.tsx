@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
+import { RunnerFinanceNextActionCard } from "@/components/runner/RunnerFinanceNextActionCard"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 import { getApiBaseUrl } from "@/lib/runtime-config"
@@ -255,6 +256,14 @@ function RunnerFinanceContent() {
               </p>
             </div>
           </div>
+
+          <RunnerFinanceNextActionCard
+            connectStatus={connectStatus}
+            paidOrderCount={paidOrders.length}
+            pendingOrderCount={pendingOrders.length}
+            visibleRefundCount={visibleRefunds}
+            visibleIncidentCount={visibleIncidents}
+          />
 
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">

@@ -189,6 +189,8 @@ describe("Provider finance page", () => {
     expect(screen.getByText("Potencialmente reembolsables")).toBeInTheDocument()
     expect(screen.getAllByText("Devoluciones visibles")).toHaveLength(2)
     expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Revisar soporte y devoluciones")).toBeInTheDocument()
     expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
     expect(screen.getAllByText("Cuenco artesanal")).toHaveLength(2)
     expect(screen.getByText(/Estado:\s*UNDER_REVIEW\s*· Tipo:\s*PROVIDER_PARTIAL/i)).toBeInTheDocument()
@@ -292,23 +294,9 @@ describe("Provider finance page", () => {
     })
   })
 
-  it("shows empty operational states when there are no paid orders or refunds", async () => {
+  it("surfaces refundable paid orders even when there are no visible refunds yet", async () => {
     getAllMock.mockResolvedValueOnce([
-      makeOrder({
-        providerOrders: [
-          {
-            id: "provider-order-pending",
-            providerId: "provider-1",
-            providerName: "Cerámica Norte",
-            status: "PENDING",
-            paymentStatus: "PAYMENT_PENDING",
-            subtotal: 18,
-            originalSubtotal: 18,
-            discountAmount: 0,
-            items: [],
-          },
-        ],
-      }),
+      makeOrder(),
     ])
     getProviderOrderRefundsMock.mockResolvedValueOnce([])
     listDeliveryOrderIncidentsMock.mockResolvedValueOnce([])
@@ -317,12 +305,13 @@ describe("Provider finance page", () => {
     render(<Page />)
 
     await waitFor(() => {
-      expect(screen.getByText(/Todavía no tienes provider orders cobrados/i)).toBeInTheDocument()
+      expect(screen.getByText("Cobros y devoluciones")).toBeInTheDocument()
     })
 
-    expect(
-      screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Vigilar pedidos reembolsables")).toBeInTheDocument()
+    expect(screen.getByText("Cuenco artesanal")).toBeInTheDocument()
+    expect(screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i)).toBeInTheDocument()
   })
 
   it("degrades safely when the main finance load fails", async () => {
@@ -336,15 +325,41 @@ describe("Provider finance page", () => {
       expect(screen.getByText("Cobros y devoluciones")).toBeInTheDocument()
     })
 
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Esperar primeros cobros visibles")).toBeInTheDocument()
     expect(screen.getByText(/Todavía no tienes provider orders cobrados/i)).toBeInTheDocument()
     expect(
       screen.getByText(/No hay devoluciones visibles todavía para tus provider orders/i),
-    ).toBeInTheDocument()
+      ).toBeInTheDocument()
     expect(getProviderOrderRefundsMock).not.toHaveBeenCalled()
     expect(listDeliveryOrderIncidentsMock).not.toHaveBeenCalled()
     expect(toastErrorMock).toHaveBeenCalledWith(
       "No se pudo cargar el centro financiero del provider.",
     )
     consoleErrorSpy.mockRestore()
+  })
+
+  it("prioritizes Stripe connection over the rest of the finance flow when the provider is disconnected", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        userId: "provider-1",
+        name: "Taller Sevilla",
+        roles: ["PROVIDER"],
+        stripeAccountId: null,
+        mfaEnabled: true,
+        hasPin: true,
+      },
+    })
+    getAllMock.mockResolvedValueOnce([])
+
+    const Page = (await import("@/app/[locale]/provider/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Cobros y devoluciones")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Conectar cobro del comercio")).toBeInTheDocument()
   })
 })

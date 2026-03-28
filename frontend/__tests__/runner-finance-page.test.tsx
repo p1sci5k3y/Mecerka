@@ -195,6 +195,8 @@ describe("Runner finance page", () => {
     expect(screen.getByText("Importe visible cobrado")).toBeInTheDocument()
     expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
     expect(screen.getByText("Devoluciones visibles")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Priorizar soporte económico")).toBeInTheDocument()
     expect(screen.getByText(/Tu cuenta está conectada, activa y preparada/i)).toBeInTheDocument()
     expect(screen.getByText("Cuenta activa")).toBeInTheDocument()
     expect(screen.getAllByText("Habilitados")).toHaveLength(2)
@@ -278,6 +280,8 @@ describe("Runner finance page", () => {
       expect(screen.getByText(/onboarding stripe pendiente/i)).toBeInTheDocument()
     })
 
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Completar onboarding de cobro")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Completar onboarding/i })).toBeInTheDocument()
     expect(screen.getByText(/Requisitos pendientes: external_account/i)).toBeInTheDocument()
   })
@@ -350,6 +354,8 @@ describe("Runner finance page", () => {
       expect(screen.getByText("Cobros del runner")).toBeInTheDocument()
     })
 
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Conectar cobro del runner")).toBeInTheDocument()
     expect(
       screen.getByText(/Aun no tienes repartos con datos de cobro visibles/i),
     ).toBeInTheDocument()
@@ -362,5 +368,32 @@ describe("Runner finance page", () => {
       "No se pudo cargar el centro financiero del runner.",
     )
     consoleErrorSpy.mockRestore()
+  })
+
+  it("surfaces pending payouts when connect is ready and there is no visible support", async () => {
+    getAllMock.mockResolvedValueOnce([
+      makeOrder({
+        id: "order-pending",
+        status: "IN_TRANSIT",
+        deliveryOrder: {
+          id: "delivery-pending",
+          runnerId: "runner-1",
+          status: "IN_TRANSIT",
+          paymentStatus: "PAYMENT_PENDING",
+        },
+      }),
+    ])
+    listDeliveryOrderIncidentsMock.mockResolvedValueOnce([])
+    getDeliveryOrderRefundsMock.mockResolvedValueOnce([])
+
+    const Page = (await import("@/app/[locale]/runner/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText("Cobros del runner")).toBeInTheDocument()
+    })
+
+    expect(screen.getByText("Siguiente acción financiera")).toBeInTheDocument()
+    expect(screen.getByText("Seguir cobros pendientes")).toBeInTheDocument()
   })
 })

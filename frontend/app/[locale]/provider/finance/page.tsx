@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
+import { ProviderFinanceNextActionCard } from "@/components/provider/ProviderFinanceNextActionCard"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
 import { getApiBaseUrl } from "@/lib/runtime-config"
@@ -259,6 +260,14 @@ function ProviderFinanceContent() {
               </p>
             </div>
           </div>
+
+          <ProviderFinanceNextActionCard
+            stripeConnected={Boolean(user?.stripeAccountId)}
+            paidOrderCount={paidOrders.length}
+            refundableOrderCount={refundableOrders.length}
+            visibleRefundCount={visibleRefunds.length}
+            visibleIncidentCount={totalIncidents}
+          />
 
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-4">
