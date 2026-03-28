@@ -8,6 +8,7 @@ import {
   runnerTrackingStatusLabel,
 } from "@/components/tracking/delivery-map-utils"
 import { buildDeliveryMilestones } from "@/components/tracking/DeliveryProgressTimeline"
+import { getDeliveryNextStepSummary } from "@/components/tracking/delivery-next-step"
 import {
   getPickupCoverageLabel,
   getRunnerAssignmentLabel,
@@ -155,5 +156,56 @@ describe("tracking and runner detail utils", () => {
         updatedAt: null,
       }),
     ).toBe("Asignado a Runner Uno")
+  })
+
+  it("derives the next delivery step from tracking and support context", () => {
+    expect(
+      getDeliveryNextStepSummary({
+        orderStatus: "CONFIRMED",
+        deliveryStatus: "RUNNER_ASSIGNED",
+        tracking: null,
+        openSupportCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Esperando recogida",
+        tone: "info",
+      }),
+    )
+
+    expect(
+      getDeliveryNextStepSummary({
+        orderStatus: "IN_TRANSIT",
+        deliveryStatus: "IN_TRANSIT",
+        tracking: {
+          orderId: "ord-1",
+          status: "IN_TRANSIT",
+          deliveryStatus: "IN_TRANSIT",
+          runner: { id: "runner-1", name: "Runner Uno" },
+          location: null,
+          updatedAt: new Date().toISOString(),
+        },
+        openSupportCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Seguir el último tramo",
+        tone: "info",
+      }),
+    )
+
+    expect(
+      getDeliveryNextStepSummary({
+        orderStatus: "CONFIRMED",
+        deliveryStatus: "PICKUP_PENDING",
+        tracking: null,
+        openSupportCount: 2,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Revisar soporte operativo",
+        tone: "warning",
+      }),
+    )
   })
 })

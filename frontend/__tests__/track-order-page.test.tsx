@@ -233,6 +233,8 @@ describe("TrackOrderPage", () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText(/Hay 3 caso\(s\) de soporte abierto/i)).toBeInTheDocument()
+    expect(screen.getByText("Siguiente paso")).toBeInTheDocument()
+    expect(screen.getByText("Revisar soporte operativo")).toBeInTheDocument()
     expect(screen.getByText("Salud operativa")).toBeInTheDocument()
     expect(screen.getByText("Asignado a Runner Uno")).toBeInTheDocument()
     expect(screen.getByText("Señal reciente")).toBeInTheDocument()

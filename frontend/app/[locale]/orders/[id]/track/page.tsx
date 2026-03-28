@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 
 import dynamic from "next/dynamic"
+import { DeliveryNextStepCard } from "@/components/tracking/DeliveryNextStepCard"
 import { DeliveryOperationalHealthCard } from "@/components/tracking/DeliveryOperationalHealthCard"
 import { Navbar } from "@/components/navbar"
 import { DeliveryProgressTimeline } from "@/components/tracking/DeliveryProgressTimeline"
@@ -181,6 +182,16 @@ export default function TrackOrderPage() {
 
   const selectedRefundTarget =
     refundTargets.find((target) => target.id === selectedRefundTargetId) ?? null
+  const openIncidentCount = incidents.filter(
+    (incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED",
+  ).length
+  const openRefundCount = refunds.filter(
+    (refund) =>
+      refund.status !== "COMPLETED" &&
+      refund.status !== "REJECTED" &&
+      refund.status !== "FAILED",
+  ).length
+  const openSupportCount = openIncidentCount + openRefundCount
 
   const loadSupportData = useCallback(async () => {
     if (!orderId || !isClient) {
@@ -346,17 +357,21 @@ export default function TrackOrderPage() {
             orderStatus={order?.status ?? null}
             deliveryStatus={order?.deliveryOrder?.status ?? null}
             stopCount={order?.providerOrders?.length ?? 0}
-            openIncidentCount={incidents.filter((incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED").length}
-            openRefundCount={refunds.filter((refund) => refund.status !== "COMPLETED" && refund.status !== "REJECTED" && refund.status !== "FAILED").length}
+            openIncidentCount={openIncidentCount}
+            openRefundCount={openRefundCount}
+          />
+
+          <DeliveryNextStepCard
+            orderStatus={order?.status ?? null}
+            deliveryStatus={order?.deliveryOrder?.status ?? null}
+            tracking={trackingSnapshot}
+            openSupportCount={openSupportCount}
           />
 
           <DeliveryOperationalHealthCard
             tracking={trackingSnapshot}
             stopCount={order?.providerOrders?.length ?? 0}
-            openSupportCount={
-              incidents.filter((incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED").length +
-              refunds.filter((refund) => refund.status !== "COMPLETED" && refund.status !== "REJECTED" && refund.status !== "FAILED").length
-            }
+            openSupportCount={openSupportCount}
           />
 
           {isClient ? (
