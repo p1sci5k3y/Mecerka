@@ -7,8 +7,8 @@ El demo mode proporciona un dataset reproducible del marketplace para que evalua
 Está diseñado para:
 
 - crear usuarios coherentes para todos los roles principales;
-- crear providers y productos demo con imágenes;
-- generar pedidos de ejemplo en distintas fases del ciclo de vida;
+- crear providers, runners y productos demo con imágenes en varias ciudades;
+- generar pedidos de ejemplo en distintas fases del ciclo de vida y en distintos verticales;
 - permitir ejecuciones repetidas de pruebas end-to-end mediante `reset + reseed`.
 
 El entorno demo queda aislado a cuentas de prueba bajo `@local.test`.
@@ -35,7 +35,7 @@ curl -c cookies.txt -X POST http://127.0.0.1:3000/auth/login \
 curl -b cookies.txt -X POST http://127.0.0.1:3000/demo/reset
 ```
 
-`/demo/reset` is admin-only.
+`/demo/reset` es solo para `ADMIN`.
 
 ## Cómo resetear el entorno
 
@@ -67,12 +67,24 @@ Esto hace deterministas las pruebas manuales repetidas y las reruns de Playwrigh
 Cuentas demo por defecto:
 
 - `admin.demo@local.test`
-- `provider.demo@local.test`
-- `provider2.demo@local.test`
-- `runner.demo@local.test`
-- `runner2.demo@local.test`
 - `user.demo@local.test`
 - `user2.demo@local.test`
+- `provider.demo@local.test`
+- `provider2.demo@local.test`
+- `madrid.provider.demo@local.test`
+- `madrid.crafts.demo@local.test`
+- `valencia.provider.demo@local.test`
+- `valencia.crafts.demo@local.test`
+- `sevilla.provider.demo@local.test`
+- `sevilla.crafts.demo@local.test`
+- `bilbao.provider.demo@local.test`
+- `bilbao.crafts.demo@local.test`
+- `runner.demo@local.test`
+- `runner2.demo@local.test`
+- `madrid.runner.demo@local.test`
+- `valencia.runner.demo@local.test`
+- `sevilla.runner.demo@local.test`
+- `bilbao.runner.demo@local.test`
 
 Todas estas cuentas usan la contraseña configurada en `DEMO_PASSWORD`.
 
@@ -81,32 +93,35 @@ La suite de Playwright también soporta leerlas desde [`frontend/.env.test`](../
 Roles:
 
 - `admin.demo@local.test`: `ADMIN`
-- `provider.demo@local.test`: `PROVIDER`
-- `provider2.demo@local.test`: `PROVIDER`
-- `runner.demo@local.test`: `RUNNER`
-- `runner2.demo@local.test`: `RUNNER`
-- `user.demo@local.test`: `CLIENT`
-- `user2.demo@local.test`: `CLIENT`
+- `*.provider.demo@local.test` y `provider*.demo@local.test`: `PROVIDER`
+- `*.runner.demo@local.test` y `runner*.demo@local.test`: `RUNNER`
+- `user.demo@local.test` y `user2.demo@local.test`: `CLIENT`
 
 ## Providers demo
 
-Los negocios sembrados para provider son:
+Los negocios sembrados para provider ya representan un ecosistema local variado:
 
-- `Panadería San Isidro`
-- `Verduras del Tajo`
+- `Toledo`: `Panadería San Isidro`, `Cerámica del Miradero`
+- `Madrid`: `Flores de la Plaza`, `Cuadernos de Malasaña`
+- `Valencia`: `Huerta del Turia`, `Seda del Carmen`
+- `Sevilla`: `Despensa de Triana`, `Marroquinería Giralda`
+- `Bilbao`: `Café Casco Viejo`, `Velas de Bilbao`
 
-Estos providers se crean a través de los servicios de dominio existentes y reciben bootstrap de cuentas de pago demo para que los flujos del marketplace funcionen en local/demo mode.
+Estos providers se crean a través de los servicios de dominio existentes y reciben bootstrap de cuentas de pago demo para que los flujos del marketplace funcionen en local y en demo mode.
 
 ## Productos demo
 
-El catálogo demo incluye:
+El catálogo demo ya mezcla alimentación y comercio no alimentario, por ejemplo:
 
 - `Pan artesano`
-- `Empanada gallega`
-- `Tomates ecológicos`
-- `Huevos camperos`
-- `Queso manchego`
-- `Aceite de oliva`
+- `Cuenco de cerámica toledana`
+- `Ramo de temporada`
+- `Cuadernos cosidos a mano`
+- `Naranjas dulces`
+- `Camino de mesa de seda`
+- `Cartera de piel`
+- `Café de tueste local`
+- `Vela aromática del Nervión`
 
 Las imágenes se sirven desde:
 
@@ -122,24 +137,27 @@ Cada producto demo incluye:
 
 ## Lifecycle de pedido en demo
 
-El demo seed crea al menos:
+El demo seed crea escenarios visibles en varias ciudades, incluyendo:
 
-- 1 pending order
-- 1 delivering order
-- 1 delivered order
+- 1 pedido multiproveedor pendiente en Toledo
+- 1 reparto en tránsito en Madrid
+- 1 entrega completada en Valencia
+- 1 entrega asignada en Sevilla
+- 1 caso con soporte abierto en Bilbao
 
 Características operativas:
 
-- al menos un pedido tiene runner asignado
+- cada ciudad tiene runners asociados al seed
 - las ubicaciones demo del runner se siembran para los flujos de tracking
 - los provider orders se crean de forma consistente con la lógica existente de pedido y pago
 - el estado de entrega se representa a través del dominio real de delivery, no mediante escrituras directas a base de datos
 
 Estados típicos visibles durante las pruebas:
 
-- pending or payment-ready order
-- assigned / delivering order
+- pending / payment-ready order
+- assigned / pickup flow / delivering order
 - delivered order
+- support/refund linked order
 
 ## Coverage Playwright
 

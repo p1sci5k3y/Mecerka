@@ -3,20 +3,32 @@
 - GitHub: https://github.com/p1sci5k3y/Mecerka/
 - Despliegue: https://mecerka.me
 - Despliegue demo: https://demo.mecerka.me
-- Credenciales demo:
-****    admin.demo@local.test / DemoPass123! ****
-****    provider.demo@local.test / DemoPass123! ****
-****    provider2.demo@local.test / DemoPass123! ****
-****    runner.demo@local.test / DemoPass123! ****
-****    runner2.demo@local.test / DemoPass123! ****
-****    user.demo@local.test / DemoPass123! ****
-****    user2.demo@local.test / DemoPass123! ****
+- Credenciales demo base:
+  - `admin.demo@local.test / DemoPass123!`
+  - `user.demo@local.test / DemoPass123!`
+  - `user2.demo@local.test / DemoPass123!`
+  - `provider.demo@local.test / DemoPass123!`
+  - `provider2.demo@local.test / DemoPass123!`
+  - `madrid.provider.demo@local.test / DemoPass123!`
+  - `madrid.crafts.demo@local.test / DemoPass123!`
+  - `valencia.provider.demo@local.test / DemoPass123!`
+  - `valencia.crafts.demo@local.test / DemoPass123!`
+  - `sevilla.provider.demo@local.test / DemoPass123!`
+  - `sevilla.crafts.demo@local.test / DemoPass123!`
+  - `bilbao.provider.demo@local.test / DemoPass123!`
+  - `bilbao.crafts.demo@local.test / DemoPass123!`
+  - `runner.demo@local.test / DemoPass123!`
+  - `runner2.demo@local.test / DemoPass123!`
+  - `madrid.runner.demo@local.test / DemoPass123!`
+  - `valencia.runner.demo@local.test / DemoPass123!`
+  - `sevilla.runner.demo@local.test / DemoPass123!`
+  - `bilbao.runner.demo@local.test / DemoPass123!`
 - Slides: [Pendiente: URL de trabajo o edición de las slides]
 
 
 ## Descripción general
 
-Mecerka es una plataforma web de comercio local orientada a operar dentro de una misma ciudad. El repositorio implementa un MVP funcional con arquitectura separada de frontend y backend, pensado para conectar cuatro perfiles de uso verificables en código: `CLIENT`, `PROVIDER`, `RUNNER` y `ADMIN`.
+Mecerka es una plataforma web de comercio local pensada para operar por circuitos urbanos de proximidad. El repositorio implementa un MVP funcional con arquitectura separada de frontend y backend, pensado para conectar cuatro perfiles de uso verificables en código: `CLIENT`, `PROVIDER`, `RUNNER` y `ADMIN`.
 
 El objetivo observable del sistema es resolver un flujo completo de compra local en el que una persona usuaria pueda descubrir productos, construir una cesta, confirmar un pedido con entrega geolocalizada y gestionar el pago de forma compatible con un escenario multiproveedor. La propuesta de valor real del proyecto no es un “marketplace” genérico, sino un circuito de comercio de proximidad con estas características implementadas:
 
@@ -82,6 +94,18 @@ Además del circuito base de compra y reparto, la versión actual ya deja visibl
 - centros financieros de `PROVIDER` y `RUNNER` con lectura explícita del siguiente paso financiero;
 - backoffice admin de incidencias y devoluciones con “siguiente acción de backoffice”;
 - panel admin de conectores de correo con `SMTP` y `AWS SES`, secretos cifrados y edición iniciada solo por acción explícita.
+
+## Ecosistema demo multi-ciudad
+
+La demo pública ya no está limitada a un único circuito alimentario. El dataset reproducible actual cubre varias ciudades y mezcla comercio alimentario con comercio no alimentario:
+
+- `Toledo`: panadería y cerámica
+- `Madrid`: floristería y papelería artesanal
+- `Valencia`: huerta local y textil
+- `Sevilla`: despensa y marroquinería
+- `Bilbao`: café local y velas artesanales
+
+Esto permite enseñar pedidos pendientes, pedidos entregados, tracking en tránsito, soporte abierto y pagos por comercio en ciudades distintas sin rehacer datos manualmente entre demos.
 
 ## Stack tecnológico
 

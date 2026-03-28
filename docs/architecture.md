@@ -2,7 +2,7 @@
 
 ## Propósito
 
-Mecerka es una plataforma de comercio local acotada a una ciudad que conecta `CLIENT`, `PROVIDER`, `RUNNER` y `ADMIN` a través de un frontend localizado en Next.js y un backend NestJS.
+Mecerka es una plataforma de comercio local organizada por circuitos urbanos de proximidad que conecta `CLIENT`, `PROVIDER`, `RUNNER` y `ADMIN` a través de un frontend localizado en Next.js y un backend NestJS.
 
 La implementación actual no separa demo y producción en aplicaciones distintas. Existe una sola aplicación, una sola API y una sola base de código, desplegadas en entornos aislados con datos, secretos y configuración de ejecución diferentes.
 

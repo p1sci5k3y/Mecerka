@@ -4,7 +4,7 @@ Fecha de actualización: `28/03/2026`
 
 ## Resumen Ejecutivo
 
-Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor en una ciudad, con despliegue dual `prod + demo`, una superficie frontend muy defendida por tests y un backend que vuelve a combinar amplitud de suites con cobertura global alta.
+Mecerka está en un estado `implementado y demostrable` para su circuito principal de marketplace multi-proveedor y ya enseña en demo varios circuitos urbanos de comercio local, con despliegue dual `prod + demo`, una superficie frontend muy defendida por tests y un backend que vuelve a combinar amplitud de suites con cobertura global alta.
 
 El proyecto ya no está en fase de construir infraestructura base. El trabajo de mayor retorno ahora consiste en cerrar agujeros de continuidad de negocio y experiencia visible, no en añadir capas técnicas nuevas.
 
@@ -14,6 +14,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - `Frontend`: funcional, con cobertura alta y defensa fuerte de flujos críticos.
 - `Deploy`: dual environment operativo con `mecerka.me` y `demo.mecerka.me`.
 - `Demo`: misma app y misma lógica que producción, con dataset demo y modo de pago fake cuando Stripe está en modo dummy.
+- `Demo dataset`: ecosistema multi-ciudad con providers, runners y catálogo alimentario y no alimentario.
 - `Documentación`: README, wiki y diagramas reajustados al modelo actual del sistema, incluyendo E/R y DFDs derivados del schema Prisma vigente.
 
 ## Métricas Verificadas
@@ -88,6 +89,7 @@ El proyecto ya no está en fase de construir infraestructura base. El trabajo de
 - lifecycle de pedido, provider order y runner
 - Stripe Connect / split payments
 - modo demo con dataset reseteable y credenciales compartidas
+- modo demo con dataset multi-ciudad en `Toledo`, `Madrid`, `Valencia`, `Sevilla` y `Bilbao`
 - deploy dual con runtime config aislado por host
 - configuración `SMTP` y `AWS SES` persistible vía `SystemSetting`, con secretos cifrados en reposo
 - clave maestra compartida `SYSTEM_SETTINGS_MASTER_KEY` inyectada en ambos stacks de despliegue
@@ -120,6 +122,7 @@ Lectura honesta:
 - finanzas de provider y runner con lectura honesta de Stripe Connect y siguiente acción priorizada
 - pago demo explícito para provider/runner cuando Stripe está en modo dummy
 - tracking soportando pedidos UUID reales con timeline, salud operativa, siguiente paso y ETA orientativa
+- demo pública ampliada con ciudades, providers, runners y catálogos que permiten enseñar el ciclo completo sin depender de un solo vertical alimentario
 - soporte visible para cliente/provider/runner y admin
 - panel admin de correo con conectores `SMTP` / `AWS SES`, secretos cifrados y formulario oculto hasta iniciar nueva conexión o reconfiguración
 
