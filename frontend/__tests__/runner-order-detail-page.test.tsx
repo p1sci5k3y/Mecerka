@@ -165,7 +165,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(getDeliveryOrderRefundsMock).toHaveBeenCalledWith("delivery-1")
     expect(screen.getByText("Cerámica Norte")).toBeInTheDocument()
     expect(screen.getByText("Calle Feria 12")).toBeInTheDocument()
-    expect(screen.getByTestId("runner-delivery-map")).toBeInTheDocument()
+    expect(await screen.findByTestId("runner-delivery-map")).toBeInTheDocument()
     expect(screen.getAllByText("Pago pendiente")).toHaveLength(2)
     expect(screen.getByText("El cliente reportó retraso")).toBeInTheDocument()
     expect(screen.getByText("DELIVERY_PARTIAL")).toBeInTheDocument()
@@ -177,12 +177,14 @@ describe("RunnerOrderDetailPage", () => {
       "href",
       "/runner/support",
     )
-    expect(dynamicDeliveryMapMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderId: "order-1",
-        isRunner: true,
-      }),
-    )
+    await waitFor(() => {
+      expect(dynamicDeliveryMapMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderId: "order-1",
+          isRunner: true,
+        }),
+      )
+    })
   })
 
   it("shows a safe error state when the delivery cannot be loaded", async () => {
@@ -240,7 +242,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(screen.getByText("2")).toBeInTheDocument()
     expect(screen.getAllByText("0")).toHaveLength(2)
     expect(screen.queryByText("Textil Sur")).not.toBeInTheDocument()
-    expect(screen.getByTestId("runner-delivery-map")).toBeInTheDocument()
+    expect(await screen.findByTestId("runner-delivery-map")).toBeInTheDocument()
   })
 
   it("does not query incidents or refunds when the order has no delivery order", async () => {

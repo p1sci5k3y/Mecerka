@@ -109,3 +109,7 @@ export function getTrackingBaseUrl() {
     ? apiBaseUrl.slice(0, -4)
     : apiBaseUrl.replace(/\/$/, "")
 }
+
+export function getRoutingBaseUrl() {
+  return process.env.NEXT_PUBLIC_ROUTING_BASE_URL || "https://router.project-osrm.org"
+}

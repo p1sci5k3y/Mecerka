@@ -60,6 +60,7 @@ vi.mock("@/lib/services/orders-service", () => ({
 
 vi.mock("@/lib/runtime-config", () => ({
   getTrackingBaseUrl: () => "https://demo.mecerka.me",
+  getRoutingBaseUrl: () => "https://router.project-osrm.org",
 }))
 
 describe("DeliveryMap", () => {
@@ -90,8 +91,46 @@ describe("DeliveryMap", () => {
       updatedAt: null,
     })
 
-    global.fetch = vi.fn().mockResolvedValue({
-      json: async () => [{ lat: "40.4168", lon: "-3.7038" }],
+    global.fetch = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes("/route/v1/driving/")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            routes: [
+              {
+                distance: 4200,
+                duration: 840,
+                geometry: {
+                  coordinates: [
+                    [-3.7038, 40.4168],
+                    [-3.61, 40.51],
+                  ],
+                },
+              },
+            ],
+          }),
+        })
+      }
+
+      if (url.includes("Sevilla%2C%20Spain")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ lat: "40.4168", lon: "-3.7038" }],
+        })
+      }
+
+      if (url.includes("Calle%20Mayor%201%2C%20Spain")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [{ lat: "40.5100", lon: "-3.6100" }],
+        })
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => [{ lat: "40.4168", lon: "-3.7038" }],
+      })
     }) as unknown as typeof fetch
 
     Object.defineProperty(globalThis.navigator, "geolocation", {
@@ -126,6 +165,10 @@ describe("DeliveryMap", () => {
     expect(screen.getByText(/Destino \(Calle Mayor 1\)/)).toBeInTheDocument()
     expect(screen.getByText("Runner Uno")).toBeInTheDocument()
     expect(screen.getByText(/ETA orientativa/i)).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText("14 min aprox.")).toBeInTheDocument()
+    })
   })
 
   it("lets the runner start GPS tracking and emits live location updates", async () => {
@@ -199,6 +242,10 @@ describe("DeliveryMap", () => {
 
     expect(screen.getByText("Runner Uno")).toBeInTheDocument()
     expect(screen.getByText(/^\d{2}:\d{2}$/)).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByText("14 min aprox.")).toBeInTheDocument()
+    })
   })
 
   it("keeps the runner GPS action disabled once the route is already closed", async () => {

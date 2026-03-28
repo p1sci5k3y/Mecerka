@@ -7,7 +7,7 @@ import L from 'leaflet';
 import io, { Socket } from 'socket.io-client';
 import { ordersService } from '@/lib/services/orders-service';
 import { Play, Square, MapPin } from 'lucide-react';
-import { getTrackingBaseUrl } from '@/lib/runtime-config';
+import { getRoutingBaseUrl, getTrackingBaseUrl } from '@/lib/runtime-config';
 
 type LeafletDefaultIconPrototype = typeof L.Icon.Default.prototype & {
     _getIconUrl?: unknown;
@@ -66,6 +66,12 @@ function formatEtaLabel(distanceKm: number | null) {
     return `${minutes} min aprox.`;
 }
 
+type RouteProjection = {
+    coordinates: [number, number][];
+    distanceKm: number;
+    etaMinutes: number;
+};
+
 function formatLastUpdateLabel(updatedAt: string | null) {
     if (!updatedAt) return 'Sin señal todavía';
     return new Date(updatedAt).toLocaleTimeString('es-ES', {
@@ -96,6 +102,46 @@ async function geocode(address: string, fallbackLat: number, fallbackLng: number
         console.error("Geocoding failed for", address);
     }
     return { lat: fallbackLat, lng: fallbackLng };
+}
+
+async function fetchProjectedRoute(
+    start: { lat: number; lng: number },
+    end: { lat: number; lng: number },
+): Promise<RouteProjection | null> {
+    try {
+        const routeUrl =
+            `${getRoutingBaseUrl().replace(/\/$/, '')}/route/v1/driving/` +
+            `${start.lng},${start.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
+        const res = await fetch(routeUrl);
+        if (!res.ok) {
+            throw new Error(`Route service unavailable (${res.status})`);
+        }
+
+        const data = await res.json() as {
+            routes?: Array<{
+                distance?: number;
+                duration?: number;
+                geometry?: {
+                    coordinates?: Array<[number, number]>;
+                };
+            }>;
+        };
+
+        const route = data.routes?.[0];
+        const geometry = route?.geometry?.coordinates;
+        if (!route || !geometry || geometry.length === 0) {
+            return null;
+        }
+
+        return {
+            coordinates: geometry.map(([lng, lat]) => [lat, lng]),
+            distanceKm: (route.distance ?? 0) / 1000,
+            etaMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)),
+        };
+    } catch (error) {
+        console.error('Route projection failed', error);
+        return null;
+    }
 }
 
 export interface DeliveryMapProps {
@@ -134,6 +180,9 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
     const [trackingStatus, setTrackingStatus] = useState<string | null>(null);
     const [runnerName, setRunnerName] = useState<string | null>(null);
     const [lastUpdateAt, setLastUpdateAt] = useState<string | null>(null);
+    const [projectedRoute, setProjectedRoute] = useState<[number, number][]>([]);
+    const [routeDistanceKm, setRouteDistanceKm] = useState<number | null>(null);
+    const [routeEtaMinutes, setRouteEtaMinutes] = useState<number | null>(null);
 
     // Tracker State
     const [isTracking, setIsTracking] = useState(false);
@@ -145,9 +194,11 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
         trackingStatus === 'IN_TRANSIT' ||
         trackingStatus === null;
     const remainingDistanceKm = useMemo(() => {
+        if (routeDistanceKm != null) return routeDistanceKm;
         if (!destination) return null;
         return calculateDistanceKm(position.lat, position.lng, destination.lat, destination.lng);
-    }, [destination, position.lat, position.lng]);
+    }, [destination, position.lat, position.lng, routeDistanceKm]);
+    const etaLabel = routeEtaMinutes != null ? `${routeEtaMinutes} min aprox.` : formatEtaLabel(remainingDistanceKm);
 
     // Initial Load & Socket Setup
     useEffect(() => {
@@ -229,6 +280,44 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
         };
     }, [initialLat, initialLng, orderId]);
 
+    useEffect(() => {
+        if (!destination) {
+            setProjectedRoute([]);
+            setRouteDistanceKm(null);
+            setRouteEtaMinutes(null);
+            return;
+        }
+
+        const start =
+            routeHistory.length > 0
+                ? { lat: position.lat, lng: position.lng }
+                : origin
+                    ? { lat: origin.lat, lng: origin.lng }
+                    : { lat: position.lat, lng: position.lng };
+
+        let cancelled = false;
+        void fetchProjectedRoute(start, destination).then((projection) => {
+            if (cancelled) return;
+            if (projection) {
+                setProjectedRoute(projection.coordinates);
+                setRouteDistanceKm(projection.distanceKm);
+                setRouteEtaMinutes(projection.etaMinutes);
+                return;
+            }
+
+            setProjectedRoute([
+                [start.lat, start.lng],
+                [destination.lat, destination.lng],
+            ]);
+            setRouteDistanceKm(calculateDistanceKm(start.lat, start.lng, destination.lat, destination.lng));
+            setRouteEtaMinutes(null);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [destination, origin, position.lat, position.lng, routeHistory.length]);
+
     const toggleTracking = () => {
         if (!runnerCanTransmit) {
             setError('La ruta no está en una fase operativa que permita emitir GPS.');
@@ -309,7 +398,7 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                     </div>
                     <div>
                         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">ETA orientativa</p>
-                        <p className="text-sm font-semibold text-foreground">{formatEtaLabel(remainingDistanceKm)}</p>
+                        <p className="text-sm font-semibold text-foreground">{etaLabel}</p>
                     </div>
                     <div>
                         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Distancia restante</p>
@@ -375,9 +464,9 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                         <Polyline positions={routeHistory} color="#df795d" weight={5} opacity={0.8} />
                     )}
 
-                    {routeHistory.length === 0 && origin && destination && (
+                    {routeHistory.length === 0 && projectedRoute.length > 0 && (
                         <Polyline
-                            positions={[[origin.lat, origin.lng], [destination.lat, destination.lng]]}
+                            positions={projectedRoute}
                             color="#94a3b8"
                             weight={3}
                             dashArray="8, 8"
@@ -386,8 +475,8 @@ export default function DeliveryMap({ orderId, initialLat = 40.4168, initialLng 
                     )}
 
                     {/* Projected Line To Destination */}
-                    {destination && position && (routeHistory.length > 0 || isTracking) && (
-                        <Polyline positions={[[position.lat, position.lng], [destination.lat, destination.lng]]} color="#81A16C" weight={3} dashArray="10, 10" opacity={0.6} />
+                    {projectedRoute.length > 1 && (routeHistory.length > 0 || isTracking) && (
+                        <Polyline positions={projectedRoute} color="#81A16C" weight={3} dashArray="10, 10" opacity={0.6} />
                     )}
 
                     {(routeHistory.length > 0 || isTracking) && (
