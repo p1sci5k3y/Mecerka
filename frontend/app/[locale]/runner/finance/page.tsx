@@ -9,9 +9,15 @@ import { Link } from "@/lib/navigation"
 import { getApiBaseUrl } from "@/lib/runtime-config"
 import { deliveryIncidentsService } from "@/lib/services/delivery-incidents-service"
 import { ordersService } from "@/lib/services/orders-service"
+import { paymentsService } from "@/lib/services/payments-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
-import type { DeliveryIncidentSummary, Order, RefundSummary } from "@/lib/types"
+import type {
+  DeliveryIncidentSummary,
+  Order,
+  PaymentConnectStatusSummary,
+  RefundSummary,
+} from "@/lib/types"
 import {
   AlertCircle,
   ArrowRight,
@@ -60,14 +66,43 @@ export default function RunnerFinancePage() {
 }
 
 function RunnerFinanceContent() {
-  const { user } = useAuth()
+  useAuth()
   const [orders, setOrders] = useState<RunnerOrderWithSupport[]>([])
+  const [connectStatus, setConnectStatus] = useState<PaymentConnectStatusSummary | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const connectTitle =
+    connectStatus?.status === "READY"
+      ? "Cuenta Stripe lista"
+      : connectStatus?.status === "REVIEW_REQUIRED"
+        ? "Cuenta Stripe con revisión pendiente"
+        : connectStatus?.status === "ONBOARDING_REQUIRED"
+          ? "Onboarding Stripe pendiente"
+          : "Stripe Connect"
+
+  const connectMessage =
+    connectStatus?.status === "READY"
+      ? "Tu cuenta está conectada, activa y preparada para liquidar repartos reales."
+      : connectStatus?.status === "REVIEW_REQUIRED"
+        ? "Stripe ya conoce tu cuenta, pero todavía hay restricciones o validaciones pendientes antes de poder cobrar con normalidad."
+        : connectStatus?.status === "ONBOARDING_REQUIRED"
+          ? "Tu cuenta Stripe existe, pero aún no has completado todos los datos necesarios para cobrar repartos."
+          : "Sin Stripe Connect no puedes recibir liquidaciones reales del reparto. Primero conecta tu cuenta y luego vuelve a este centro."
+
+  const connectActionLabel =
+    connectStatus?.status === "REVIEW_REQUIRED"
+      ? "Revisar cuenta en Stripe"
+      : connectStatus?.status === "ONBOARDING_REQUIRED"
+        ? "Completar onboarding"
+        : "Conectar con Stripe"
 
   useEffect(() => {
     async function loadData() {
       try {
-        const data = await ordersService.getAll()
+        const [data, stripeStatus] = await Promise.all([
+          ordersService.getAll(),
+          paymentsService.getConnectStatus().catch(() => null),
+        ])
         const deliveryOrders = data.filter((order) => order.deliveryOrder)
         const withSupport = await Promise.all(
           deliveryOrders.map(async (order) => {
@@ -93,6 +128,7 @@ function RunnerFinanceContent() {
           }),
         )
         setOrders(withSupport)
+        setConnectStatus(stripeStatus)
       } catch (error) {
         console.error("Error loading runner finance center:", error)
         setOrders([])
@@ -224,30 +260,80 @@ function RunnerFinanceContent() {
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-3">
                 <h2 className="text-xl font-bold text-foreground">Stripe Connect</h2>
-                {user?.stripeAccountId ? (
+                {connectStatus?.status === "READY" ? (
                   <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                     <p>
-                      Tu cuenta está conectada. Los cobros del runner se pueden liquidar a tu cuenta Stripe Connect cuando el reparto queda pagado.
+                      {connectMessage}
                     </p>
+                  </div>
+                ) : connectStatus?.status === "REVIEW_REQUIRED" ? (
+                  <div className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="space-y-2">
+                      <p>{connectMessage}</p>
+                      {connectStatus.requirementsDisabledReason ? (
+                        <p className="text-xs font-medium uppercase tracking-wider text-rose-700">
+                          Motivo de bloqueo: {connectStatus.requirementsDisabledReason}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : connectStatus?.status === "ONBOARDING_REQUIRED" ? (
+                  <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div className="space-y-2">
+                      <p>{connectMessage}</p>
+                      {connectStatus.requirementsDue.length > 0 ? (
+                        <p className="text-xs text-amber-800">
+                          Requisitos pendientes: {connectStatus.requirementsDue.slice(0, 3).join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                     <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
                     <p>
-                      Sin Stripe Connect no puedes recibir liquidaciones reales del reparto. Primero conecta tu cuenta y luego vuelve a este centro.
+                      {connectMessage}
                     </p>
                   </div>
                 )}
               </div>
 
-              {!user?.stripeAccountId ? (
+              {connectStatus?.status !== "READY" ? (
                 <Button onClick={handleStripeConnect}>
                   <CreditCard className="mr-2 h-4 w-4" />
-                  Conectar con Stripe
+                  {connectActionLabel}
                 </Button>
               ) : null}
             </div>
+            {connectStatus ? (
+              <div className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-4">
+                <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Estado</p>
+                  <p className="mt-2 font-semibold text-foreground">{connectTitle}</p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Cobros</p>
+                  <p className="mt-2 font-semibold text-foreground">
+                    {connectStatus.chargesEnabled ? "Habilitados" : "Pendientes"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Payouts</p>
+                  <p className="mt-2 font-semibold text-foreground">
+                    {connectStatus.payoutsEnabled ? "Habilitados" : "Pendientes"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider">Cuenta activa</p>
+                  <p className="mt-2 font-semibold text-foreground">
+                    {connectStatus.paymentAccountActive ? "Activa" : "Pendiente"}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </section>
 
           <section className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">

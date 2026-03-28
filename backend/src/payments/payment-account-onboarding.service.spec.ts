@@ -17,7 +17,10 @@ describe('PaymentAccountOnboardingService', () => {
     };
   };
   let configServiceMock: { get: jest.Mock };
-  let paymentAccountRepositoryMock: { upsert: jest.Mock };
+  let paymentAccountRepositoryMock: {
+    upsert: jest.Mock;
+    findActive: jest.Mock;
+  };
   let stripeAccountsCreate: jest.Mock;
   let stripeAccountsRetrieve: jest.Mock;
   let stripeAccountLinksCreate: jest.Mock;
@@ -38,6 +41,7 @@ describe('PaymentAccountOnboardingService', () => {
     };
     paymentAccountRepositoryMock = {
       upsert: jest.fn(),
+      findActive: jest.fn(),
     };
     stripeAccountsCreate = jest.fn();
     stripeAccountsRetrieve = jest.fn();
@@ -136,6 +140,138 @@ describe('PaymentAccountOnboardingService', () => {
 
     expect(stripeAccountsCreate).not.toHaveBeenCalled();
     expect(stripeAccountLinksCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns not connected status when the runner has not started onboarding yet', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'runner-1',
+      email: 'runner@example.test',
+      roles: [Role.RUNNER],
+      stripeAccountId: null,
+    });
+
+    await expect(service.getConnectStatus('runner-1')).resolves.toEqual({
+      provider: 'STRIPE',
+      ownerType: PaymentAccountOwnerType.RUNNER,
+      status: 'NOT_CONNECTED',
+      accountId: null,
+      configured: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
+    });
+
+    expect(stripeAccountsRetrieve).not.toHaveBeenCalled();
+    expect(paymentAccountRepositoryMock.findActive).not.toHaveBeenCalled();
+  });
+
+  it('returns onboarding required status when Stripe still has pending requirements', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'runner-1',
+      email: 'runner@example.test',
+      roles: [Role.RUNNER],
+      stripeAccountId: 'acct_runner_1',
+    });
+    stripeAccountsRetrieve.mockResolvedValue({
+      id: 'acct_runner_1',
+      details_submitted: false,
+      charges_enabled: false,
+      payouts_enabled: false,
+      requirements: {
+        currently_due: ['external_account', 'business_profile.url'],
+        disabled_reason: null,
+      },
+    });
+    paymentAccountRepositoryMock.findActive.mockResolvedValue(null);
+
+    await expect(service.getConnectStatus('runner-1')).resolves.toEqual({
+      provider: 'STRIPE',
+      ownerType: PaymentAccountOwnerType.RUNNER,
+      status: 'ONBOARDING_REQUIRED',
+      accountId: 'acct_runner_1',
+      configured: true,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: ['external_account', 'business_profile.url'],
+      requirementsDisabledReason: null,
+    });
+  });
+
+  it('returns ready status when Stripe and the payment account are fully active', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'runner-1',
+      email: 'runner@example.test',
+      roles: [Role.RUNNER],
+      stripeAccountId: 'acct_runner_1',
+    });
+    stripeAccountsRetrieve.mockResolvedValue({
+      id: 'acct_runner_1',
+      details_submitted: true,
+      charges_enabled: true,
+      payouts_enabled: true,
+      requirements: {
+        currently_due: [],
+        disabled_reason: null,
+      },
+    });
+    paymentAccountRepositoryMock.findActive.mockResolvedValue({
+      id: 'payment-account-1',
+    });
+
+    await expect(service.getConnectStatus('runner-1')).resolves.toEqual({
+      provider: 'STRIPE',
+      ownerType: PaymentAccountOwnerType.RUNNER,
+      status: 'READY',
+      accountId: 'acct_runner_1',
+      configured: true,
+      detailsSubmitted: true,
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      paymentAccountActive: true,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
+    });
+  });
+
+  it('returns review required status when Stripe is submitted but payouts are still restricted', async () => {
+    prismaMock.user.findUnique.mockResolvedValue({
+      id: 'runner-1',
+      email: 'runner@example.test',
+      roles: [Role.RUNNER],
+      stripeAccountId: 'acct_runner_1',
+    });
+    stripeAccountsRetrieve.mockResolvedValue({
+      id: 'acct_runner_1',
+      details_submitted: true,
+      charges_enabled: true,
+      payouts_enabled: false,
+      requirements: {
+        currently_due: [],
+        disabled_reason: 'requirements.past_due',
+      },
+    });
+    paymentAccountRepositoryMock.findActive.mockResolvedValue({
+      id: 'payment-account-1',
+    });
+
+    await expect(service.getConnectStatus('runner-1')).resolves.toEqual({
+      provider: 'STRIPE',
+      ownerType: PaymentAccountOwnerType.RUNNER,
+      status: 'REVIEW_REQUIRED',
+      accountId: 'acct_runner_1',
+      configured: true,
+      detailsSubmitted: true,
+      chargesEnabled: true,
+      payoutsEnabled: false,
+      paymentAccountActive: true,
+      requirementsDue: [],
+      requirementsDisabledReason: 'requirements.past_due',
+    });
   });
 
   it('verifies the connected account and activates the repository record for a runner', async () => {

@@ -1,6 +1,7 @@
 import { api } from "@/lib/api"
 import type {
   OrderProviderPaymentsAggregate,
+  PaymentConnectStatusSummary,
   ProviderOrderPaymentSummary,
   ProviderPaymentSessionSummary,
   RunnerPaymentSessionSummary,
@@ -178,6 +179,10 @@ function mapOrderProviderPaymentsAggregate(
 }
 
 export const paymentsService = {
+  async getConnectStatus() {
+    return api.get<PaymentConnectStatusSummary>("/payments/connect/status")
+  },
+
   async prepareOrderProviderPayments(orderId: string) {
     const data = await api.post<BackendOrderProviderPaymentsAggregate>(
       `/payments/orders/${orderId}/provider-sessions`,

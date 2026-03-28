@@ -7,10 +7,17 @@ const toastErrorMock = vi.fn()
 const useAuthMock = vi.fn()
 const fetchMock = vi.fn()
 const replaceStateMock = vi.fn()
+const getConnectStatusMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
     getAll: (...args: unknown[]) => getAllMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/payments-service", () => ({
+  paymentsService: {
+    getConnectStatus: (...args: unknown[]) => getConnectStatusMock(...args),
   },
 }))
 
@@ -66,6 +73,7 @@ describe("RunnerDashboard component", () => {
     toastErrorMock.mockReset()
     useAuthMock.mockReset()
     fetchMock.mockReset()
+    getConnectStatusMock.mockReset()
 
     vi.stubGlobal("fetch", fetchMock)
     Object.defineProperty(globalThis, "location", {
@@ -77,6 +85,19 @@ describe("RunnerDashboard component", () => {
       value: {
         replaceState: replaceStateMock,
       },
+    })
+    getConnectStatusMock.mockResolvedValue({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "READY",
+      accountId: "acct_runner",
+      configured: true,
+      detailsSubmitted: true,
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      paymentAccountActive: true,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
     })
   })
 
@@ -103,6 +124,7 @@ describe("RunnerDashboard component", () => {
 
     expect(toastSuccessMock).toHaveBeenCalledWith("¡Cuenta de Stripe vinculada con éxito!")
     expect(replaceStateMock).toHaveBeenCalled()
+    expect(screen.getByText(/Tu cuenta Stripe está lista para cobrar/i)).toBeInTheDocument()
     expect(screen.getByText("1")).toBeInTheDocument()
     expect(screen.getByText("€2.00")).toBeInTheDocument()
     expect(screen.getByText("0.5h")).toBeInTheDocument()
@@ -122,6 +144,19 @@ describe("RunnerDashboard component", () => {
         name: "Rider Demo",
         stripeAccountId: null,
       },
+    })
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "NOT_CONNECTED",
+      accountId: null,
+      configured: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
     })
     getAllMock.mockResolvedValueOnce([])
     fetchMock.mockResolvedValueOnce({
@@ -156,6 +191,19 @@ describe("RunnerDashboard component", () => {
       ok: true,
       json: async () => ({ url: "https://evil.example/phish" }),
     })
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "NOT_CONNECTED",
+      accountId: null,
+      configured: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
+    })
     rerender(<RunnerDashboard />)
 
     fireEvent.click(screen.getByRole("button", { name: /Conectar con Stripe/i }))
@@ -164,6 +212,36 @@ describe("RunnerDashboard component", () => {
       expect(toastErrorMock).toHaveBeenCalledWith(
         "No se pudo iniciar la conexión con Stripe.",
       )
+    })
+  })
+
+  it("shows a completion CTA when stripe onboarding is still incomplete", async () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        name: "Rider Demo",
+        stripeAccountId: "acct_runner_pending",
+      },
+    })
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "ONBOARDING_REQUIRED",
+      accountId: "acct_runner_pending",
+      configured: true,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: ["external_account"],
+      requirementsDisabledReason: null,
+    })
+    getAllMock.mockResolvedValueOnce([])
+
+    const { RunnerDashboard } = await import("@/app/[locale]/dashboard/runner-dashboard")
+    render(<RunnerDashboard />)
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Completar onboarding/i })).toBeInTheDocument()
     })
   })
 })

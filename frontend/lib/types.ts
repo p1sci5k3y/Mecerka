@@ -135,6 +135,35 @@ export interface RunnerPaymentSessionSummary {
   paymentStatus: string
 }
 
+export interface PaymentConnectStatusSummary {
+  provider: "STRIPE"
+  ownerType: "PROVIDER" | "RUNNER"
+  status: "NOT_CONNECTED" | "ONBOARDING_REQUIRED" | "REVIEW_REQUIRED" | "READY"
+  accountId: string | null
+  configured: boolean
+  detailsSubmitted: boolean
+  chargesEnabled: boolean
+  payoutsEnabled: boolean
+  paymentAccountActive: boolean
+  requirementsDue: string[]
+  requirementsDisabledReason: string | null
+}
+
+export interface OrderTrackingSnapshot {
+  orderId: string
+  status: string
+  deliveryStatus: string | null
+  runner: {
+    id: string
+    name: string
+  } | null
+  location: {
+    lat: number
+    lng: number
+  } | null
+  updatedAt: string | null
+}
+
 export interface RefundSummary {
   id: string
   orderId?: string | null

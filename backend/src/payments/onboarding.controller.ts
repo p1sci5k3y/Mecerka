@@ -33,6 +33,13 @@ export class OnboardingController {
     return { url };
   }
 
+  @Get('status')
+  @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
+  @Roles(Role.PROVIDER, Role.RUNNER)
+  async getConnectStatus(@Request() req: RequestWithUser) {
+    return this.paymentsService.getConnectStatus(req.user.userId);
+  }
+
   @Get('callback')
   @UseGuards(JwtAuthGuard, MfaCompleteGuard, RolesGuard)
   @Roles(Role.PROVIDER, Role.RUNNER)

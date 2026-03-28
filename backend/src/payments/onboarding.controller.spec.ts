@@ -5,6 +5,7 @@ describe('OnboardingController', () => {
   let controller: OnboardingController;
   let paymentsServiceMock: {
     generateOnboardingLink: jest.Mock;
+    getConnectStatus: jest.Mock;
     verifyAndSaveConnectedAccount: jest.Mock;
   };
 
@@ -13,6 +14,19 @@ describe('OnboardingController', () => {
       generateOnboardingLink: jest
         .fn()
         .mockResolvedValue('https://connect.stripe.test/onboarding'),
+      getConnectStatus: jest.fn().mockResolvedValue({
+        provider: 'STRIPE',
+        ownerType: 'RUNNER',
+        status: 'READY',
+        accountId: 'acct_runner_1',
+        configured: true,
+        detailsSubmitted: true,
+        chargesEnabled: true,
+        payoutsEnabled: true,
+        paymentAccountActive: true,
+        requirementsDue: [],
+        requirementsDisabledReason: null,
+      }),
       verifyAndSaveConnectedAccount: jest.fn().mockResolvedValue(undefined),
     };
     controller = new OnboardingController(paymentsServiceMock as never);
@@ -34,6 +48,17 @@ describe('OnboardingController', () => {
     expect(result).toEqual({
       url: 'https://connect.stripe.test/onboarding',
     });
+  });
+
+  it('delegates connect status lookup for the authenticated user', async () => {
+    const req = { user: { userId: 'runner-1' } };
+
+    const result = await controller.getConnectStatus(req as never);
+
+    expect(paymentsServiceMock.getConnectStatus).toHaveBeenCalledWith(
+      'runner-1',
+    );
+    expect(result.status).toBe('READY');
   });
 
   it('rejects callback requests without accountId', async () => {

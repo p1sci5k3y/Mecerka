@@ -8,10 +8,17 @@ const fetchMock = vi.fn()
 const toastErrorMock = vi.fn()
 const listDeliveryOrderIncidentsMock = vi.fn()
 const getDeliveryOrderRefundsMock = vi.fn()
+const getConnectStatusMock = vi.fn()
 
 vi.mock("@/lib/services/orders-service", () => ({
   ordersService: {
     getAll: (...args: unknown[]) => getAllMock(...args),
+  },
+}))
+
+vi.mock("@/lib/services/payments-service", () => ({
+  paymentsService: {
+    getConnectStatus: (...args: unknown[]) => getConnectStatusMock(...args),
   },
 }))
 
@@ -98,6 +105,7 @@ describe("Runner finance page", () => {
     toastErrorMock.mockReset()
     listDeliveryOrderIncidentsMock.mockReset()
     getDeliveryOrderRefundsMock.mockReset()
+    getConnectStatusMock.mockReset()
     vi.stubGlobal("fetch", fetchMock)
     useAuthMock.mockReturnValue({
       user: {
@@ -108,6 +116,19 @@ describe("Runner finance page", () => {
         mfaEnabled: true,
         hasPin: true,
       },
+    })
+    getConnectStatusMock.mockResolvedValue({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "READY",
+      accountId: "acct_runner_123",
+      configured: true,
+      detailsSubmitted: true,
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      paymentAccountActive: true,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
     })
   })
 
@@ -174,7 +195,9 @@ describe("Runner finance page", () => {
     expect(screen.getByText("Importe visible cobrado")).toBeInTheDocument()
     expect(screen.getByText("Incidencias visibles")).toBeInTheDocument()
     expect(screen.getByText("Devoluciones visibles")).toBeInTheDocument()
-    expect(screen.getByText(/Tu cuenta está conectada/i)).toBeInTheDocument()
+    expect(screen.getByText(/Tu cuenta está conectada, activa y preparada/i)).toBeInTheDocument()
+    expect(screen.getByText("Cuenta activa")).toBeInTheDocument()
+    expect(screen.getAllByText("Habilitados")).toHaveLength(2)
     expect(screen.getByText("Cobrado")).toBeInTheDocument()
     expect(screen.getByText("Sesion lista")).toBeInTheDocument()
     expect(screen.getByText(/Soporte visible:\s*1 devoluciones · 1 incidencias/i)).toBeInTheDocument()
@@ -203,15 +226,18 @@ describe("Runner finance page", () => {
   })
 
   it("shows the stripe connect CTA when the runner is not connected yet", async () => {
-    useAuthMock.mockReturnValue({
-      user: {
-        userId: "runner-1",
-        name: "Rider Local",
-        roles: ["RUNNER"],
-        stripeAccountId: null,
-        mfaEnabled: true,
-        hasPin: true,
-      },
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "NOT_CONNECTED",
+      accountId: null,
+      configured: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
     })
     getAllMock.mockResolvedValueOnce([])
     listDeliveryOrderIncidentsMock.mockResolvedValue([])
@@ -227,16 +253,48 @@ describe("Runner finance page", () => {
     expect(screen.getByRole("button", { name: /Conectar con Stripe/i })).toBeInTheDocument()
   })
 
+  it("shows a completion CTA when Stripe onboarding exists but is still incomplete", async () => {
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "ONBOARDING_REQUIRED",
+      accountId: "acct_runner_pending",
+      configured: true,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: ["external_account"],
+      requirementsDisabledReason: null,
+    })
+    getAllMock.mockResolvedValueOnce([])
+    listDeliveryOrderIncidentsMock.mockResolvedValue([])
+    getDeliveryOrderRefundsMock.mockResolvedValue([])
+
+    const Page = (await import("@/app/[locale]/runner/finance/page")).default
+    render(<Page />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/onboarding stripe pendiente/i)).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole("button", { name: /Completar onboarding/i })).toBeInTheDocument()
+    expect(screen.getByText(/Requisitos pendientes: external_account/i)).toBeInTheDocument()
+  })
+
   it("opens Stripe Connect only for a safe URL, and keeps the empty-state visible", async () => {
-    useAuthMock.mockReturnValue({
-      user: {
-        userId: "runner-1",
-        name: "Rider Local",
-        roles: ["RUNNER"],
-        stripeAccountId: null,
-        mfaEnabled: true,
-        hasPin: true,
-      },
+    getConnectStatusMock.mockResolvedValueOnce({
+      provider: "STRIPE",
+      ownerType: "RUNNER",
+      status: "NOT_CONNECTED",
+      accountId: null,
+      configured: false,
+      detailsSubmitted: false,
+      chargesEnabled: false,
+      payoutsEnabled: false,
+      paymentAccountActive: false,
+      requirementsDue: [],
+      requirementsDisabledReason: null,
     })
     getAllMock.mockResolvedValueOnce([])
     listDeliveryOrderIncidentsMock.mockResolvedValue([])
@@ -283,6 +341,7 @@ describe("Runner finance page", () => {
   it("degrades safely when the main runner finance load fails", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined)
     getAllMock.mockRejectedValueOnce(new Error("finance down"))
+    getConnectStatusMock.mockResolvedValueOnce(null)
 
     const Page = (await import("@/app/[locale]/runner/finance/page")).default
     render(<Page />)

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ordersService } from '@/lib/services/orders-service';
+import { paymentsService } from '@/lib/services/payments-service';
 import { useAuth } from '@/contexts/auth-context';
-import type { Order, OrderItem } from '@/lib/types';
+import type { Order, OrderItem, PaymentConnectStatusSummary } from '@/lib/types';
 import { Loader2, Route, CheckCircle, Clock, Navigation, MapPin, Truck, CheckCircle2, Package, CreditCard, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -11,15 +12,20 @@ export function RunnerDashboard() {
     const { user } = useAuth();
     const [activeOrders, setActiveOrders] = useState<Order[]>([]);
     const [completedOrders, setCompletedOrders] = useState<Order[]>([]);
+    const [connectStatus, setConnectStatus] = useState<PaymentConnectStatusSummary | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function loadData() {
             if (!user) return;
             try {
-                const data = await ordersService.getAll(); // Filtered by runnerId in backend
+                const [data, stripeStatus] = await Promise.all([
+                    ordersService.getAll(),
+                    paymentsService.getConnectStatus().catch(() => null),
+                ]);
                 setActiveOrders(data.filter((order) => order.status !== 'DELIVERED'));
                 setCompletedOrders(data.filter((order) => order.status === 'DELIVERED'));
+                setConnectStatus(stripeStatus);
             } catch (error) {
                 console.error('Error loading runner dashboard:', error);
             } finally {
@@ -84,6 +90,13 @@ export function RunnerDashboard() {
 
     const activeStop = activeOrders.length > 0 ? activeOrders[0] : null;
 
+    const connectCtaLabel =
+        connectStatus?.status === 'REVIEW_REQUIRED'
+            ? 'Revisar cuenta en Stripe'
+            : connectStatus?.status === 'ONBOARDING_REQUIRED'
+                ? 'Completar onboarding'
+                : 'Conectar con Stripe';
+
     const handleMarkDelivered = async () => {
         // In a real app we'd call an endpoint like completed
         // await ordersService.completeOrder(activeStop.id);
@@ -110,15 +123,25 @@ export function RunnerDashboard() {
             <div className="bg-white dark:bg-[#201512]/50 rounded-xl p-8 shadow-sm border border-[#df795d]/10 mb-8 overflow-hidden relative">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative z-10">
                     <div className="flex gap-4 items-start">
-                        <div className={`p-3 rounded-full ${user?.stripeAccountId ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                        <div className={`p-3 rounded-full ${connectStatus?.status === 'READY' ? 'bg-emerald-100 text-emerald-600' : connectStatus?.status === 'REVIEW_REQUIRED' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'}`}>
                             <CreditCard className="w-6 h-6" />
                         </div>
                         <div>
                             <h2 className="text-slate-900 dark:text-slate-100 text-xl font-serif font-bold">Cobros y Depósitos Automáticos</h2>
-                            {user?.stripeAccountId ? (
+                            {connectStatus?.status === 'READY' ? (
                                 <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
                                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                    Tu cuenta bancaria está conectada y verificada. Recibirás en ella el pago de todos tus viajes (liquidación 50/50 Cliente-Restaurante).
+                                    Tu cuenta Stripe está lista para cobrar y liquidar repartos reales.
+                                </p>
+                            ) : connectStatus?.status === 'REVIEW_REQUIRED' ? (
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-rose-500" />
+                                    Stripe tiene tu cuenta registrada, pero todavía hay bloqueos o revisiones pendientes antes de habilitar payouts.
+                                </p>
+                            ) : connectStatus?.status === 'ONBOARDING_REQUIRED' ? (
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
+                                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                                    Ya existe una cuenta Connect, pero aún no has completado todos los datos necesarios para cobrar.
                                 </p>
                             ) : (
                                 <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-2">
@@ -126,11 +149,24 @@ export function RunnerDashboard() {
                                     Es obligatorio conectar tu cuenta bancaria (Stripe) para poder recibir el dinero de los viajes que realices.
                                 </p>
                             )}
+                            {connectStatus ? (
+                                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                                    <span className="rounded-full border border-border bg-background px-3 py-1">
+                                        Cobros: {connectStatus.chargesEnabled ? 'OK' : 'pendientes'}
+                                    </span>
+                                    <span className="rounded-full border border-border bg-background px-3 py-1">
+                                        Payouts: {connectStatus.payoutsEnabled ? 'OK' : 'pendientes'}
+                                    </span>
+                                    <span className="rounded-full border border-border bg-background px-3 py-1">
+                                        Cuenta activa: {connectStatus.paymentAccountActive ? 'sí' : 'no'}
+                                    </span>
+                                </div>
+                            ) : null}
                         </div>
                     </div>
-                    {!user?.stripeAccountId && (
+                    {connectStatus?.status !== 'READY' && (
                         <Button onClick={handleStripeConnect} className="bg-[#df795d] hover:bg-[#c96a51] text-white whitespace-nowrap">
-                            Conectar con Stripe
+                            {connectCtaLabel}
                         </Button>
                     )}
                 </div>

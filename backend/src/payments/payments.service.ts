@@ -190,6 +190,10 @@ export class PaymentsService {
     return this.paymentAccountOnboardingService.generateOnboardingLink(userId);
   }
 
+  async getConnectStatus(userId: string) {
+    return this.paymentAccountOnboardingService.getConnectStatus(userId);
+  }
+
   /**
    * Verifies if the Stripe Account is fully setup and active after OAuth callback.
    */
