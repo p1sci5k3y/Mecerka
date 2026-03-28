@@ -2,12 +2,16 @@ import { ConfigService } from '@nestjs/config';
 import { EmailSecretsCryptoService } from './email-secrets-crypto.service';
 
 describe('EmailSecretsCryptoService', () => {
-  function makeService(secret = 'jwt-secret-for-tests') {
+  function makeService(secret = 'jwt-secret-for-tests', nodeEnv = 'test') {
     return new EmailSecretsCryptoService({
       get: jest.fn((key: string) =>
-        key === 'SYSTEM_SETTINGS_MASTER_KEY' || key === 'JWT_SECRET'
+        key === 'SYSTEM_SETTINGS_MASTER_KEY'
           ? secret
-          : undefined,
+          : key === 'JWT_SECRET'
+            ? secret
+            : key === 'NODE_ENV'
+              ? nodeEnv
+              : undefined,
       ),
     } as unknown as ConfigService);
   }
@@ -48,11 +52,12 @@ describe('EmailSecretsCryptoService', () => {
     ).toBe(false);
   });
 
-  it('falls back to JWT_SECRET when SYSTEM_SETTINGS_MASTER_KEY is absent', () => {
+  it('falls back to JWT_SECRET outside production when SYSTEM_SETTINGS_MASTER_KEY is absent', () => {
     const service = new EmailSecretsCryptoService({
       get: jest.fn((key: string) => {
         if (key === 'SYSTEM_SETTINGS_MASTER_KEY') return undefined;
         if (key === 'JWT_SECRET') return 'jwt-only-secret';
+        if (key === 'NODE_ENV') return 'test';
         return undefined;
       }),
     } as unknown as ConfigService);
@@ -108,6 +113,26 @@ describe('EmailSecretsCryptoService', () => {
     );
 
     process.env.JWT_SECRET = originalJwtSecret;
+    process.env.SYSTEM_SETTINGS_MASTER_KEY = originalMasterKey;
+  });
+
+  it('requires SYSTEM_SETTINGS_MASTER_KEY in production even if JWT_SECRET exists', () => {
+    const originalMasterKey = process.env.SYSTEM_SETTINGS_MASTER_KEY;
+    delete process.env.SYSTEM_SETTINGS_MASTER_KEY;
+
+    const service = new EmailSecretsCryptoService({
+      get: jest.fn((key: string) => {
+        if (key === 'SYSTEM_SETTINGS_MASTER_KEY') return undefined;
+        if (key === 'JWT_SECRET') return 'jwt-only-secret';
+        if (key === 'NODE_ENV') return 'production';
+        return undefined;
+      }),
+    } as unknown as ConfigService);
+
+    expect(() => service.encryptJson({ connectorType: 'SMTP' })).toThrow(
+      'SYSTEM_SETTINGS_MASTER_KEY is required in production',
+    );
+
     process.env.SYSTEM_SETTINGS_MASTER_KEY = originalMasterKey;
   });
 });

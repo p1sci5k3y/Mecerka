@@ -1,50 +1,51 @@
 # Puesta En Marcha
 
-This guide reflects the current implementation and the shipped repository defaults.
+Esta guía refleja la implementación actual y los defaults que entrega el repositorio.
 
-## 1. Prerequisites
+## 1. Requisitos previos
 
-- Docker and Docker Compose
-- Node.js if you want to run linting or tests outside containers
+- Docker y Docker Compose
+- Node.js si quieres ejecutar linting o tests fuera de contenedores
 
-## 2. Bootstrap the local environment
+## 2. Bootstrap del entorno local
 
-Generate a local `.env` file with secure random secrets:
+Genera un `.env` local con secretos aleatorios seguros:
 
 ```bash
 make setup
 ```
 
-This uses `scripts/bootstrap-env.sh`, which:
+Esto usa `scripts/bootstrap-env.sh`, que:
 
-- creates `.env` only if it does not already exist;
-- generates secrets using `openssl rand`;
-- initializes `JWT_SECRET` and `JWT_SECRET_CURRENT` consistently;
-- generates `FISCAL_PEPPER`;
-- sets `DEMO_MODE=false` by default.
+- crea `.env` solo si todavía no existe;
+- genera secretos con `openssl rand`;
+- inicializa `JWT_SECRET` y `JWT_SECRET_CURRENT` de forma coherente;
+- genera `SYSTEM_SETTINGS_MASTER_KEY` para secretos cifrados persistidos;
+- genera `FISCAL_PEPPER`;
+- fija `DEMO_MODE=false` por defecto.
 
-The repository is therefore safe by default with respect to demo mode: **demo mode is opt-in and disabled by default**.
+El repositorio queda así seguro por defecto respecto al modo demo: **demo mode es opt-in y está desactivado por defecto**.
 
-## 3. Start the platform
+## 3. Arrancar la plataforma
 
 ```bash
 docker compose up -d --build
 ```
 
-This starts:
+Esto arranca:
 
 - PostgreSQL
 - backend API
 - frontend
 - Mailpit for local email inspection
 
-## 4. Verify backend health
+## 4. Verificar el health del backend
 
 ```bash
 curl -fsS http://localhost:3000/health
 ```
 
-Expected structure:
+Estructura esperada:
 
 ```json
 {
@@ -56,17 +57,17 @@ Expected structure:
 }
 ```
 
-## 5. Open the application
+## 5. Abrir la aplicación
 
 - frontend: `http://localhost:3001`
 - backend: `http://localhost:3000`
 - Mailpit: `http://localhost:8025`
 
-## 6. Enable demo mode only if needed
+## 6. Activar demo mode solo si hace falta
 
-The shipped configuration does **not** enable demo mode automatically.
+La configuración entregada no activa `DEMO_MODE` automáticamente.
 
-If you want the demo dataset and demo endpoints:
+Si quieres el dataset demo y los endpoints demo:
 
 1. edit `.env`
 2. set:
@@ -82,9 +83,9 @@ DEMO_PASSWORD=choose-a-demo-password
 docker compose up -d --build
 ```
 
-When enabled, the demo module may auto-seed demo users, products, and orders, and the admin-only endpoints `/demo/seed` and `/demo/reset` become usable. `DEMO_PASSWORD` must be set explicitly because demo credentials are no longer hardcoded in the backend.
+Cuando está activo, el módulo demo puede sembrar usuarios, productos y pedidos de ejemplo, y los endpoints admin `/demo/seed` y `/demo/reset` pasan a ser operativos. `DEMO_PASSWORD` debe definirse explícitamente porque las credenciales demo ya no van hardcodeadas en backend.
 
-## 7. Backend quality checks
+## 7. Quality checks del backend
 
 ```bash
 cd backend
@@ -94,20 +95,21 @@ npm run test
 npm run test:e2e
 ```
 
-For the full local quality gate:
+Para el gate local completo:
 
 ```bash
 cd /path/to/repo
 npm run test:ci
 ```
 
-## 8. Notes on email behavior
+## 8. Notas sobre correo
 
-- In normal local Docker execution, Mailpit is available for email inspection.
-- In backend `test` / `E2E` execution, Nodemailer uses `jsonTransport`, so tests do not depend on external SMTP availability.
+- En Docker local normal, Mailpit está disponible para inspeccionar correo.
+- En `test` y `E2E` de backend, Nodemailer usa `jsonTransport`, así que las pruebas no dependen de SMTP externo.
+- Si quieres persistir un conector `SMTP` o `AWS SES` desde `ADMIN`, mantén `SYSTEM_SETTINGS_MASTER_KEY` estable entre reinicios del entorno.
 
-## 9. Production deployment
+## 9. Despliegue de producción
 
-Production deployment is handled by [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) against [`docker-compose.prod.yml`](../docker-compose.prod.yml).
+El despliegue de producción se gobierna desde [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) contra [`docker-compose.prod.yml`](../docker-compose.prod.yml).
 
-The deployment flow validates required environment variables before writing `.env`, keeps secrets externalized, uses restrictive file permissions, and is safe to run repeatedly on the same host.
+El flujo de despliegue valida variables requeridas antes de escribir `.env`, mantiene secretos externalizados, usa permisos restrictivos y es seguro para ejecuciones repetidas sobre el mismo host.

@@ -53,11 +53,22 @@ export function validateEnvironment(config: EnvRecord) {
     throw new Error(`NODE_ENV must be one of: ${validNodeEnvs.join(', ')}`);
   }
 
+  const systemSettingsMasterKey = readString(
+    config,
+    'SYSTEM_SETTINGS_MASTER_KEY',
+  );
+  if (nodeEnv === 'production' && !systemSettingsMasterKey) {
+    throw new Error('SYSTEM_SETTINGS_MASTER_KEY is required in production');
+  }
+
   if (!config.TOTP_ISSUER) {
     config.TOTP_ISSUER = 'Mecerka';
   }
 
   config.FISCAL_PEPPER = fiscalPepper;
   config.NODE_ENV = nodeEnv;
+  if (systemSettingsMasterKey) {
+    config.SYSTEM_SETTINGS_MASTER_KEY = systemSettingsMasterKey;
+  }
   return config;
 }

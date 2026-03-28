@@ -103,19 +103,36 @@ export class EmailSecretsCryptoService {
   }
 
   private deriveKey() {
+    const nodeEnv =
+      this.configService.get<string>('NODE_ENV')?.trim() ||
+      process.env.NODE_ENV?.trim() ||
+      'development';
     const masterSecret =
       this.configService.get<string>('SYSTEM_SETTINGS_MASTER_KEY')?.trim() ||
+      process.env.SYSTEM_SETTINGS_MASTER_KEY?.trim();
+
+    if (masterSecret) {
+      return scryptSync(masterSecret, DERIVATION_SALT, KEY_LENGTH);
+    }
+
+    if (nodeEnv === 'production') {
+      this.logger.error(
+        'SYSTEM_SETTINGS_MASTER_KEY is required in production for encrypted system settings',
+      );
+      throw new Error('SYSTEM_SETTINGS_MASTER_KEY is required in production');
+    }
+
+    const jwtSecret =
       this.configService.get<string>('JWT_SECRET')?.trim() ||
-      process.env.SYSTEM_SETTINGS_MASTER_KEY?.trim() ||
       process.env.JWT_SECRET?.trim();
 
-    if (!masterSecret) {
+    if (!jwtSecret) {
       this.logger.error('No encryption key material is configured');
       throw new Error(
         'SYSTEM_SETTINGS_MASTER_KEY or JWT_SECRET configuration is required',
       );
     }
 
-    return scryptSync(masterSecret, DERIVATION_SALT, KEY_LENGTH);
+    return scryptSync(jwtSecret, DERIVATION_SALT, KEY_LENGTH);
   }
 }

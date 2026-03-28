@@ -358,6 +358,29 @@ describe('EmailSettingsService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('requires SYSTEM_SETTINGS_MASTER_KEY when persisting connector secrets in production', async () => {
+    configServiceMock.get.mockImplementation((key: string) => {
+      if (key === 'NODE_ENV') return 'production';
+      if (key === 'SYSTEM_SETTINGS_MASTER_KEY') return undefined;
+      if (key === 'JWT_SECRET') return 'jwt-secret-for-tests';
+      return undefined;
+    });
+
+    await expect(
+      service.saveSettings(
+        {
+          connectorType: 'SMTP',
+          host: 'smtp.example.com',
+          port: 465,
+          user: 'mailer',
+          password: 'secret-pass',
+          from: 'no-reply@example.com',
+        },
+        'admin-1',
+      ),
+    ).rejects.toThrow('SYSTEM_SETTINGS_MASTER_KEY is required in production');
+  });
+
   it('uses AWS environment fallbacks from generic AWS variables', async () => {
     configServiceMock.get.mockImplementation((key: string) => {
       const values: Record<string, string> = {

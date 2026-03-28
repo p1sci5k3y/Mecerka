@@ -84,6 +84,13 @@ if [ -z "$JWT_SECRET_CURRENT" ]; then
   generated_keys="$generated_keys JWT_SECRET_CURRENT"
 fi
 
+SYSTEM_SETTINGS_MASTER_KEY=$(read_value "SYSTEM_SETTINGS_MASTER_KEY" "$ENV_FILE")
+if [ -z "$SYSTEM_SETTINGS_MASTER_KEY" ]; then
+  SYSTEM_SETTINGS_MASTER_KEY=$(openssl rand -hex 32)
+  replace_or_append "SYSTEM_SETTINGS_MASTER_KEY" "$SYSTEM_SETTINGS_MASTER_KEY" "$ENV_FILE"
+  generated_keys="$generated_keys SYSTEM_SETTINGS_MASTER_KEY"
+fi
+
 FISCAL_PEPPER=$(read_value "FISCAL_PEPPER" "$ENV_FILE")
 if [ -z "$FISCAL_PEPPER" ]; then
   FISCAL_PEPPER=$(openssl rand -hex 32)

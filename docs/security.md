@@ -2,200 +2,192 @@
 
 ## Alcance
 
-This document describes the security controls that are actually implemented in the backend. It does not claim absolute security; it explains the mechanisms that can be verified in code and tests.
+Este documento describe los controles de seguridad que están implementados y verificables en el código y en las pruebas del repositorio. No promete seguridad absoluta ni controles externos no visibles desde la aplicación.
 
 ## Autenticación
 
-The backend uses JWT-based authentication with NestJS guards.
+La autenticación se basa en JWT con guards de NestJS y sesión por cookie `HttpOnly` en la integración web.
 
-Implemented controls:
+Controles implementados:
 
-- password hashing with Argon2;
-- email verification before login;
-- token invalidation through `tokenVersion`;
-- MFA support with a dedicated completion guard.
-- cookie-based session handling with HttpOnly cookies in the app integration.
-
-### JWT validation model
-
-The backend signs tokens with `JWT_SECRET`.
-
-Validation accepts:
-
-- `JWT_SECRET_CURRENT`
-- optionally `JWT_SECRET_PREVIOUS`
-
-This supports controlled secret rotation by configuration. It is a practical rotation model, not a centralized key-management platform.
+- hash de contraseñas con Argon2;
+- verificación de email antes del login;
+- invalidación de tokens mediante `tokenVersion`;
+- MFA con guard específico de completitud;
+- rotación de secreto JWT mediante `JWT_SECRET_CURRENT` y `JWT_SECRET_PREVIOUS`.
 
 ## Autorización
 
-Authorization is implemented in layers:
+La autorización se aplica por capas:
 
-1. **JWT authentication**
-2. **MFA completion checks** for sensitive routes
-3. **RBAC** through `RolesGuard` and `@Roles(...)`
-4. **Ownership checks inside services**
+1. autenticación JWT;
+2. MFA completado en rutas sensibles;
+3. RBAC con `RolesGuard` y `@Roles(...)`;
+4. comprobaciones de ownership dentro de los servicios.
 
-The RBAC model alone is not treated as sufficient. For example:
+La afirmación correcta del sistema es **RBAC más ownership de recurso**, no RBAC aislado.
 
-- users can only read their own orders unless they are the assigned runner, the involved provider, or an admin;
-- providers can manage only their own products and provider orders;
-- runners can act only on assigned deliveries;
-- admin-only routes are guarded explicitly, including `/metrics`, observability, risk, and demo endpoints.
+Ejemplos verificados:
 
-This is why the correct security claim is **RBAC plus resource ownership validation**, not RBAC in isolation.
+- un `CLIENT` solo puede leer sus pedidos;
+- un `PROVIDER` solo puede gestionar sus productos y sus `provider orders`;
+- un `RUNNER` solo puede operar sobre entregas asignadas;
+- las rutas de `ADMIN` están protegidas de forma explícita.
 
-## Role model
+## Escalada De Roles
 
-The implemented roles are:
+Los roles implementados son:
 
 - `CLIENT`
 - `PROVIDER`
 - `RUNNER`
 - `ADMIN`
 
-The public registration flow always creates `CLIENT`.
+El registro público siempre crea `CLIENT`.
 
-The endpoint `POST /auth/register` does not permit public assignment of privileged roles, and `ADMIN` cannot be self-requested.
+El flujo `POST /users/request-role`:
 
-## Privileged role escalation
+- exige autenticación;
+- exige MFA completado;
+- solo admite `PROVIDER` y `RUNNER`;
+- exige `country` y `fiscalId`;
+- rechaza autoasignación de `ADMIN`;
+- ejecuta asignación con transacción y bloqueo.
 
-Privileged role acquisition is explicit and controlled.
+Las concesiones administrativas reutilizan la misma lógica de dominio, mantienen auditoría y no hacen append ciego de roles.
 
-### Public flow
+## Validación De Entrada
 
-`POST /users/request-role`
-
-Requires:
-
-- authenticated user;
-- MFA completed;
-- requested role in `{PROVIDER, RUNNER}`;
-- `country`;
-- `fiscalId`.
-
-This flow:
-
-- rejects `ADMIN`;
-- validates the fiscal identifier format locally for Spanish identifiers;
-- applies a cooldown window between privileged requests;
-- executes assignment in a transaction with row-level locking.
-
-### Administrative overrides
-
-Administrative role grants are not hidden or ad hoc. They remain available, but they reuse the same internal role-assignment logic and preserve the same critical invariants.
-
-This means:
-
-- no blind role array append;
-- `RUNNER` assignment creates `runnerProfile`;
-- audit snapshot fields remain coherent;
-- admin grants are marked with their own audit source.
-
-## DTO validation and mass-assignment protection
-
-Global validation is enabled with:
+La validación global usa:
 
 - `whitelist: true`
 - `forbidNonWhitelisted: true`
 - `transform: true`
 
-Sensitive routes use DTOs rather than inline plain object bodies, including admin city and category mutation routes.
+Las rutas sensibles usan DTOs en vez de cuerpos inline, incluidas las de administración y configuración de correo. Esto reduce riesgo de mass assignment y de campos persistence-like inyectados por el cliente.
 
-This prevents the API from trusting arbitrary client fields such as:
+## Privacidad Y Datos Fiscales
 
-- roles
-- role status
-- fiscal metadata
-- nested persistence-like payloads
+El identificador fiscal no se recoge durante el registro normal.
 
-## Privacy and fiscal data
+Solo se solicita cuando un usuario pide `PROVIDER` o `RUNNER`.
 
-### Data minimization
-
-Fiscal identifiers are not collected during normal user registration.
-
-They are requested only when a user explicitly asks for `PROVIDER` or `RUNNER`.
-
-### Storage model
-
-The raw `fiscalId` is not persisted.
-
-The backend stores:
+El backend no persiste el valor en claro. Guarda:
 
 - `fiscalIdHash`
 - `fiscalIdLast4`
 - `fiscalCountry`
 
-The hash is computed as **HMAC-SHA256** using `FISCAL_PEPPER`.
+El hash se calcula con HMAC-SHA256 usando `FISCAL_PEPPER`.
 
-### Real limitation
+Limitación real:
 
-The implementation performs format validation for Spanish identifiers (`NIF`, `NIE`, `CIF`) when `country = ES`.
+- se valida formato local para identificadores españoles;
+- no existe verificación contra registros externos oficiales.
 
-It does **not** perform external validation against government or tax registries.
+## Logging Y Redacción
 
-## Logging and secret hygiene
+El logger estructurado aplica redacción recursiva sobre campos sensibles, incluyendo:
 
-The backend uses a structured logger with recursive redaction for sensitive fields, including:
+- passwords;
+- tokens y JWT;
+- cookies;
+- `fiscalId`;
+- `fiscalIdHash`;
+- `fiscalIdLast4`.
 
-- passwords
-- tokens
-- JWT values
-- cookies
-- `fiscalId`
-- `fiscalCountry`
-- `fiscalIdHash`
-- `fiscalIdLast4`
+Esto reduce filtrado accidental en trazas operativas, pero no sustituye a una política externa de observabilidad o retención.
 
-The logger is therefore designed to reduce accidental disclosure in operational traces.
+## Configuración Operativa De Correo
 
-## Operational email configuration
+La plataforma soporta dos orígenes de configuración de correo:
 
-The project now supports admin-managed SMTP configuration persisted in the database, in addition to environment-based configuration.
+- variables de entorno;
+- configuración persistida desde `ADMIN`.
 
-This improves self-hosting ergonomics, but also creates a clear next hardening target:
+Conectores soportados:
 
-- persisted SMTP credentials should be treated as application secrets and strengthened with encryption at rest.
+- `SMTP`
+- `AWS SES`
 
-## Payment security
+### Protección de secretos persistidos
 
-Critical payment flows are protected through:
+Los secretos de conectores se almacenan en base de datos con:
 
-- Stripe webhook signature verification;
-- raw request body usage for signature validation;
-- metadata validation;
-- payment amount and currency checks;
-- controlled payment-session processing;
-- idempotency safeguards in critical webhook/payment paths.
+- cifrado `AES-256-GCM`;
+- derivación de clave con `scrypt`;
+- fingerprint con `scrypt + salt` para detectar manipulación.
 
-This should be described as **critical-flow protection**, not universal idempotency across the entire system.
+El frontend no vuelve a recibir secretos persistidos una vez guardados. Solo ve un resumen del conector activo y el estado de configuración.
 
-## Rate limiting
+### Clave maestra
 
-The application uses Nest Throttler globally and adds endpoint-level throttles to sensitive authentication routes such as:
+En producción, los secretos persistidos requieren `SYSTEM_SETTINGS_MASTER_KEY`.
+
+Reglas actuales:
+
+- en `production`, `SYSTEM_SETTINGS_MASTER_KEY` es obligatoria;
+- fuera de producción, se permite fallback a `JWT_SECRET` para compatibilidad local y tests;
+- el workflow de despliegue exige secretos separados `PROD_SYSTEM_SETTINGS_MASTER_KEY` y `DEMO_SYSTEM_SETTINGS_MASTER_KEY`.
+
+### Transporte
+
+`SMTP` se abre con TLS verificado salvo el relay local por defecto (`mailpit`).
+
+`AWS SES` usa el SDK oficial sobre HTTPS.
+
+Las rutas admin de configuración de correo rechazan sesiones no HTTPS cuando `NODE_ENV=production`.
+
+## Seguridad De Pagos
+
+Los flujos de pago críticos incluyen:
+
+- verificación de firma de webhooks de Stripe;
+- uso de `raw body` para validar la firma;
+- validación de metadata;
+- comprobación de importes y moneda;
+- tratamiento controlado de `payment sessions`;
+- salvaguardas de idempotencia en rutas críticas.
+
+La afirmación defendible es **protección fuerte de flujos críticos**, no idempotencia universal de toda la plataforma.
+
+## Rate Limiting
+
+La aplicación usa Nest Throttler globalmente y endurece rutas sensibles como:
 
 - `/auth/register`
 - `/auth/login`
 - `/auth/resend-verification`
 - `/auth/forgot-password`
 
-## Demo and non-production isolation
+## Demo Y Separación De Entornos
 
-Demo accounts use reserved non-production domains such as:
+`DEMO_MODE` está desactivado por defecto.
 
-- `@local.test`
-- `@example.test`
+Demo y producción se aíslan por:
 
-`DEMO_MODE` is disabled by default and must be enabled intentionally. Demo endpoints are admin-protected and only become operational when demo mode is explicitly activated.
+- base de datos;
+- secretos JWT y pepper fiscal;
+- credenciales Stripe;
+- configuración de correo;
+- modo demo y contraseña demo;
+- `SYSTEM_SETTINGS_MASTER_KEY`.
 
-## What is not claimed
+## Estado Actual De Dependencias
 
-This project should not claim:
+A fecha `28/03/2026`:
 
-- full zero-trust architecture;
-- external fiscal verification;
-- complete elimination of all authorization risk by RBAC alone;
-- full tactical DDD security modeling.
+- `frontend npm audit --omit=dev` no reporta vulnerabilidades;
+- `backend npm audit --omit=dev` reporta una vulnerabilidad alta transitiva en `path-to-regexp` a través del stack de Nest 11;
+- el repositorio fija `path-to-regexp@8.4.0` por override para cerrar esa cadena en el lockfile.
 
-The defensible claim is that the system implements **concrete, layered, code-verifiable security controls appropriate for a production-grade MVP**.
+## Qué No Se Está Afirmando
+
+Este proyecto no debe afirmar:
+
+- zero trust completo;
+- verificación fiscal externa;
+- imposibilidad absoluta de MITM si el cliente final controla su navegador o su equipo;
+- eliminación total de riesgo de autorización solo por usar RBAC.
+
+La afirmación correcta es que el sistema implementa **controles de seguridad por capas, verificables en código y razonables para un producto real en este estado de madurez**.

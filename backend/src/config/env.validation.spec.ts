@@ -104,4 +104,22 @@ describe('validateEnvironment', () => {
     const result = validateEnvironment(config);
     expect(result.TOTP_ISSUER).toBe('MyApp');
   });
+
+  it('requires SYSTEM_SETTINGS_MASTER_KEY in production', () => {
+    const config = { ...baseConfig(), NODE_ENV: 'production' };
+    expect(() => validateEnvironment(config)).toThrow(
+      'SYSTEM_SETTINGS_MASTER_KEY is required in production',
+    );
+  });
+
+  it('accepts SYSTEM_SETTINGS_MASTER_KEY in production and preserves it', () => {
+    const config = {
+      ...baseConfig(),
+      NODE_ENV: 'production',
+      SYSTEM_SETTINGS_MASTER_KEY: 'master-key-for-prod',
+    };
+
+    const result = validateEnvironment(config);
+    expect(result.SYSTEM_SETTINGS_MASTER_KEY).toBe('master-key-for-prod');
+  });
 });
