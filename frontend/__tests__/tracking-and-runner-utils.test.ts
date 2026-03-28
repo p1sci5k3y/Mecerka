@@ -23,6 +23,7 @@ import {
   runnerPaymentLabel,
   shouldShowRouteMap,
 } from "@/components/runner/runner-order-detail-utils"
+import { getRunnerNextActionSummary } from "@/components/runner/runner-next-action"
 
 describe("tracking and runner detail utils", () => {
   it("formats tracking labels and distances safely", () => {
@@ -100,6 +101,76 @@ describe("tracking and runner detail utils", () => {
     expect(refundStatusLabel("FAILED")).toBe("Fallida")
     expect(shouldShowRouteMap("IN_TRANSIT")).toBe(true)
     expect(shouldShowRouteMap("CANCELLED")).toBe(false)
+  })
+
+  it("derives the next runner action from delivery, support and payout context", () => {
+    expect(
+      getRunnerNextActionSummary({
+        deliveryStatus: "ASSIGNED",
+        paymentStatus: "PAYMENT_READY",
+        activeStops: [
+          {
+            id: "provider-order-1",
+            providerId: "provider-1",
+            providerName: "Ceramica Norte",
+            status: "READY_FOR_PICKUP",
+            paymentStatus: "PAID",
+            subtotal: 12,
+            originalSubtotal: 12,
+            discountAmount: 0,
+            items: [],
+          },
+        ],
+        openSupportCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Coordinar recogida",
+        tone: "info",
+      }),
+    )
+
+    expect(
+      getRunnerNextActionSummary({
+        deliveryStatus: "IN_TRANSIT",
+        paymentStatus: "PAYMENT_PENDING",
+        activeStops: [],
+        openSupportCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Completar la entrega final",
+        tone: "info",
+      }),
+    )
+
+    expect(
+      getRunnerNextActionSummary({
+        deliveryStatus: "DELIVERED",
+        paymentStatus: "PAYMENT_PENDING",
+        activeStops: [],
+        openSupportCount: 0,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Revisar cobro del reparto",
+        tone: "info",
+      }),
+    )
+
+    expect(
+      getRunnerNextActionSummary({
+        deliveryStatus: "PICKUP_PENDING",
+        paymentStatus: "PAYMENT_READY",
+        activeStops: [],
+        openSupportCount: 2,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        title: "Revisar soporte visible",
+        tone: "warning",
+      }),
+    )
   })
 
   it("builds delivery milestones from operational states", () => {

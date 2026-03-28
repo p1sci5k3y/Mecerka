@@ -160,6 +160,8 @@ describe("RunnerOrderDetailPage", () => {
     render(<Page />)
 
     expect(await screen.findByText("Ficha de entrega del runner")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción operativa")).toBeInTheDocument()
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(getOneMock).toHaveBeenCalledWith("order-1")
     expect(listDeliveryOrderIncidentsMock).toHaveBeenCalledWith("delivery-1")
     expect(getDeliveryOrderRefundsMock).toHaveBeenCalledWith("delivery-1")
@@ -284,6 +286,7 @@ describe("RunnerOrderDetailPage", () => {
     render(<Page />)
 
     expect(await screen.findByText("Ficha de entrega del runner")).toBeInTheDocument()
+    expect(screen.getByText("Esperando contexto operativo")).toBeInTheDocument()
     expect(
       screen.getByText("No hay paradas operativas visibles para esta entrega."),
     ).toBeInTheDocument()
@@ -414,6 +417,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(await screen.findByText("Ficha de entrega del runner")).toBeInTheDocument()
     expect(screen.getAllByText("Cobrado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Entregado").length).toBeGreaterThan(0)
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(screen.getByText("Recogido")).toBeInTheDocument()
     expect(screen.getByText("Rechazada")).toBeInTheDocument()
     expect(screen.getByText("Fallida")).toBeInTheDocument()
@@ -546,6 +550,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(await screen.findByText("Ficha de entrega del runner")).toBeInTheDocument()
     expect(screen.getAllByText("Asignado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Sesión lista").length).toBeGreaterThan(0)
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(screen.getAllByText("En preparación").length).toBeGreaterThan(0)
     expect(screen.getAllByText("En revisión").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Resuelta").length).toBeGreaterThan(0)
@@ -599,6 +604,7 @@ describe("RunnerOrderDetailPage", () => {
     expect(await screen.findByText("Ficha de entrega del runner")).toBeInTheDocument()
     expect(screen.getAllByText("Cancelado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Pago fallido").length).toBeGreaterThan(0)
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(screen.getAllByText("Entregado").length).toBeGreaterThan(0)
     expect(screen.getByText("UNKNOWN_PICKUP")).toBeInTheDocument()
     expect(screen.getByText("provider-1")).toBeInTheDocument()

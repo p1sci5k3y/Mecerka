@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
 import { ProtectedRoute } from "@/components/protected-route"
 import { RunnerLiveRouteCard } from "@/components/runner/RunnerLiveRouteCard"
+import { RunnerNextActionCard } from "@/components/runner/RunnerNextActionCard"
 import {
   deliveryStatusLabel,
   formatCurrency,
@@ -120,6 +121,7 @@ function RunnerOrderDetailContent() {
       ),
     [activeStops],
   )
+  const openSupportCount = detail ? detail.incidents.length + detail.refunds.length : 0
 
   if (loading) {
     return (
@@ -247,6 +249,13 @@ function RunnerOrderDetailContent() {
 
               <div className="grid gap-8 lg:grid-cols-[1.15fr,0.85fr]">
                 <section className="space-y-6">
+                  <RunnerNextActionCard
+                    deliveryStatus={detail.order.deliveryOrder?.status ?? detail.order.status}
+                    paymentStatus={detail.order.deliveryOrder?.paymentStatus}
+                    activeStops={activeStops}
+                    openSupportCount={openSupportCount}
+                  />
+
                   <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
                     <div className="flex items-center gap-2">
                       <Route className="h-5 w-5 text-primary" />
