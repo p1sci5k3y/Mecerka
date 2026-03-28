@@ -128,7 +128,7 @@ Reglas actuales:
 
 - en `production`, `SYSTEM_SETTINGS_MASTER_KEY` es obligatoria;
 - fuera de producción, se permite fallback a `JWT_SECRET` para compatibilidad local y tests;
-- el workflow de despliegue exige secretos separados `PROD_SYSTEM_SETTINGS_MASTER_KEY` y `DEMO_SYSTEM_SETTINGS_MASTER_KEY`.
+- el workflow de despliegue usa un único secret `SYSTEM_SETTINGS_MASTER_KEY` y lo inyecta en ambos stacks.
 
 ### Transporte
 

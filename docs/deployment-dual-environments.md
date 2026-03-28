@@ -34,14 +34,13 @@ El aislamiento se fuerza mediante:
 
 ## Secrets y variables necesarios en GitHub
 
-El workflow de despliegue espera valores separados con prefijos `PROD_*` y `DEMO_*`.
+El workflow de despliegue espera valores separados con prefijos `PROD_*` y `DEMO_*` para los parámetros de cada stack, pero la clave maestra de secretos persistidos se gobierna con un único secret compartido.
 
 Ejemplos:
 
 - `PROD_POSTGRES_PASSWORD`
 - `DEMO_POSTGRES_PASSWORD`
-- `PROD_SYSTEM_SETTINGS_MASTER_KEY`
-- `DEMO_SYSTEM_SETTINGS_MASTER_KEY`
+- `SYSTEM_SETTINGS_MASTER_KEY`
 - `PROD_STRIPE_SECRET_KEY`
 - `DEMO_STRIPE_SECRET_KEY`
 - `PROD_MAIL_HOST`
@@ -94,7 +93,7 @@ A `28/03/2026`, el estado observable es:
 - `https://mecerka.me/` and `https://mecerka.me/api/health` respond `200`
 - `https://demo.mecerka.me/` and `https://demo.mecerka.me/api/health` respond `200`
 - `https://demo.mecerka.me/runtime-config` serves `"/api"` and Stripe dummy
-- el workflow exige `PROD_SYSTEM_SETTINGS_MASTER_KEY` y `DEMO_SYSTEM_SETTINGS_MASTER_KEY`
+- el workflow exige `SYSTEM_SETTINGS_MASTER_KEY` y la inyecta en ambos stacks
 - el login admin demo alcanza `/api/admin/email-settings`
 - el resumen SMTP es visible y actualmente resuelve desde `environment` en la demo pública
 
