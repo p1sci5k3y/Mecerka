@@ -340,6 +340,8 @@ export default function TrackOrderPage() {
             orderStatus={order?.status ?? null}
             deliveryStatus={order?.deliveryOrder?.status ?? null}
             stopCount={order?.providerOrders?.length ?? 0}
+            openIncidentCount={incidents.filter((incident) => incident.status !== "RESOLVED" && incident.status !== "REJECTED").length}
+            openRefundCount={refunds.filter((refund) => refund.status !== "COMPLETED" && refund.status !== "REJECTED" && refund.status !== "FAILED").length}
           />
 
           {isClient ? (

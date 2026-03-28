@@ -111,5 +111,21 @@ describe("tracking and runner detail utils", () => {
         stopCount: 1,
       }).map((milestone) => milestone.state),
     ).toEqual(["done", "done", "done", "done"])
+
+    expect(
+      buildDeliveryMilestones({
+        orderStatus: "CONFIRMED",
+        deliveryStatus: "RUNNER_ASSIGNED",
+        stopCount: 1,
+      })[1]?.description,
+    ).toContain("runner asignado")
+
+    expect(
+      buildDeliveryMilestones({
+        orderStatus: "IN_TRANSIT",
+        deliveryStatus: "PICKED_UP",
+        stopCount: 1,
+      })[2]?.description,
+    ).toContain("ya está recogido")
   })
 })

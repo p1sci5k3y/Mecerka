@@ -68,6 +68,7 @@ vi.mock("@/lib/services/refunds-service", () => ({
 function makeOrder() {
   return {
     id: "577731b8-f2e9-4a16-8594-981b5dff09b2",
+    status: "CONFIRMED",
     deliveryFee: 4.5,
     providerOrders: [
       {
@@ -79,6 +80,7 @@ function makeOrder() {
     ],
     deliveryOrder: {
       id: "delivery-order-1",
+      status: "RUNNER_ASSIGNED",
     },
   }
 }
@@ -215,6 +217,8 @@ describe("TrackOrderPage", () => {
     expect(screen.getByText("Recogida coordinada")).toBeInTheDocument()
     expect(screen.getByText("Pedido en reparto")).toBeInTheDocument()
     expect(screen.getByText("Entrega completada")).toBeInTheDocument()
+    expect(screen.getByText(/runner asignado/i)).toBeInTheDocument()
+    expect(screen.getByText(/Hay 3 caso\(s\) de soporte abierto/i)).toBeInTheDocument()
     expect(mapPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         orderId: "577731b8-f2e9-4a16-8594-981b5dff09b2",

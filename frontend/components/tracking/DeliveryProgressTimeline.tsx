@@ -4,6 +4,8 @@ type DeliveryProgressTimelineProps = {
   orderStatus?: string | null
   deliveryStatus?: string | null
   stopCount: number
+  openIncidentCount?: number
+  openRefundCount?: number
 }
 
 type Milestone = {
@@ -16,9 +18,63 @@ type Milestone = {
 function normalizeStage(orderStatus?: string | null, deliveryStatus?: string | null) {
   if (deliveryStatus === "DELIVERED" || orderStatus === "DELIVERED") return 4
   if (deliveryStatus === "IN_TRANSIT" || orderStatus === "IN_TRANSIT") return 3
-  if (deliveryStatus === "PICKED_UP" || deliveryStatus === "PICKUP_PENDING") return 2
+  if (
+    deliveryStatus === "PICKED_UP" ||
+    deliveryStatus === "PICKUP_PENDING" ||
+    deliveryStatus === "RUNNER_ASSIGNED"
+  ) {
+    return 2
+  }
   if (deliveryStatus === "ASSIGNED" || orderStatus === "CONFIRMED" || orderStatus === "ACCEPTED") return 1
   return 1
+}
+
+function pickupDescription(stopCount: number, deliveryStatus?: string | null) {
+  if (deliveryStatus === "RUNNER_ASSIGNED") {
+    return "Ya hay runner asignado y la recogida se está coordinando con los comercios."
+  }
+
+  if (deliveryStatus === "PICKUP_PENDING") {
+    return stopCount > 1
+      ? `${stopCount} paradas operativas previstas para consolidar el reparto antes de salir.`
+      : "La recogida está preparada y pendiente de arrancar en el punto de origen."
+  }
+
+  if (deliveryStatus === "PICKED_UP") {
+    return "La recogida ya se ha completado y el pedido está consolidado para el último tramo."
+  }
+
+  return stopCount > 1
+    ? `${stopCount} paradas operativas previstas para consolidar el reparto.`
+    : "El runner prepara la recogida del pedido y su consolidación final."
+}
+
+function transitDescription(deliveryStatus?: string | null) {
+  if (deliveryStatus === "PICKED_UP") {
+    return "El pedido ya está recogido y el runner se prepara para salir al último tramo."
+  }
+
+  if (deliveryStatus === "IN_TRANSIT") {
+    return "La ruta ya está activa y el seguimiento en mapa refleja el último tramo."
+  }
+
+  if (deliveryStatus === "DELIVERED") {
+    return "El último tramo ya se ha completado correctamente."
+  }
+
+  return "La ruta se activará cuando el runner salga a entrega."
+}
+
+function deliveredDescription(orderStatus?: string | null, deliveryStatus?: string | null) {
+  if (deliveryStatus === "DELIVERED" || orderStatus === "DELIVERED") {
+    return "El pedido llegó a destino y el seguimiento queda cerrado."
+  }
+
+  if (deliveryStatus === "CANCELLED" || orderStatus === "CANCELLED") {
+    return "La entrega no seguirá adelante porque el flujo operativo se cerró antes de completar el reparto."
+  }
+
+  return "La entrega se marcará aquí cuando el pedido llegue al cliente."
 }
 
 export function buildDeliveryMilestones({
@@ -38,22 +94,19 @@ export function buildDeliveryMilestones({
     {
       key: "pickup",
       title: "Recogida coordinada",
-      description:
-        stopCount > 1
-          ? `${stopCount} paradas operativas previstas para consolidar el reparto.`
-          : "El runner prepara la recogida del pedido y su consolidación final.",
+      description: pickupDescription(stopCount, deliveryStatus),
       state: stage > 2 ? "done" : stage === 2 ? "current" : "upcoming",
     },
     {
       key: "transit",
       title: "Pedido en reparto",
-      description: "La ruta ya está activa y el seguimiento en mapa refleja el último tramo.",
+      description: transitDescription(deliveryStatus),
       state: stage > 3 ? "done" : stage === 3 ? "current" : "upcoming",
     },
     {
       key: "delivered",
       title: "Entrega completada",
-      description: "El pedido llega a destino y el seguimiento se cierra.",
+      description: deliveredDescription(orderStatus, deliveryStatus),
       state: stage === 4 ? "done" : "upcoming",
     },
   ]
@@ -84,6 +137,7 @@ function milestoneStyles(state: Milestone["state"]) {
 
 export function DeliveryProgressTimeline(props: DeliveryProgressTimelineProps) {
   const milestones = buildDeliveryMilestones(props)
+  const openCases = (props.openIncidentCount ?? 0) + (props.openRefundCount ?? 0)
 
   return (
     <section className="mt-8 rounded-2xl border bg-card p-6">
@@ -93,6 +147,12 @@ export function DeliveryProgressTimeline(props: DeliveryProgressTimelineProps) {
           Vista rápida del estado operativo del pedido para que el mapa no sea el único contexto.
         </p>
       </div>
+
+      {openCases > 0 ? (
+        <div className="mt-4 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Hay {openCases} caso(s) de soporte abierto(s) asociado(s) a este pedido. El timeline sigue el estado operativo, pero el soporte puede condicionar el cierre final.
+        </div>
+      ) : null}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-4">
         {milestones.map((milestone, index) => {
