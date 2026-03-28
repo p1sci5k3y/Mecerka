@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { Navbar } from "@/components/navbar"
 import { Footer } from "@/components/footer"
+import { ProviderNextActionCard } from "@/components/provider/ProviderNextActionCard"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Link } from "@/lib/navigation"
@@ -12,6 +13,15 @@ import { ordersService } from "@/lib/services/orders-service"
 import { refundsService } from "@/lib/services/refunds-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { DeliveryIncidentSummary, Order, ProviderOrder, RefundSummary } from "@/lib/types"
+import {
+  deliveryStatusLabel,
+  formatCurrency,
+  incidentStatusLabel,
+  orderStatusLabel,
+  paymentStatusLabel,
+  providerStatusLabel,
+  refundStatusLabel,
+} from "@/components/provider/provider-order-detail-utils"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -29,123 +39,6 @@ type ProviderOrderDetail = {
   providerOrder: ProviderOrder
   refunds: RefundSummary[]
   incidents: DeliveryIncidentSummary[]
-}
-
-function formatCurrency(amount: number) {
-  return amount.toLocaleString("es-ES", {
-    style: "currency",
-    currency: "EUR",
-  })
-}
-
-function providerStatusLabel(status: ProviderOrder["status"]) {
-  switch (status) {
-    case "PENDING":
-      return "Pendiente"
-    case "ACCEPTED":
-      return "Aceptado"
-    case "PREPARING":
-      return "Preparando"
-    case "READY_FOR_PICKUP":
-      return "Listo para recogida"
-    case "PICKED_UP":
-      return "Recogido"
-    case "DELIVERED":
-      return "Entregado"
-    case "CANCELLED":
-      return "Cancelado"
-    case "REJECTED_BY_STORE":
-      return "Rechazado por comercio"
-    default:
-      return "Sin estado"
-  }
-}
-
-function paymentStatusLabel(status?: string) {
-  switch (status) {
-    case "PAID":
-      return "Cobrado"
-    case "PAYMENT_READY":
-      return "Sesión lista"
-    case "PAYMENT_PENDING":
-      return "Pago pendiente"
-    case "FAILED":
-      return "Pago fallido"
-    default:
-      return "Sin estado"
-  }
-}
-
-function orderStatusLabel(status: Order["status"]) {
-  switch (status) {
-    case "PENDING":
-      return "Pendiente"
-    case "CONFIRMED":
-      return "Confirmado"
-    case "READY_FOR_ASSIGNMENT":
-      return "Listo para asignación"
-    case "ASSIGNED":
-      return "Repartidor asignado"
-    case "IN_TRANSIT":
-      return "En reparto"
-    case "DELIVERED":
-      return "Entregado"
-    case "CANCELLED":
-      return "Cancelado"
-    default:
-      return "Sin estado"
-  }
-}
-
-function deliveryStatusLabel(status?: string | null) {
-  switch (status) {
-    case "ASSIGNED":
-      return "Asignado"
-    case "IN_TRANSIT":
-      return "En reparto"
-    case "DELIVERED":
-      return "Entregado"
-    case "CANCELLED":
-      return "Cancelado"
-    default:
-      return "Sin estado"
-  }
-}
-
-function refundStatusLabel(status: string) {
-  switch (status) {
-    case "REQUESTED":
-      return "Solicitada"
-    case "UNDER_REVIEW":
-      return "En revisión"
-    case "APPROVED":
-      return "Aprobada"
-    case "REJECTED":
-      return "Rechazada"
-    case "EXECUTING":
-      return "Ejecutando"
-    case "COMPLETED":
-      return "Completada"
-    case "FAILED":
-      return "Fallida"
-    default:
-      return "Sin estado"
-  }
-}
-
-function incidentStatusLabel(status: DeliveryIncidentSummary["status"]) {
-  switch (status) {
-    case "OPEN":
-      return "Abierta"
-    case "UNDER_REVIEW":
-      return "En revisión"
-    case "RESOLVED":
-      return "Resuelta"
-    case "REJECTED":
-      return "Rechazada"
-    default:
-      return "Sin estado"
-  }
 }
 
 export default function ProviderOrderDetailPage() {
@@ -234,6 +127,7 @@ function ProviderOrderDetailContent() {
     () => detail?.providerOrder.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0,
     [detail],
   )
+  const openSupportCount = detail ? detail.refunds.length + detail.incidents.length : 0
 
   if (loading) {
     return (
@@ -353,6 +247,14 @@ function ProviderOrderDetailContent() {
 
               <div className="grid gap-8 lg:grid-cols-[1.15fr,0.85fr]">
                 <section className="space-y-6">
+                  <ProviderNextActionCard
+                    providerStatus={detail.providerOrder.status}
+                    paymentStatus={detail.providerOrder.paymentStatus}
+                    rootOrderStatus={detail.rootOrder.status}
+                    deliveryStatus={detail.rootOrder.deliveryOrder?.status}
+                    openSupportCount={openSupportCount}
+                  />
+
                   <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-sm">
                     <div className="flex items-center gap-2">
                       <PackageCheck className="h-5 w-5 text-primary" />

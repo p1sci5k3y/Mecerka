@@ -172,6 +172,8 @@ describe("ProviderOrderDetailPage", () => {
     render(<Page />)
 
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
+    expect(screen.getByText("Siguiente acción del comercio")).toBeInTheDocument()
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(getAllMock).toHaveBeenCalledTimes(1)
     expect(getProviderOrderRefundsMock).toHaveBeenCalledWith("provider-order-1")
     expect(listDeliveryOrderIncidentsMock).toHaveBeenCalledWith("delivery-1")
@@ -231,6 +233,7 @@ describe("ProviderOrderDetailPage", () => {
     expect(screen.getAllByText("0")).toHaveLength(2)
     expect(screen.getAllByText("Cobrado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Listo para recogida").length).toBeGreaterThan(0)
+    expect(screen.getByText("Preparado para recogida")).toBeInTheDocument()
   })
 
   it("shows fallback labels when support, delivery and product context are missing", async () => {
@@ -271,6 +274,7 @@ describe("ProviderOrderDetailPage", () => {
 
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
     expect(screen.getByText("Producto prod-raw")).toBeInTheDocument()
+    expect(screen.getByText("Preparar pedido del comercio")).toBeInTheDocument()
     expect(screen.getAllByText("Sin estado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Pendiente").length).toBeGreaterThan(0)
     expect(screen.getByText("No hay devoluciones visibles todavía para este tramo.")).toBeInTheDocument()
@@ -498,6 +502,7 @@ describe("ProviderOrderDetailPage", () => {
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
     expect(screen.getAllByText("Entregado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Pago fallido").length).toBeGreaterThan(0)
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(screen.getByText("Completada")).toBeInTheDocument()
     expect(screen.getByText("Resuelta")).toBeInTheDocument()
   })
@@ -579,6 +584,7 @@ describe("ProviderOrderDetailPage", () => {
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
     expect(screen.getAllByText("Aceptado").length).toBeGreaterThan(0)
     expect(screen.getAllByText("Sesión lista").length).toBeGreaterThan(0)
+    expect(screen.getByText("Revisar soporte visible")).toBeInTheDocument()
     expect(screen.getByText("Confirmado")).toBeInTheDocument()
     expect(screen.getByText("Asignado")).toBeInTheDocument()
     expect(screen.getByText("Solicitada")).toBeInTheDocument()
@@ -718,6 +724,7 @@ describe("ProviderOrderDetailPage", () => {
     render(<Page />)
 
     expect(await screen.findByText("Ficha operativa del provider order")).toBeInTheDocument()
+    expect(screen.getByText("Flujo del comercio cerrado")).toBeInTheDocument()
     expect(screen.getByText("Repartidor asignado")).toBeInTheDocument()
     expect(screen.getAllByText("Rechazado por comercio").length).toBeGreaterThan(0)
   })
