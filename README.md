@@ -25,8 +25,7 @@
   - `bilbao.runner.demo@local.test / DemoPass123!`
 - Presentación TFM:
   - release: [Presentación](https://github.com/p1sci5k3y/Mecerka/releases/tag/Presentacion)
-  - descarga PPTX: [Mecerka_Presentation.pptx](https://github.com/p1sci5k3y/Mecerka/releases/download/Presentacion/Mecerka_Presentation.pptx)
-
+  - descarga PPTX: [Mecerka_Presentation.pptx](https://github.com/user-attachments/files/26327659/Mecerka_Presentation.pptx)
 
 ## Descripción general
 
