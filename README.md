@@ -1,5 +1,7 @@
 # Mecerka
 
+[![DeepScan grade](https://deepscan.io/api/teams/6469/projects/31088/branches/1005587/badge/grade.svg)](https://deepscan.io/dashboard#view=project&tid=6469&pid=31088&bid=1005587)
+
 - GitHub: https://github.com/p1sci5k3y/Mecerka/
 - Despliegue: https://mecerka.me
 - Despliegue demo: https://demo.mecerka.me
@@ -25,7 +27,29 @@
   - `bilbao.runner.demo@local.test / DemoPass123!`
 - Presentación TFM:
   - release: [Presentación](https://github.com/p1sci5k3y/Mecerka/releases/tag/Presentacion)
-  - descarga PPTX: [Mecerka_Presentation.pptx](https://github.com/user-attachments/files/26327659/Mecerka_Presentation.pptx)
+  - descarga PPTX: [Mecerka_Presentation.pptx](https://github.com/p1sci5k3y/Mecerka/releases/download/Presentacion/Mecerka_Presentation.pptx)
+- Casos de prueba visuales y capturas Playwright:
+  - suite: [`frontend/e2e/presentation-slides.spec.ts`](frontend/e2e/presentation-slides.spec.ts)
+  - config demo: [`frontend/e2e.presentation-demo.config.mjs`](frontend/e2e.presentation-demo.config.mjs)
+  - assets listos para presentación: [`docs/presentation-assets`](docs/presentation-assets)
+
+## Recorrido visual
+
+| Home / catálogo | Detalle de producto |
+| --- | --- |
+| ![Home catálogo](docs/presentation-assets/01-home-catalogo.png) | ![Detalle de producto](docs/presentation-assets/02-producto-detalle.png) |
+
+| Carrito multiproveedor | Checkout con dirección |
+| --- | --- |
+| ![Carrito multiproveedor](docs/presentation-assets/03-carrito-multiproveedor.png) | ![Checkout con dirección](docs/presentation-assets/04-checkout-direccion.png) |
+
+| Confirmación / pagos | Panel proveedor |
+| --- | --- |
+| ![Confirmación de pedido](docs/presentation-assets/05-confirmacion-pedido.png) | ![Panel proveedor](docs/presentation-assets/06-panel-proveedor.png) |
+
+| Panel runner | Panel admin |
+| --- | --- |
+| ![Panel runner](docs/presentation-assets/07-panel-runner.png) | ![Panel admin](docs/presentation-assets/08-panel-admin.png) |
 
 ## Descripción general
 
