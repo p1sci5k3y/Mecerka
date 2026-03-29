@@ -35,21 +35,23 @@
 
 ## Recorrido visual
 
-| Home / catálogo | Detalle de producto |
+| Detalle de producto | Carrito multiproveedor |
 | --- | --- |
-| ![Home catálogo](docs/presentation-assets/01-home-catalogo.png) | ![Detalle de producto](docs/presentation-assets/02-producto-detalle.png) |
+| ![Detalle de producto](docs/presentation-assets/02-producto-detalle.png) | ![Carrito multiproveedor](docs/presentation-assets/03-carrito-multiproveedor.png) |
 
-| Carrito multiproveedor | Checkout con dirección |
+| Checkout con dirección | Confirmación / pagos |
 | --- | --- |
-| ![Carrito multiproveedor](docs/presentation-assets/03-carrito-multiproveedor.png) | ![Checkout con dirección](docs/presentation-assets/04-checkout-direccion.png) |
+| ![Checkout con dirección](docs/presentation-assets/04-checkout-direccion.png) | ![Confirmación de pedido](docs/presentation-assets/05-confirmacion-pedido.png) |
 
-| Confirmación / pagos | Panel proveedor |
+| Panel proveedor | Panel runner |
 | --- | --- |
-| ![Confirmación de pedido](docs/presentation-assets/05-confirmacion-pedido.png) | ![Panel proveedor](docs/presentation-assets/06-panel-proveedor.png) |
+| ![Panel proveedor](docs/presentation-assets/06-panel-proveedor.png) | ![Panel runner](docs/presentation-assets/07-panel-runner.png) |
 
-| Panel runner | Panel admin |
+| Panel admin | Home / catálogo multi-ciudad |
 | --- | --- |
-| ![Panel runner](docs/presentation-assets/07-panel-runner.png) | ![Panel admin](docs/presentation-assets/08-panel-admin.png) |
+| ![Panel admin](docs/presentation-assets/08-panel-admin.png) | ![Home catálogo multi-ciudad](docs/presentation-assets/01b-home-catalogo-recorte.png) |
+
+La captura panorámica completa del catálogo sigue disponible en [`docs/presentation-assets/01-home-catalogo.png`](docs/presentation-assets/01-home-catalogo.png).
 
 ## Descripción general
 
