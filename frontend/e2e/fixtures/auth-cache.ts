@@ -7,6 +7,7 @@ export type DemoRoleName =
   | 'provider2'
   | 'runner'
   | 'runner2'
+  | 'runnerSevilla'
   | 'user'
   | 'user2';
 

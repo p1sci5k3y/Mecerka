@@ -12,6 +12,9 @@
     "test:cov": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test --config=e2e.config.mjs",
+    "test:e2e:presentation": "playwright test --config=e2e.presentation-demo.config.mjs e2e/presentation-slides.spec.ts",
+    "test:e2e:presentation:local": "playwright test --config=e2e.presentation.config.mjs e2e/presentation-slides.spec.ts",
+    "test:e2e:presentation:demo": "playwright test --config=e2e.presentation-demo.config.mjs e2e/presentation-slides.spec.ts",
     "test:e2e:full": "node scripts/test-e2e-full.mjs"
   },
   "dependencies": {

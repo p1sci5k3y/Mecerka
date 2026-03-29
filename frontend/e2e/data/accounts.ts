@@ -1,3 +1,8 @@
+import path from 'node:path';
+import { loadTestEnv } from '../load-test-env.mjs';
+
+loadTestEnv(path.resolve(__dirname, '../..'));
+
 export const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? 'DemoPass123!';
 export const BOOTSTRAP_ADMIN_EMAIL = resolveAllowedNonProdEmail(
   'E2E_BOOTSTRAP_ADMIN_EMAIL',
@@ -39,6 +44,10 @@ const demoRunner2Email = resolveDemoEmail(
   'DEMO_RUNNER2_EMAIL',
   'runner2.demo@local.test',
 );
+const demoRunnerSevillaEmail = resolveDemoEmail(
+  'DEMO_RUNNER_SEVILLA_EMAIL',
+  'sevilla.runner.demo@local.test',
+);
 const demoUser2Email = resolveDemoEmail('DEMO_USER2_EMAIL', 'user2.demo@local.test');
 export const accounts = {
   admin: {
@@ -66,6 +75,11 @@ export const accounts = {
   },
   runner2: {
     email: demoRunner2Email,
+    password: DEMO_PASSWORD,
+    label: 'RUNNER',
+  },
+  runnerSevilla: {
+    email: demoRunnerSevillaEmail,
     password: DEMO_PASSWORD,
     label: 'RUNNER',
   },

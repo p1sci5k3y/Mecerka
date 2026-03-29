@@ -2,11 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { loadTestEnv } from '../load-test-env.mjs';
-import {
-  accounts,
-  BOOTSTRAP_ADMIN_EMAIL,
-  BOOTSTRAP_ADMIN_PASSWORD,
-} from '../data/accounts';
+import { accounts } from '../data/accounts';
 
 const BACKEND_URL = 'http://localhost:3000';
 const FRONTEND_URL = 'http://localhost:3001';
@@ -82,23 +78,6 @@ async function apiLogin(email: string, password: string): Promise<LoginResult> {
   throw new Error(`Login failed for ${email}: retry budget exhausted`);
 }
 
-async function resetDemoOnce(bootstrapToken: string) {
-  const response = await fetch(`${BACKEND_URL}/demo/reset`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      Authorization: `Bearer ${bootstrapToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Demo reset failed: ${response.status} ${await response.text()}`,
-    );
-  }
-  await sleep(500);
-}
-
 function buildStorageState(cookieValue: string) {
   return {
     cookies: [
@@ -122,44 +101,75 @@ function buildStorageState(cookieValue: string) {
   };
 }
 
-export default async function globalSetup() {
-  loadTestEnv(path.resolve(__dirname, '../..'));
-  const scriptPath = path.resolve(
-    __dirname,
-    '../../../backend/seed-e2e-admin.js',
-  );
-  const demoAccountsScriptPath = path.resolve(
-    __dirname,
-    '../../../backend/seed-e2e-demo-accounts.js',
-  );
-  const env = { ...process.env };
-  const authDir = path.resolve(process.cwd(), 'test-results', '.auth');
-
-  if (!env.DATABASE_URL || env.DATABASE_URL.includes('@postgres:')) {
-    env.DATABASE_URL =
-      'postgresql://postgres:change_me@localhost:5432/marketplace';
+async function waitForDemoAccounts() {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      await apiLogin(accounts.admin.email, accounts.admin.password);
+      return;
+    } catch {
+      await sleep(1000);
+    }
   }
 
-  execFileSync('node', [scriptPath], {
+  throw new Error('Demo accounts were not ready for presentation auth setup');
+}
+
+export default async function presentationGlobalSetup() {
+  loadTestEnv(path.resolve(__dirname, '../..'));
+
+  const workspaceRoot = path.resolve(__dirname, '../../..');
+  const backendRoot = path.resolve(__dirname, '../../../backend');
+  const authDir = path.resolve(process.cwd(), 'test-results', '.auth');
+  const databaseUrl =
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:change_me@localhost:5432/marketplace';
+  const baseEnv = {
+    ...process.env,
+    DATABASE_URL: databaseUrl,
+  };
+
+  execFileSync(path.resolve(backendRoot, 'node_modules/.bin/prisma'), [
+    'migrate',
+    'deploy',
+  ], {
     stdio: 'inherit',
-    cwd: path.resolve(__dirname, '../../..'),
-    env,
+    cwd: backendRoot,
+    env: baseEnv,
   });
 
-  const bootstrapLogin = await apiLogin(
-    BOOTSTRAP_ADMIN_EMAIL,
-    BOOTSTRAP_ADMIN_PASSWORD,
-  );
-  await resetDemoOnce(bootstrapLogin.accessToken);
-
-  execFileSync('node', [demoAccountsScriptPath], {
-    stdio: 'inherit',
-    cwd: path.resolve(__dirname, '../../..'),
-    env: {
-      ...env,
-      E2E_DEMO_PASSWORD: accounts.admin.password,
+  execFileSync(
+    'node',
+    [path.resolve(__dirname, '../../../backend/seed-e2e-admin.js')],
+    {
+      stdio: 'inherit',
+      cwd: workspaceRoot,
+      env: baseEnv,
     },
-  });
+  );
+
+  execFileSync(
+    'node',
+    [path.resolve(__dirname, '../../../backend/seed-e2e-demo-dataset.js')],
+    {
+      stdio: 'inherit',
+      cwd: backendRoot,
+      env: baseEnv,
+    },
+  );
+
+  execFileSync(
+    'node',
+    [path.resolve(__dirname, '../../../backend/seed-e2e-demo-accounts.js')],
+    {
+      stdio: 'inherit',
+      cwd: workspaceRoot,
+      env: {
+        ...baseEnv,
+        E2E_DEMO_PASSWORD: accounts.admin.password,
+      },
+    },
+  );
+  await waitForDemoAccounts();
 
   await rm(authDir, { recursive: true, force: true });
   await mkdir(authDir, { recursive: true });

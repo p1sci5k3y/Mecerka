@@ -37,6 +37,10 @@ const config = {
           env: {
             ...process.env,
             PORT: '3000',
+            E2E: 'true',
+            DATABASE_URL:
+              process.env.DATABASE_URL ??
+              'postgresql://postgres:change_me@localhost:5432/marketplace',
             FRONTEND_URL: 'http://localhost:3001',
             DEMO_PASSWORD: process.env.DEMO_PASSWORD ?? 'DemoPass123!',
             STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? 'sk_test_dummy',
