@@ -23,7 +23,9 @@
   - `valencia.runner.demo@local.test / DemoPass123!`
   - `sevilla.runner.demo@local.test / DemoPass123!`
   - `bilbao.runner.demo@local.test / DemoPass123!`
-- Slides: [Pendiente: URL de trabajo o edición de las slides]
+- Presentación TFM:
+  - release: [Presentación](https://github.com/p1sci5k3y/Mecerka/releases/tag/Presentacion)
+  - descarga PPTX: [Mecerka_Presentation.pptx](https://github.com/p1sci5k3y/Mecerka/releases/download/Presentacion/Mecerka_Presentation.pptx)
 
 
 ## Descripción general
