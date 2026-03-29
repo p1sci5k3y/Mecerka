@@ -115,4 +115,4 @@ Public disclosure is permitted only after:
 Project Maintainer:  
 Mecerka Security Team  
 
-Contact: pisciskey@protonmail.com
+Contact: suppor@mecerka.me
